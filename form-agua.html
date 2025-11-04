@@ -6,7 +6,9 @@
 <style>
 body { font-family: Arial; padding:20px; max-width:600px; margin:auto; }
 input, textarea { width:100%; padding:8px; margin:8px 0; }
-button { padding:10px; cursor:pointer; }
+button { padding:10px; cursor:pointer; margin:5px 0; }
+ul { padding:0; list-style:none; }
+li { margin:5px 0; }
 </style>
 </head>
 <body>
@@ -24,37 +26,41 @@ button { padding:10px; cursor:pointer; }
 <textarea name="obs"></textarea>
 
 <button onclick="guardar()">💾 Guardar datos</button>
-<label>Adjuntar archivo (planos, fotos, PDF):</label>
-<input type="file" id="fileInput">
+<button onclick="location.href='menu.html'">⬅️ Volver</button>
 
+<hr><br>
+
+<h3>Adjuntar archivos</h3>
+
+<input type="file" id="fileInput">
 <button onclick="guardarArchivo()">📎 Guardar archivo</button>
 
+<h4>Archivos cargados:</h4>
 <ul id="fileList"></ul>
-
-<button onclick="location.href='menu.html'">⬅️ Volver</button>
 
 <script>
 if(!sessionStorage.getItem('usuario')) location.href="index.html";
 
-// ✅ Guardar datos
+// ✅ Guardar datos texto
 function guardar() {
     const usuario = sessionStorage.getItem('usuario');
     const modulo = window.location.pathname.split('/').pop().replace('.html','');
     const datos = {};
-    document.querySelectorAll("input, textarea").forEach(el => datos[el.name] = el.value);
+    document.querySelectorAll("input[name], textarea[name]").forEach(el => datos[el.name] = el.value);
 
     localStorage.setItem(usuario + "_" + modulo, JSON.stringify(datos));
     marcarCompleto(modulo);
     alert("✅ Datos guardados");
 }
 
+// ✅ marcar módulo completado
 function marcarCompleto(modulo) {
     let e = JSON.parse(localStorage.getItem("estado_" + sessionStorage.getItem('usuario'))) || {};
     e[modulo] = "completo";
     localStorage.setItem("estado_" + sessionStorage.getItem('usuario'), JSON.stringify(e));
 }
 
-// ✅ guardar archivo en localStorage en base64
+// ✅ guardar archivo en base64
 function guardarArchivo() {
     const usuario = sessionStorage.getItem('usuario');
     const modulo = window.location.pathname.split('/').pop().replace('.html','');
@@ -73,18 +79,18 @@ function guardarArchivo() {
     reader.readAsDataURL(input);
 }
 
-// ✅ mostrar archivos
+// ✅ listar archivos
 function mostrarArchivos() {
     const usuario = sessionStorage.getItem('usuario');
     const modulo = window.location.pathname.split('/').pop().replace('.html','');
     const archivos = JSON.parse(localStorage.getItem(usuario + "_" + modulo + "_files")) || [];
     const lista = document.getElementById("fileList");
-
     lista.innerHTML = "";
+
     archivos.forEach((f, i) => {
         const li = document.createElement("li");
         li.innerHTML = `${f.nombre} 
-            <button onclick="descargarArchivo(${i})">⬇️</button>`;
+            <button onclick="descargarArchivo(${i})">⬇️ Descargar</button>`;
         lista.appendChild(li);
     });
 }
@@ -103,7 +109,6 @@ function descargarArchivo(i) {
 }
 
 mostrarArchivos();
-
 </script>
 
 </body>
