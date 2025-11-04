@@ -24,6 +24,9 @@ li { margin: 5px 0; }
 
 <p id="mensaje" style="color:green;"></p>
 
+<!-- Librería jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script>
 // Sesión
 const usuario = localStorage.getItem("usuarioActual");
@@ -42,7 +45,6 @@ document.getElementById("archivoInput").addEventListener("change", function(e) {
     archivos.push(file);
   }
   mostrarArchivos();
-  // limpiar input para permitir volver a añadir el mismo archivo si se quiere
   e.target.value = "";
 });
 
@@ -65,43 +67,61 @@ function mostrarArchivos() {
   });
 }
 
-// Botón firmar y enviar
-document.getElementById("firmarBtn").addEventListener("click", function() {
+// Firmar y enviar
+document.getElementById("firmarBtn").addEventListener("click", async function() {
   if (archivos.length === 0) {
     alert("No hay archivos adjuntos");
     return;
   }
 
   const formData = new FormData();
-  formData.append("usuario", localStorage.getItem("usuarioActual"));
+  formData.append("usuario", usuario);
   archivos.forEach((f,i) => formData.append(`archivo${i}`, f));
 
-  fetch("https://formspree.io/f/movporjk", {  // <--- reemplaza XXXX con tu endpoint
-    method: "POST",
-    body: formData
-  })
-  .then(res => {
-    if(res.ok){
-      document.getElementById("mensaje").textContent = "Formulario firmado y enviado correctamente";
-      archivos = [];
-      mostrarArchivos();
-    } else {
-      throw new Error("Error en el envío");
-    }
-  })
-  .catch(err => {
+  try {
+    const res = await fetch("https://formspree.io/f/movporjk", { // <--- reemplaza XXXX por tu endpoint
+      method: "POST",
+      body: formData
+    });
+
+    if (!res.ok) throw new Error("Error en el envío");
+
+    document.getElementById("mensaje").textContent = "Formulario firmado y enviado correctamente";
+
+    // Generar resguardo PDF
+    generarResguardoPDF();
+
+    // Limpiar archivos
+    archivos = [];
+    mostrarArchivos();
+  } catch (err) {
     console.error(err);
     alert("No se pudo enviar el formulario");
+  }
+});
+
+// Generar resguardo en PDF
+function generarResguardoPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const fecha = new Date().toLocaleString();
+
+  doc.setFontSize(16);
+  doc.text("Resguardo Formulario EIEL", 10, 10);
+  doc.setFontSize(12);
+  doc.text(`Fecha: ${fecha}`, 10, 20);
+  doc.text(`Municipio: ${usuario}`, 10, 30);
+
+  let y = 40;
+  doc.text("Archivos adjuntos:", 10, y);
+  y += 10;
+  archivos.forEach(f => {
+    doc.text(f.name, 15, y);
+    y += 10;
   });
-});
 
-
-  // Aquí simularíamos envío, por ejemplo:
-  console.log("Archivos enviados:", archivos);
-  archivos = [];
-  mostrarArchivos();
-  document.getElementById("mensaje").textContent = "Archivos firmados y enviados correctamente";
-});
+  doc.save(`resguardo_${usuario}_${Date.now()}.pdf`);
+}
 
 function cerrarSesion() {
   localStorage.removeItem("usuarioActual");
