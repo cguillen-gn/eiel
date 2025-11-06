@@ -2,160 +2,153 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Formulario Agua</title>
+<title>Formulario Agua - EIEL</title>
 <style>
-body { font-family: Arial; padding: 20px; background: #f2f2f2; }
-.container { max-width: 600px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}
-input, button { width: 100%; padding: 8px; margin: 5px 0; }
-button { cursor: pointer; }
-.file-list { margin: 10px 0; }
-.file-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-.file-item span { flex: 1; }
-.file-item button { background: red; color: white; border: none; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
-#mensaje { margin-top: 10px; font-weight: bold; }
+body { font-family: Arial; padding: 16px; background:#f7f7f7; }
+.container {
+  background: white; padding: 20px; border-radius: 8px;
+  max-width: 800px; margin: auto; box-shadow:0 2px 10px rgba(0,0,0,0.1);
+}
+input, button {
+  padding:10px; margin:8px 0; width:100%; max-width:350px;
+}
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+table td, table th {
+  border:1px solid #ccc; padding:8px; text-align:center;
+}
+.file-list { margin-top:8px; }
+.file-item { background:#eee; padding:6px; margin:3px 0; border-radius:4px; display:flex; justify-content:space-between; }
+button { cursor:pointer; background:#1976d2; color:white; border:none; border-radius:5px; }
+button:hover { background:#145a9c; }
+#mensaje { font-weight:bold; margin-top:10px; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
+
 <body>
-
 <div class="container">
-  <h2>Formulario Agua</h2>
-  <p>Municipio: <span id="usuario"></span></p>
 
-  <div id="depositos"></div>
+<h2>Formulario — Agua</h2>
+<p>Municipio: <span id="muniName"></span></p>
 
-  <input type="file" id="adjuntar" multiple>
-  <div class="file-list" id="fileList"></div>
+<table>
+<thead>
+<tr><th>Depósito</th><th>Última limpieza</th></tr>
+</thead>
+<tbody id="tablaDepositos"></tbody>
+</table>
 
-  <button id="firmarBtn">Firmar y enviar</button>
-  <div id="mensaje"></div>
+<h3>Adjuntar archivos</h3>
+<input type="file" id="fileInput" multiple>
+<div id="fileList" class="file-list"></div>
+
+<button id="firmarBtn">Firmar y enviar</button>
+<div id="mensaje"></div>
 </div>
 
 <script>
-// Evitar acceso sin login
-const usuario = localStorage.getItem("usuarioActual");
-if(!usuario) window.location.href = "login.html";
-document.getElementById("usuario").textContent = usuario;
+// ------------------------
+// CONFIG
+// ------------------------
+const URL_DRIVE = "https://script.google.com/macros/s/AKfycbwfTVUs-72HueT5TXYEewnsSe8DYKWXxHgsK79ZOpsNi4bMyVM1Y0XJ4Btg1nuPXLvcPw/exec";
+const URL_GOOGLE_FORMS = "https://docs.google.com/forms/u/0/d/e/FORM_ID_HERE/formResponse"; // 🔁 CAMBIA FORM_ID
 
-// JSON de ejemplo de depósitos
-const depositosData = [
-  {nombre: "Depósito Central"},
-  {nombre: "Depósito Norte"},
-  {nombre: "Depósito Sur"}
+let municipio = localStorage.getItem("usuarioActual") || "";
+document.getElementById("muniName").textContent = municipio;
+
+// ------------------------
+// DEPOSITOS — DE EJEMPLO
+// (luego los cargarás desde PostgreSQL)
+// ------------------------
+let depositos = [
+  { nombre:"Depósito Alto", fecha:"" },
+  { nombre:"Depósito Centro", fecha:"" },
+  { nombre:"Depósito Sur", fecha:"" }
 ];
 
-// Generar formulario dinámicamente
-const depositosDiv = document.getElementById("depositos");
-depositosData.forEach((dep,i)=>{
-  const div = document.createElement("div");
-  div.innerHTML = `
-    <label>${dep.nombre} - Última limpieza:</label>
-    <input type="date" id="fecha_${i}">
-  `;
-  depositosDiv.appendChild(div);
-});
-
-// Archivos adjuntos
-let archivos = [];
-const adjuntarInput = document.getElementById("adjuntar");
-const fileListDiv = document.getElementById("fileList");
-
-adjuntarInput.addEventListener("change", (e)=>{
-  for(const f of e.target.files){
-    archivos.push(f);
-  }
-  mostrarArchivos();
-});
-
-function mostrarArchivos(){
-  fileListDiv.innerHTML = "";
-  archivos.forEach((f,i)=>{
-    const div = document.createElement("div");
-    div.className = "file-item";
-    div.innerHTML = `<span>${f.name}</span><button onclick="quitarArchivo(${i})">X</button>`;
-    fileListDiv.appendChild(div);
+// Pintar tabla
+function pintarTabla(){
+  let html = "";
+  depositos.forEach((d,i)=>{
+    html += `<tr>
+      <td>${d.nombre}</td>
+      <td><input type="date" onchange="cambiarFecha(${i},this.value)" value="${d.fecha}"></td>
+    </tr>`;
   });
+  document.getElementById("tablaDepositos").innerHTML = html;
+}
+pintarTabla();
+
+function cambiarFecha(i, val){
+  depositos[i].fecha = val;
 }
 
-function quitarArchivo(index){
-  archivos.splice(index,1);
-  mostrarArchivos();
-}
+// ------------------------
+// ARCHIVOS
+// ------------------------
+let archivos = [];
+const input = document.getElementById("fileInput");
+const fileList = document.getElementById("fileList");
 
-// Configuración Google Drive Web App
-const URL_DRIVE = "https://script.google.com/macros/s/AKfycbwRZ4qYYIwZZbrZIlmdaCE7vjxqDmKum28oQsq4fjdb4af5Q6Upv6lBQB0sc5KxIdW-0w/exec"; // reemplazar con la URL de tu Apps Script
-
-// Configuración Google Forms (solo nombres y fechas)
-const URL_FORM = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/viewform?usp=header";
-const FORM_ENTRIES = {
-  municipio: "entry.960913048", // cambiar a entry correcto
-  depositos: depositosData.map((d,i)=>`entry.312379068${i}`),
-  archivos: "entry.1907656835"
+input.onchange = ()=>{
+  archivos = Array.from(input.files);
+  renderArchivos();
 };
 
-// Función generar PDF
-function generarPDF(){
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  const fechaEnvio = new Date().toLocaleString();
-  doc.setFontSize(16);
-  doc.text("Resguardo Formulario EIEL", 10, 10);
-  doc.setFontSize(12);
-  doc.text(`Fecha: ${fechaEnvio}`, 10, 20);
-  doc.text(`Municipio: ${usuario}`, 10, 30);
-  let y=40;
-  doc.text("Depósitos y última limpieza:",10,y);
-  y+=10;
-  depositosData.forEach((d,i)=>{
-    const val = document.getElementById(`fecha_${i}`).value || "No registrada";
-    doc.text(`${d.nombre}: ${val}`,15,y);
-    y+=10;
-  });
-  if(archivos.length>0){
-    doc.text("Archivos adjuntos:",10,y);
-    y+=10;
-    archivos.forEach(f=>{doc.text(f.name,15,y); y+=10;});
-  }
-  doc.save(`resguardo_${usuario}_${Date.now()}.pdf`);
+function eliminarArchivo(i){
+  archivos.splice(i,1);
+  renderArchivos();
 }
 
-// Botón firmar y enviar
-document.getElementById("firmarBtn").addEventListener("click", async()=>{
-  document.getElementById("mensaje").textContent = "";
+function renderArchivos(){
+  fileList.innerHTML = archivos.map((f,i)=>`
+    <div class="file-item">
+      ${f.name}
+      <button style="width:30px;background:#b71c1c" onclick="eliminarArchivo(${i})">X</button>
+    </div>
+  `).join("");
+}
 
-  // 1️⃣ Subir archivos a Drive
+// ------------------------
+// ENVIAR
+// ------------------------
+document.getElementById("firmarBtn").addEventListener("click", async()=>{
+
+  document.getElementById("mensaje").textContent = "Procesando...";
+
+  // ✅ 1. Subir archivos a Drive vía Apps Script
   if(archivos.length>0){
     const fd = new FormData();
     archivos.forEach((f,i)=>fd.append("file"+i,f));
+    fd.append("municipio", municipio);
+
     try{
-      await fetch(URL_DRIVE,{method:"POST", body: fd});
+      await fetch(URL_DRIVE,{ method:"POST", body: fd });
     }catch(err){
+      document.getElementById("mensaje").textContent = "❌ Error subiendo archivos a Drive";
       console.error(err);
-      document.getElementById("mensaje").textContent="Error subiendo archivos a Drive";
       return;
     }
   }
 
-  // 2️⃣ Generar PDF local
-  generarPDF();
-
-  // 3️⃣ Enviar datos resumidos a Google Forms
-  const fdForm = new FormData();
-  fdForm.append(FORM_ENTRIES.municipio, usuario);
-  depositosData.forEach((d,i)=>{
-    const val = document.getElementById(`fecha_${i}`).value || "";
-    fdForm.append(FORM_ENTRIES.depositos[i], val);
-  });
-  const nombresArchivos = archivos.map(f=>f.name).join(", ");
-  fdForm.append(FORM_ENTRIES.archivos,nombresArchivos);
+  // ✅ 2. Enviar datos a Google Forms
+  const formData = new FormData();
+  formData.append("entry.960913048", municipio);
+  formData.append("entry.312379068", JSON.stringify(depositos));
+  formData.append("entry.1907656835", archivos.map(a=>a.name).join(", "));
 
   try{
-    await fetch(URL_FORM,{method:"POST", mode:"no-cors", body:fdForm});
-  }catch(err){console.warn("No se pudo enviar a Forms, pero PDF y Drive OK");}
+    await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
+  }catch(err){
+    document.getElementById("mensaje").textContent = "❌ Error enviando datos a Google Forms";
+    console.error(err);
+    return;
+  }
 
-  archivos = [];
-  mostrarArchivos();
-  document.getElementById("mensaje").textContent="Formulario firmado y enviado correctamente";
+  // ✅ 3. Confirmación
+  document.getElementById("mensaje").textContent = "✅ Datos enviados correctamente";
+
+  // ✅ 4. Descargar PDF local (si ya tienes esta función)
+  if(typeof generarPDFResumen === "function"){ generarPDFResumen(); }
 });
 </script>
 
