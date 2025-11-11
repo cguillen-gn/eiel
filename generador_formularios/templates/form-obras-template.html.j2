@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Formulario Obras - {{ muni_display }}</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f4f4;
+  padding: 20px;
+}
+.container {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 900px;
+  margin: auto;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+table th, table td {
+  padding: 10px;
+  border: 1px solid #ccc;
+}
+th {
+  background: #eee;
+}
+select, input[type="checkbox"] {
+  font-size: 14px;
+}
+button {
+  padding: 12px;
+  font-size: 16px;
+  margin-top: 20px;
+  width: 100%;
+  background: #1976d2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover {
+  background: #125ea3;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>Formulario de Obras - {{ muni_display }} ({{ muni_code }})</h2>
+
+<form id="frmObras">
+
+<table>
+<thead>
+<tr>
+  <th>Obra</th>
+  <th>Plan</th>
+  <th>Estado obra</th>
+  <th>Adjunta Proyecto</th>
+</tr>
+</thead>
+
+<tbody>
+{% for o in obras %}
+<tr>
+  <td>{{ o.nombre }}</td>
+  <td>{{ o.plan_obra }}</td>
+
+  <td>
+    {% if o.cond == 1 %}
+      <select name="estado_{{ loop.index }}">
+        <option value="">-- Seleccione --</option>
+        <option>No iniciada</option>
+        <option>En ejecución</option>
+        <option>Paralizada</option>
+        <option>Finalizada</option>
+        <option>Anulada</option>
+      </select>
+    {% elif o.cond == 2 %}
+      Finalizada
+    {% else %}
+      -
+    {% endif %}
+  </td>
+
+  <td>
+    {% if o.cond in [1,2] %}
+        <button type="button" onclick="subirAdjunto('{{ muni_code }}', '{{ o.orden }}')">Adjuntar</button>
+    {% else %}
+        -
+    {% endif %}
+    </td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+<button type="submit">Enviar</button>
+</form>
+
+</div>
+
+<script>
+async function subirAdjunto(mun, obra) {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.multiple = true;
+  fileInput.accept = "*/*";
+
+  fileInput.onchange = async () => {
+    const files = fileInput.files;
+    if (!files.length) return;
+
+    const formData = new FormData();
+    formData.append("mun", mun);
+    formData.append("obra", obra);
+
+    for (let f of files) {
+      formData.append("file" + f.name, f);
+    }
+
+    const resp = await fetch("TU_URL_SCRIPT/exec", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await resp.json();
+    if (data.status === "ok") {
+      alert("✅ Archivos subidos correctamente");
+    } else {
+      alert("❌ Error subiendo archivos");
+    }
+  };
+
+  fileInput.click();
+}
+</script>
+
+
+</body>
+</html>
