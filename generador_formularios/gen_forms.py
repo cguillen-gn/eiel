@@ -27,7 +27,7 @@ URL_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8j
 # ---------------- END CONFIG -----------------------------------
 
 env = Environment(
-    loader=FileSystemLoader(TEMPLATE_DIR),
+    loader=FileSystemLoader(TEMPLATE_DIR, encoding="utf-8"),
     autoescape=select_autoescape(['html','xml'])
 )
 template_agua = env.get_template(TEMPLATE_AGUA)
@@ -43,7 +43,7 @@ def cargar_mapado_municipios(path):
     d = {}
     if not os.path.exists(path):
         return d
-    with open(path, "r", encoding="utf-8") as fh:
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
             line=line.strip()
             if not line or line.startswith("#"): continue

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -64,10 +64,10 @@ let depositos = [{"nombre": "DEPOSITO SANTA POLA 2 FARO (MCT)", "limpieza": "200
 function pintarTabla(){
   let html = "";
   depositos.forEach((d,i)=>{
-    html += `<tr>
+    html += '<tr>
       <td>${d.nombre}</td>
       <td><input type="date" onchange="cambiarFecha(${i},this.value)" value="${d.limpieza || ''}"></td>
-    </tr>`;
+    </tr>';
   });
   document.getElementById("tablaDepositos").innerHTML = html;
 }
@@ -86,69 +86,88 @@ const fileList = document.getElementById("fileList");
 input.onchange = ()=>{ archivos = Array.from(input.files); renderArchivos(); };
 function eliminarArchivo(i){ archivos.splice(i,1); renderArchivos(); }
 function renderArchivos(){
-  fileList.innerHTML = archivos.map((f,i)=>`
+  fileList.innerHTML = archivos.map((f,i)=>'
     <div class="file-item">
       ${f.name}
       <button style="width:30px;background:#b71c1c" onclick="eliminarArchivo(${i})">X</button>
     </div>
-  `).join("");
+  ').join("");
 }
 
 // ------------------------
-// SUBIR ARCHIVOS A DRIVE (tu método)
-async function subirArchivosADrive() {
-  if (archivos.length === 0) return true;
+// ARCHIVOS — igual estilo que Obras + botón borrar
+// ------------------------
+let archivos = [];
+const input = document.getElementById("fileInput");
+const fileList = document.getElementById("fileList");
 
-  const promises = archivos.map((file, index) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve({
-      index,
-      data: e.target.result.split(',')[1],
-      name: file.name,
-      type: file.type
-    });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  }));
+input.onchange = () => {
+  archivos.push(...Array.from(input.files));
+  renderArchivos();
+};
 
-  const archivosBase64 = await Promise.all(promises);
-  const datos = { municipio: municipio };
-  archivosBase64.forEach((a) => {
-    datos[`file${a.index}`] = a.data;
-    datos[`file${a.index}_name`] = a.name;
-    datos[`file${a.index}_type`] = a.type;
+function eliminarArchivo(i) {
+  archivos.splice(i, 1);
+  renderArchivos();
+}
+
+function renderArchivos() {
+  fileList.innerHTML = archivos
+    .map((f, i) => `
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
+        <span>📎 ${f.name}</span>
+        <button 
+          type="button" 
+          onclick="eliminarArchivo(${i})"
+          style="background:#b71c1c; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;"
+        >
+          X
+        </button>
+      </div>
+    `)
+    .join("");
+}
+
+async function subirArchivos() {
+  if (!archivos.length) return true;
+
+  const formData = new FormData();
+  formData.append("tipo", "agua");
+  formData.append("mun", municipio);
+
+  archivos.forEach((f, idx) => {
+    formData.append(`file${idx}`, f);
   });
 
-  const formBody = Object.keys(datos).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(datos[k])).join('&');
-
-  const response = await fetch(URL_DRIVE, {
-    method: "POST",
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: formBody
-  });
-
-  // Asumimos JSON de respuesta con {status:"ok", archivosSubidos: N}
   try {
-    const resultado = await response.json();
-    return resultado.status === "ok";
-  } catch(e) {
-    // fallback: si no devuelve JSON, consideralo ok (dependiendo de tu Apps Script)
-    return true;
+    const resp = await fetch("https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await resp.json();
+    return data.status === "ok";
+  } catch (e) {
+    return false;
   }
 }
+
 
 // ------------------------
 // ENVIAR
 document.getElementById("firmarBtn").addEventListener("click", async () => {
   document.getElementById("mensaje").textContent = "Procesando...";
-  const driveOk = await subirArchivosADrive();
-  if (!driveOk) { document.getElementById("mensaje").textContent = "❌ Error subiendo archivos a Drive"; return; }
+  const driveOk = await subirArchivos();
+    if (!driveOk) {
+      document.getElementById("mensaje").textContent = "❌ Error subiendo archivos";
+      return;
+    }
 
   // enviar resumen a Google Forms
   const formData = new FormData();
   formData.append("entry.960913048", municipioNombre);
   formData.append("entry.312379068", JSON.stringify(depositos));
-  formData.append("entry.1907656835", archivos.map(a=>a.name).join(", "));
+  formData.append("entry.1907656835", archivos.map(a=>a.name).join("\n"));
 
   await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
 
