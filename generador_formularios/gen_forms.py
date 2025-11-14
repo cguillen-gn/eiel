@@ -22,8 +22,8 @@ OUT_DIR = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo\formularios
 MUNICIPIOS_TSV = "municipios.tsv"
 
 # Opcional: URLs que se inyectarán en la plantilla (deja en blanco o pon las tuyas)
-URL_DRIVE = "https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec"
-URL_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec"
+URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
 # ---------------- END CONFIG -----------------------------------
 
 env = Environment(
@@ -34,10 +34,11 @@ template_agua = env.get_template(TEMPLATE_AGUA)
 template_obras = env.get_template(TEMPLATE_OBRAS)
 
 def conectar():
-    return psycopg2.connect(
+    conn = psycopg2.connect(
         host=DB["host"], port=DB["port"], dbname=DB["dbname"],
-        user=DB["user"], password=DB["password"]
+        user=DB["user"], password=DB["password"], client_encoding='UTF8'
     )
+    return conn
 
 def cargar_mapado_municipios(path):
     d = {}
@@ -55,83 +56,96 @@ def cargar_mapado_municipios(path):
     return d
 
 def obtener_municipios(conn):
-    cur = conn.cursor()
-    # Obtenemos los códigos de municipios presentes en deposito_enc (fase último)
-    cur.execute("""
-        SELECT DISTINCT mun
-        FROM municipio
-        WHERE fase = (SELECT max(fase) FROM geonet_fase) and prov = '03'
-        ORDER BY mun;
-    """)
-    rows = cur.fetchall()
-    cur.close()
-    return [r[0] for r in rows]
+    try:
+        cur = conn.cursor()
+        # Obtenemos los códigos de municipios presentes en deposito_enc (fase último)
+        cur.execute("""
+            SELECT DISTINCT mun
+            FROM municipio
+            WHERE fase = (SELECT max(fase) FROM geonet_fase) and prov = '03'
+            ORDER BY mun;
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        return [r[0] for r in rows]
+    except psycopg2.Error as e:
+        print(f"❌ Error BD en municipio {mun}: {e}")
+        return []  # Devolver lista vacía si falla
 
 def obtener_depositos(conn, mun):
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("""
-        SELECT d.mun, d.orden_depo, d.nombre, de.limpieza
-        FROM deposito d
-        LEFT JOIN deposito_enc de USING (fase, mun, orden_depo)
-        WHERE d.fase = (SELECT max(fase) FROM geonet_fase) AND d.mun = %s
-        ORDER BY d.orden_depo;
-    """, (mun,))
-    rows = cur.fetchall()
-    cur.close()
-    # Convertir a lista de dicts con las claves que usa la plantilla
-    depositos = []
-    for r in rows:
-        depositos.append({
-            "nombre": r["nombre"] if r["nombre"] is not None else "",
-            "limpieza": str(r["limpieza"]) if r["limpieza"] is not None else ""
-        })
-    return depositos
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur.execute("""
+            SELECT d.mun, d.orden_depo, d.nombre, de.limpieza
+            FROM deposito d
+            LEFT JOIN deposito_enc de USING (fase, mun, orden_depo)
+            WHERE d.fase = (SELECT max(fase) FROM geonet_fase) AND d.mun = %s
+            ORDER BY d.orden_depo;
+        """, (mun,))
+        rows = cur.fetchall()
+        cur.close()
+        
+        depositos = []
+        for r in rows:
+            depositos.append({
+                "nombre": r["nombre"] if r["nombre"] is not None else "",
+                "limpieza": str(r["limpieza"]) if r["limpieza"] is not None else ""
+            })
+        return depositos
+        
+    except psycopg2.Error as e:
+        print(f"❌ Error BD en municipio {mun}: {e}")
+        return []  # Devolver lista vacía si falla
 
 def obtener_obras(conn, mun):
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    try:
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    # Condición 1
-    cur.execute("""
-        SELECT mun, orden, nombre, plan_obra, 1 as cond
-        FROM geonet_obras
-        WHERE fase = (SELECT max(fase) FROM geonet_fase) 
-        AND (estado IS NULL OR estado NOT IN ('FI','AN'))
-        AND (equipamientos IS NULL OR equipamientos = 'SI'
-            OR alumbrado IS NULL OR alumbrado = 'SI'
-            OR infra_viaria IS NULL OR infra_viaria = 'SI'
-            OR abastecimiento IS NULL OR abastecimiento = 'SI'
-            OR saneamiento IS NULL OR saneamiento = 'SI')
-        AND (proyecto IS NULL OR proyecto <> 'SI')
-        AND mun = %s
-    """, (mun,))
-    c1 = cur.fetchall()
+        # Condición 1
+        cur.execute("""
+            SELECT mun, orden, nombre, plan_obra, 1 as cond
+            FROM geonet_obras
+            WHERE fase = (SELECT max(fase) FROM geonet_fase) 
+            AND (estado IS NULL OR estado NOT IN ('FI','AN'))
+            AND (equipamientos IS NULL OR equipamientos = 'SI'
+                OR alumbrado IS NULL OR alumbrado = 'SI'
+                OR infra_viaria IS NULL OR infra_viaria = 'SI'
+                OR abastecimiento IS NULL OR abastecimiento = 'SI'
+                OR saneamiento IS NULL OR saneamiento = 'SI')
+            AND (proyecto IS NULL OR proyecto <> 'SI')
+            AND mun = %s
+        """, (mun,))
+        c1 = cur.fetchall()
 
-    # Condición 2
-    cur.execute("""
-        SELECT mun, orden, nombre, plan_obra, 2 as cond
-        FROM geonet_obras
-        WHERE fase = (SELECT max(fase) FROM geonet_fase) 
-        AND estado = 'FI'
-        AND (equipamientos IS NULL OR equipamientos = 'SI'
-            OR alumbrado IS NULL OR alumbrado = 'SI'
-            OR infra_viaria IS NULL OR infra_viaria = 'SI'
-            OR abastecimiento IS NULL OR abastecimiento = 'SI'
-            OR saneamiento IS NULL OR saneamiento = 'SI')
-        AND (proyecto IS NULL OR proyecto <> 'SI')
-        AND mun = %s
-    """, (mun,))
-    c2 = cur.fetchall()
-    cur.close()
+        # Condición 2
+        cur.execute("""
+            SELECT mun, orden, nombre, plan_obra, 2 as cond
+            FROM geonet_obras
+            WHERE fase = (SELECT max(fase) FROM geonet_fase) 
+            AND estado = 'FI'
+            AND (equipamientos IS NULL OR equipamientos = 'SI'
+                OR alumbrado IS NULL OR alumbrado = 'SI'
+                OR infra_viaria IS NULL OR infra_viaria = 'SI'
+                OR abastecimiento IS NULL OR abastecimiento = 'SI'
+                OR saneamiento IS NULL OR saneamiento = 'SI')
+            AND (proyecto IS NULL OR proyecto <> 'SI')
+            AND mun = %s
+        """, (mun,))
+        c2 = cur.fetchall()
+        cur.close()
 
-    obras = []
-    for r in (c1 + c2):
-        obras.append({
-            "nombre": r["nombre"],
-            "plan_obra": r["plan_obra"],
-            "cond": r["cond"]
-        })
-    return obras
-
+        obras = []
+        for r in (c1 + c2):
+            obras.append({
+                "nombre": r["nombre"],
+                "plan_obra": r["plan_obra"],
+                "cond": r["cond"]
+            })
+        return obras
+    
+    except psycopg2.Error as e:
+        print(f"❌ Error BD en municipio {mun}: {e}")
+        return []  # Devolver lista vacía si falla
 
     
 def asegurar_carpeta(path):
@@ -164,8 +178,8 @@ def main():
                 muni_code = mun_code,
                 muni_display = muni_display,
                 depositos_json = depositos_json,
-                url_drive = URL_DRIVE,
-                url_forms = URL_FORMS
+                url_apps_script = URL_APPS_SCRIPT,
+                url_google_forms = URL_GOOGLE_FORMS
             )
             
             fname_agua = f"agua_{mun_code}.html"
@@ -179,8 +193,8 @@ def main():
                 muni_display = muni_display,
                 obras = obras,
                 obras_json = obras_json,
-                url_drive = URL_DRIVE,
-                url_forms = URL_FORMS
+                url_apps_script = URL_APPS_SCRIPT,
+                url_google_forms = URL_GOOGLE_FORMS
             )
            
             fname_obras = f"obras_{mun_code}.html"

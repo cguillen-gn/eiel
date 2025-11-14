@@ -111,6 +111,12 @@ button:hover {
 
 <script>
 
+// ------------------------
+
+const URL_APPS_SCRIPT = "{{ url_apps_script }}"; 
+const URL_GOOGLE_FORMS = "{{ url_google_forms }}";
+
+
 let adjuntosObras = {};
 
 function renderAdjuntosObra(obra) {
@@ -139,8 +145,6 @@ function eliminarAdjunto(obra, index) {
   renderAdjuntosObra(obra);
 }
 
-
-
 async function subirAdjunto(mun, obra) {
   const fileInput = document.createElement("input");
   fileInput.type = "file";
@@ -155,6 +159,13 @@ async function subirAdjunto(mun, obra) {
     adjuntosObras[obra].push(...files);
     renderAdjuntosObra(obra);
 
+    // ← AÑADIR FEEDBACK VISUAL
+    const statusDiv = document.getElementById("adjuntos_" + obra);
+    const loading = document.createElement("div");
+    loading.textContent = "⏳ Subiendo archivos...";
+    loading.style.color = "orange";
+    statusDiv.appendChild(loading);
+
     const formData = new FormData();
     formData.append("tipo", "obra");
     formData.append("mun", mun);
@@ -163,20 +174,79 @@ async function subirAdjunto(mun, obra) {
     files.forEach((f, idx) => formData.append(`file${idx}`, f));
 
     try {
-      const resp = await fetch("https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec", {
+      const resp = await fetch(URL_APPS_SCRIPT, {  // ← Usar variable
         method: "POST",
         body: formData
       });
 
       const data = await resp.json();
-      if (data.status !== "ok") alert("❌ Error al subir archivo");
+      loading.remove();  // ← Quitar mensaje de carga
+      
+      if (data.status !== "ok") {
+        alert("❌ Error al subir archivo");
+      } else {
+        // ← MENSAJE DE ÉXITO
+        const success = document.createElement("div");
+        success.textContent = "✅ Archivos subidos correctamente";
+        success.style.color = "green";
+        statusDiv.appendChild(success);
+        setTimeout(() => success.remove(), 3000);  // Desaparece en 3s
+      }
     } catch(e) {
+      loading.remove();
       alert("❌ Error de conexión");
     }
   };
 
   fileInput.click();
 }
+
+
+// ------------------------
+// ENVIAR
+document.getElementById("frmObras").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  // Recopilar estados de las obras
+  const estados = [];
+  const form = e.target;
+  
+  {% for o in obras %}
+  {% if o.cond == 1 %}
+  const estado{{ loop.index }} = form.querySelector('[name="estado_{{ loop.index }}"]').value;
+  estados.push({
+    obra: "{{ o.nombre }}",
+    plan: "{{ o.plan_obra }}",
+    estado: estado{{ loop.index }},
+    archivos: (adjuntosObras["{{ loop.index }}"] || []).map(f => f.name)
+  });
+  {% elif o.cond == 2 %}
+  estados.push({
+    obra: "{{ o.nombre }}",
+    plan: "{{ o.plan_obra }}",
+    estado: "Finalizada",
+    archivos: (adjuntosObras["{{ loop.index }}"] || []).map(f => f.name)
+  });
+  {% endif %}
+  {% endfor %}
+
+  // Enviar a Google Forms
+  const formData = new FormData();
+  formData.append("entry.XXXXX", "{{ muni_display }}");  // ← Cambia XXXXX por tu entry ID
+  formData.append("entry.YYYYY", JSON.stringify(estados));  // ← Cambia YYYYY
+
+  try {
+    await fetch("URL_GOOGLE_FORMS", { 
+      method: "POST", 
+      body: formData, 
+      mode: "no-cors" 
+    });
+    alert("✅ Obras enviadas correctamente");
+  } catch(error) {
+    alert("❌ Error al enviar: " + error.message);
+  }
+});
+
 </script>
 </body>
 </html>
