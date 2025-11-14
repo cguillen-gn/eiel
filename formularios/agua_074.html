@@ -121,47 +121,45 @@ function renderArchivos() {
 async function subirArchivos() {
   if (!archivos.length) return true;
 
-  console.log("📤 Subiendo con iframe...");
-
   return new Promise((resolve) => {
-    // Crear formulario oculto
     const form = document.createElement("form");
     form.method = "POST";
     form.action = URL_APPS_SCRIPT;
     form.target = "upload-iframe";
+    form.enctype = "multipart/form-data";
     form.style.display = "none";
 
-    // Añadir parámetros
-    const tipoInput = document.createElement("input");
-    tipoInput.name = "tipo";
-    tipoInput.value = "agua";
-    form.appendChild(tipoInput);
+    // Parámetros requeridos
+    [
+      ["tipo", "agua"],
+      ["mun", municipio]
+    ].forEach(([name, value]) => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    });
 
-    const munInput = document.createElement("input");
-    munInput.name = "mun";
-    munInput.value = municipio;
-    form.appendChild(munInput);
+    // Crear un input file POR ARCHIVO
+    archivos.forEach((f, index) => {
+      const fakeInput = document.createElement("input");
+      fakeInput.type = "file";
+      fakeInput.name = `file${index}`;
 
-    // Crear FileList virtual para los archivos
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.name = "file0";
-    fileInput.multiple = true;
-    
-    // Transferir archivos (truco con DataTransfer)
-    const dt = new DataTransfer();
-    archivos.forEach(f => dt.items.add(f));
-    fileInput.files = dt.files;
-    
-    form.appendChild(fileInput);
+      const dt = new DataTransfer();
+      dt.items.add(f);
+      fakeInput.files = dt.files;
 
-    // Crear iframe oculto
+      form.appendChild(fakeInput);
+    });
+
+    // Crear iframe para recibir la respuesta
     const iframe = document.createElement("iframe");
     iframe.name = "upload-iframe";
     iframe.style.display = "none";
-    
-    iframe.onload = function() {
-      console.log("✅ Iframe cargado (subida completa)");
+
+    iframe.onload = () => {
       document.body.removeChild(form);
       document.body.removeChild(iframe);
       resolve(true);
@@ -169,8 +167,7 @@ async function subirArchivos() {
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
-    
-    console.log("🚀 Enviando formulario...");
+
     form.submit();
   });
 }
