@@ -49,9 +49,9 @@ button:hover { background:#145a9c; }
 
 <script>
 // ------------------------
-// CONFIG (ajusta si necesitas)
 
-const URL_GOOGLE_FORMS = "https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec";       
+const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec"; 
+const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
 // MUNICIPIO inyectado por el generador (código INE)
 let municipio = "069";
@@ -129,7 +129,7 @@ async function subirArchivos() {
 
   try {
     const resp = await fetch(
-      "https://script.google.com/macros/s/AKfycbyeAuUOpMdItcuR-pIsEqqLvgX2ygo4U-hOucMqlcoFMcuCSxeRo0u0vA8bhFLkm5e4Iw/exec",
+      URL_APPS_SCRIPT,
       { method: "POST", body: formData }
     );
     const data = await resp.json();
@@ -143,22 +143,33 @@ async function subirArchivos() {
 // ------------------------
 // ENVIAR
 document.getElementById("firmarBtn").addEventListener("click", async () => {
-  document.getElementById("mensaje").textContent = "Procesando...";
-  const driveOk = await subirArchivos();
+  try {
+    document.getElementById("mensaje").textContent = "⏳ Subiendo archivos...";
+    
+    const driveOk = await subirArchivos();
     if (!driveOk) {
       document.getElementById("mensaje").textContent = "❌ Error subiendo archivos";
       return;
     }
 
-  // enviar resumen a Google Forms
-  const formData = new FormData();
-  formData.append("entry.960913048", municipioNombre);
-  formData.append("entry.312379068", JSON.stringify(depositos));
-  formData.append("entry.1907656835", archivos.map(a=>a.name).join("\n"));
+    document.getElementById("mensaje").textContent = "⏳ Enviando datos...";
 
-  await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
+    const formData = new FormData();
+    formData.append("entry.960913048", municipioNombre);
+    formData.append("entry.312379068", JSON.stringify(depositos));
+    formData.append("entry.1907656835", archivos.map(a=>a.name).join("\n"));
 
-  document.getElementById("mensaje").textContent = "✅ Datos enviados correctamente";
+    await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
+
+    document.getElementById("mensaje").textContent = "✅ Datos enviados correctamente";
+    
+    // Opcional: limpiar formulario
+    archivos = [];
+    renderArchivos();
+    
+  } catch(error) {
+    document.getElementById("mensaje").textContent = "❌ Error: " + error.message;
+  }
 });
 
 // --- Control de acceso ---
@@ -172,7 +183,8 @@ if (!municipioLogin) {
 // Mostrar municipio arriba si hay etiqueta
 document.addEventListener("DOMContentLoaded", () => {
   const muniName = document.getElementById("muniName");
-  if (muniName) { muniName.textContent = municipioLogin; }
+  if (muniName) { 
+    muniName.textContent = localStorage.getItem("usuarioNombre") || municipioLogin;  }
 
   // Validar que el usuario coincide con el formulario
   const formMunicipio = "069"; // código del HTML
