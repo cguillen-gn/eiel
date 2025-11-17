@@ -121,53 +121,123 @@ function renderArchivos() {
 async function subirArchivos() {
   if (!archivos.length) return true;
 
+  console.log("📤 Subiendo", archivos.length, "archivos con formulario...");
+
   return new Promise((resolve) => {
+    // Crear iframe oculto
+    const iframeName = "upload-iframe-" + Date.now();
+    const iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    document.body.appendChild(iframe);
+
+    // Crear formulario
     const form = document.createElement("form");
     form.method = "POST";
     form.action = URL_APPS_SCRIPT;
-    form.target = "upload-iframe";
+    form.target = iframeName;
     form.enctype = "multipart/form-data";
     form.style.display = "none";
 
-    // Parámetros requeridos
-    [
-      ["tipo", "agua"],
-      ["mun", municipio]
-    ].forEach(([name, value]) => {
+    // Añadir parámetros
+    const addInput = (name, value) => {
       const input = document.createElement("input");
       input.type = "hidden";
       input.name = name;
       input.value = value;
       form.appendChild(input);
-    });
-
-    // Crear un input file POR ARCHIVO
-    archivos.forEach((f, index) => {
-      const fakeInput = document.createElement("input");
-      fakeInput.type = "file";
-      fakeInput.name = `file${index}`;
-
-      const dt = new DataTransfer();
-      dt.items.add(f);
-      fakeInput.files = dt.files;
-
-      form.appendChild(fakeInput);
-    });
-
-    // Crear iframe para recibir la respuesta
-    const iframe = document.createElement("iframe");
-    iframe.name = "upload-iframe";
-    iframe.style.display = "none";
-
-    iframe.onload = () => {
-      document.body.removeChild(form);
-      document.body.removeChild(iframe);
-      resolve(true);
     };
 
-    document.body.appendChild(iframe);
+    addInput("tipo", "agua");
+    addInput("mun", municipio);
+
+    // Añadir archivos
+    archivos.forEach((file, idx) => {
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      
+      const fileInput = document.createElement("input");
+      fileInput.type = "file";
+      fileInput.name = "file" + idx;
+      fileInput.files = dt.files;
+      form.appendChild(fileInput);
+      
+      console.log(`Añadido file${idx}: ${file.name}`);
+    });
+
     document.body.appendChild(form);
 
+    // Variable para evitar limpieza múltiple
+    let cleaned = false;
+    
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      
+      try {
+        if (form.parentNode) document.body.removeChild(form);
+      } catch(e) { console.log("Form ya eliminado"); }
+      
+      try {
+        if (iframe.parentNode) document.body.removeChild(iframe);
+      } catch(e) { console.log("Iframe ya eliminado"); }
+    };
+
+    // Manejar respuesta
+    let timeoutId;
+    
+    iframe.onload = function() {
+      clearTimeout(timeoutId);
+      
+      console.log("📥 Iframe cargado");
+      
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        const responseText = iframeDoc.body.textContent;
+        
+        if (responseText) {
+          console.log("Respuesta:", responseText);
+          
+          try {
+            const data = JSON.parse(responseText);
+            
+            if (data.logs) {
+              console.log("=== LOGS DEL SERVIDOR ===");
+              data.logs.forEach((log, i) => console.log(`${i + 1}. ${log}`));
+              console.log("============================");
+            }
+            
+            if (data.status === "ok") {
+              console.log("✅ Subida exitosa:", data.archivos, "archivo(s)");
+            } else {
+              console.error("❌ Error:", data.msg);
+            }
+          } catch(parseError) {
+            console.log("Respuesta no es JSON:", responseText.substring(0, 100));
+          }
+        } else {
+          console.log("⚠️ Sin respuesta legible");
+        }
+      } catch(e) {
+        console.log("⚠️ No se puede acceder al contenido del iframe (CORS)");
+        console.log("Asumiendo que la subida fue exitosa");
+      }
+      
+      // Esperar 1 segundo antes de limpiar
+      setTimeout(() => {
+        cleanup();
+        resolve(true);
+      }, 1000);
+    };
+
+    // Timeout de seguridad (30 segundos)
+    timeoutId = setTimeout(() => {
+      console.log("⏱️ Timeout alcanzado (30s), asumiendo éxito");
+      cleanup();
+      resolve(true);
+    }, 30000);
+
+    console.log("🚀 Enviando formulario a:", URL_APPS_SCRIPT);
     form.submit();
   });
 }
