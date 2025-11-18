@@ -121,7 +121,7 @@ function renderArchivos() {
 async function subirArchivos() {
   if (!archivos.length) return true;
 
-  console.log("📤 Subiendo", archivos.length, "archivo(s) con IFRAME...");
+  console.log("📤 Subiendo", archivos.length, "archivo(s)...");
 
   return new Promise((resolve) => {
     const iframeName = "upload_" + Date.now();
@@ -129,7 +129,6 @@ async function subirArchivos() {
     // Crear iframe
     const iframe = document.createElement("iframe");
     iframe.name = iframeName;
-    iframe.id = iframeName;
     iframe.style.display = "none";
     document.body.appendChild(iframe);
 
@@ -139,8 +138,9 @@ async function subirArchivos() {
     form.action = URL_APPS_SCRIPT;
     form.target = iframeName;
     form.enctype = "multipart/form-data";
+    form.style.display = "none";
 
-    // Parámetros de texto
+    // Parámetros texto
     const inputTipo = document.createElement("input");
     inputTipo.type = "hidden";
     inputTipo.name = "tipo";
@@ -153,104 +153,77 @@ async function subirArchivos() {
     inputMun.value = municipio;
     form.appendChild(inputMun);
 
-    // CRÍTICO: Añadir archivos usando DataTransfer
+    // NUEVO: Crear inputs de archivo desde el input original
+    const originalFileInput = document.getElementById("fileInput");
+    
+    // Clonar el input original con sus archivos
     archivos.forEach((file, idx) => {
       const fileInput = document.createElement("input");
       fileInput.type = "file";
       fileInput.name = "file" + idx;
       
-      // Crear DataTransfer y añadir archivo
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      fileInput.files = dataTransfer.files;
+      // Crear un nuevo FileList con este archivo
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
       
       form.appendChild(fileInput);
-      console.log(`✓ file${idx}: ${file.name} (${file.size} bytes)`);
+      console.log(`✓ Preparado file${idx}: ${file.name}`);
     });
 
     document.body.appendChild(form);
-
+    
     let procesado = false;
-    let timeoutId;
 
-    // Handler cuando se carga el iframe
-    const onLoad = () => {
+    iframe.onload = function() {
       if (procesado) return;
       procesado = true;
       
-      clearTimeout(timeoutId);
-      
-      console.log("📥 Respuesta recibida del servidor");
+      console.log("📥 Respuesta recibida");
 
-      // Intentar leer respuesta
       setTimeout(() => {
         try {
-          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          const respuesta = iframeDoc.body.textContent || iframeDoc.body.innerText;
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          const txt = doc.body.textContent;
           
-          if (respuesta && respuesta.trim()) {
-            console.log("Respuesta raw:", respuesta.substring(0, 200));
-            
+          if (txt) {
+            console.log("Respuesta:", txt.substring(0, 300));
             try {
-              const data = JSON.parse(respuesta);
-              
+              const data = JSON.parse(txt);
               if (data.logs) {
-                console.log("\n=== LOGS DEL SERVIDOR ===");
-                data.logs.forEach((log, i) => console.log(`${i+1}. ${log}`));
-                console.log("==========================\n");
+                console.log("=== LOGS ===");
+                data.logs.forEach(l => console.log(l));
               }
               
-              if (data.status === "ok") {
-                console.log(`✅ ÉXITO: ${data.archivos} archivo(s) subido(s)`);
+              if (data.archivos > 0) {
+                console.log(`✅ ${data.archivos} archivo(s) subido(s)`);
               } else {
-                console.warn(`⚠️ Advertencia: ${data.msg}`);
+                console.warn("⚠️", data.msg);
               }
-            } catch(jsonErr) {
-              console.log("⚠️ Respuesta no es JSON válido");
-            }
-          } else {
-            console.log("⚠️ Sin respuesta legible del servidor");
+            } catch(e) {}
           }
-        } catch(err) {
-          console.log("⚠️ No se puede leer iframe (CORS), esto es normal");
-          console.log("✅ Si no hay error 403, los archivos deberían haberse subido");
+        } catch(e) {
+          console.log("⚠️ No se puede leer respuesta (normal)");
         }
 
-        // Limpiar DOM
-        setTimeout(() => {
-          try {
-            if (form.parentNode) form.remove();
-            if (iframe.parentNode) iframe.remove();
-          } catch(e) {
-            console.log("Error limpiando DOM:", e);
-          }
-        }, 500);
-
-        console.log("✅ Proceso de subida completado");
+        try { form.remove(); } catch(e) {}
+        try { iframe.remove(); } catch(e) {}
+        
         resolve(true);
-      }, 1500);
+      }, 2000);
     };
 
-    iframe.addEventListener("load", onLoad);
-
-    // Timeout de seguridad (30 segundos)
-    timeoutId = setTimeout(() => {
+    setTimeout(() => {
       if (!procesado) {
         procesado = true;
-        console.log("⏱️ Timeout alcanzado (30s)");
-        console.log("Asumiendo que la subida se completó");
-        
-        try {
-          if (form.parentNode) form.remove();
-          if (iframe.parentNode) iframe.remove();
-        } catch(e) {}
-        
+        console.log("⏱️ Timeout");
+        try { form.remove(); } catch(e) {}
+        try { iframe.remove(); } catch(e) {}
         resolve(true);
       }
     }, 30000);
 
-    // Enviar formulario
-    console.log("🚀 Enviando formulario a:", URL_APPS_SCRIPT);
+    console.log("🚀 Enviando...");
     form.submit();
   });
 }
