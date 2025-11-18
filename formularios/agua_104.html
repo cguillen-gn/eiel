@@ -121,112 +121,79 @@ function renderArchivos() {
 async function subirArchivos() {
   if (!archivos.length) return true;
 
-  console.log("📤 Subiendo", archivos.length, "archivo(s)...");
+  console.log("📤 Método directo:", archivos.length, "archivo(s)");
 
   return new Promise((resolve) => {
     const iframeName = "upload_" + Date.now();
-    
-    // Crear iframe
     const iframe = document.createElement("iframe");
     iframe.name = iframeName;
     iframe.style.display = "none";
     document.body.appendChild(iframe);
 
-    // Crear formulario
     const form = document.createElement("form");
     form.method = "POST";
     form.action = URL_APPS_SCRIPT;
     form.target = iframeName;
     form.enctype = "multipart/form-data";
-    form.style.display = "none";
 
-    // Parámetros texto
-    const inputTipo = document.createElement("input");
-    inputTipo.type = "hidden";
-    inputTipo.name = "tipo";
-    inputTipo.value = "agua";
-    form.appendChild(inputTipo);
-
-    const inputMun = document.createElement("input");
-    inputMun.type = "hidden";
-    inputMun.name = "mun";
-    inputMun.value = municipio;
-    form.appendChild(inputMun);
-
-    // NUEVO: Crear inputs de archivo desde el input original
-    const originalFileInput = document.getElementById("fileInput");
-    
-    // Clonar el input original con sus archivos
-    archivos.forEach((file, idx) => {
-      const fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.name = "file" + idx;
-      
-      // Crear un nuevo FileList con este archivo
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      fileInput.files = dt.files;
-      
-      form.appendChild(fileInput);
-      console.log(`✓ Preparado file${idx}: ${file.name}`);
+    // Parámetros
+    ["tipo", "agua", "mun", municipio].forEach((val, i) => {
+      if (i % 2 === 0) return;
+      const inp = document.createElement("input");
+      inp.type = "hidden";
+      inp.name = i === 1 ? "tipo" : "mun";
+      inp.value = val;
+      form.appendChild(inp);
     });
 
-    document.body.appendChild(form);
+    // CRÍTICO: Usar el FileInput ORIGINAL directamente
+    const originalInput = document.getElementById("fileInput");
     
-    let procesado = false;
+    // Clonar el input con sus archivos
+    const clonedInput = originalInput.cloneNode(true);
+    clonedInput.name = "file0";
+    clonedInput.id = ""; // Quitar ID para no duplicar
+    form.appendChild(clonedInput);
+    
+    console.log("✓ Archivos del input clonado:", clonedInput.files.length);
 
-    iframe.onload = function() {
-      if (procesado) return;
-      procesado = true;
-      
-      console.log("📥 Respuesta recibida");
+    document.body.appendChild(form);
+
+    let done = false;
+
+    iframe.onload = () => {
+      if (done) return;
+      done = true;
 
       setTimeout(() => {
         try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          const txt = doc.body.textContent;
-          
-          if (txt) {
-            console.log("Respuesta:", txt.substring(0, 300));
-            try {
-              const data = JSON.parse(txt);
-              if (data.logs) {
-                console.log("=== LOGS ===");
-                data.logs.forEach(l => console.log(l));
-              }
-              
-              if (data.archivos > 0) {
-                console.log(`✅ ${data.archivos} archivo(s) subido(s)`);
-              } else {
-                console.warn("⚠️", data.msg);
-              }
-            } catch(e) {}
-          }
+          const txt = (iframe.contentDocument || iframe.contentWindow.document).body.textContent;
+          console.log("Respuesta:", txt.substring(0, 200));
+          const data = JSON.parse(txt);
+          if (data.logs) data.logs.forEach(l => console.log(l));
+          console.log(data.archivos > 0 ? `✅ ${data.archivos} OK` : "⚠️ Sin archivos");
         } catch(e) {
-          console.log("⚠️ No se puede leer respuesta (normal)");
+          console.log("⚠️ No legible");
         }
 
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        
+        try { form.remove(); iframe.remove(); } catch(e) {}
         resolve(true);
       }, 2000);
     };
 
     setTimeout(() => {
-      if (!procesado) {
-        procesado = true;
-        console.log("⏱️ Timeout");
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
+      if (!done) {
+        done = true;
+        try { form.remove(); iframe.remove(); } catch(e) {}
         resolve(true);
       }
     }, 30000);
 
-    console.log("🚀 Enviando...");
+    console.log("🚀 Submit");
     form.submit();
   });
 }
+
 // ------------------------
 // ENVIAR
 document.getElementById("firmarBtn").addEventListener("click", async () => {
