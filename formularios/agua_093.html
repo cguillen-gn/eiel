@@ -121,115 +121,63 @@ function renderArchivos() {
 async function subirArchivos() {
   if (!archivos.length) return true;
 
-  console.log("📤 Subiendo", archivos.length, "archivo(s)...");
+  console.log("📤 Subiendo", archivos.length, "archivo(s) con método POST...");
 
-  return new Promise((resolve) => {
-    const iframeName = "upload_" + Date.now();
-    const iframe = document.createElement("iframe");
-    iframe.name = iframeName;
-    iframe.style.display = "none";
+  // Crear FormData con archivos reales
+  const formData = new FormData();
+  formData.append("tipo", "agua");
+  formData.append("mun", municipio);
+  
+  archivos.forEach((file, idx) => {
+    formData.append("file" + idx, file, file.name);
+    console.log(`file${idx}: ${file.name} (${file.size} bytes)`);
+  });
+
+  // Usar fetch con FormData (sin headers personalizados)
+  try {
+    console.log("🚀 Enviando a:", URL_APPS_SCRIPT);
     
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = URL_APPS_SCRIPT;
-    form.target = iframeName;
-    form.enctype = "multipart/form-data";
-    form.style.display = "none";
-
-    // Parámetros
-    ["tipo", "agua", "mun", municipio].forEach((val, i) => {
-      if (i % 2 === 0) {
-        const inp = document.createElement("input");
-        inp.type = "hidden";
-        inp.name = val;
-        inp.value = arguments[0] || municipio;
-        if (i === 0) inp.value = "agua";
-        form.appendChild(inp);
-      }
+    const response = await fetch(URL_APPS_SCRIPT, {
+      method: "POST",
+      body: formData,
+      redirect: "follow"  // Seguir redirecciones
     });
 
-    const inp1 = document.createElement("input");
-    inp1.type = "hidden";
-    inp1.name = "tipo";
-    inp1.value = "agua";
-    form.appendChild(inp1);
-
-    const inp2 = document.createElement("input");
-    inp2.type = "hidden";
-    inp2.name = "mun";
-    inp2.value = municipio;
-    form.appendChild(inp2);
-
-    // Archivos
-    archivos.forEach((file, idx) => {
-      const dt = new DataTransfer();
-      dt.items.add(file);
+    console.log("📥 Respuesta recibida, status:", response.status);
+    
+    if (response.ok) {
+      const text = await response.text();
+      console.log("Respuesta texto:", text);
       
-      const finp = document.createElement("input");
-      finp.type = "file";
-      finp.name = "file" + idx;
-      finp.files = dt.files;
-      form.appendChild(finp);
-      
-      console.log(`file${idx}: ${file.name} (${file.size} bytes)`);
-    });
-
-    let resuelto = false;
-
-    iframe.onload = function() {
-      if (resuelto) return;
-      
-      console.log("📥 Respuesta recibida");
-      
-      setTimeout(() => {
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          const txt = doc.body.textContent || doc.body.innerText;
-          
-          if (txt) {
-            console.log("Respuesta:", txt.substring(0, 200));
-            try {
-              const data = JSON.parse(txt);
-              if (data.logs) {
-                console.log("=== LOGS ===");
-                data.logs.forEach(l => console.log(l));
-              }
-              console.log(data.status === "ok" ? "✅ Éxito" : "⚠️ " + data.msg);
-            } catch(e) {}
-          }
-        } catch(e) {
-          console.log("⚠️ No se puede leer iframe (CORS), asumiendo éxito");
+      try {
+        const data = JSON.parse(text);
+        
+        if (data.logs) {
+          console.log("=== LOGS DEL SERVIDOR ===");
+          data.logs.forEach(log => console.log(log));
+          console.log("============================");
         }
         
-        resuelto = true;
-        
-        // Limpiar de forma segura
-        setTimeout(() => {
-          try { form.remove(); } catch(e) {}
-          try { iframe.remove(); } catch(e) {}
-        }, 500);
-        
-        resolve(true);
-      }, 1000);
-    };
-
-    // Timeout
-    setTimeout(() => {
-      if (!resuelto) {
-        console.log("⏱️ Timeout");
-        resuelto = true;
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        resolve(true);
+        if (data.status === "ok") {
+          console.log("✅ Subida exitosa:", data.archivos, "archivo(s)");
+          return true;
+        } else {
+          console.error("❌ Error del servidor:", data.msg);
+          return false;
+        }
+      } catch(e) {
+        console.log("⚠️ Respuesta no es JSON, pero status OK");
+        return true;
       }
-    }, 30000);
-
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
+    } else {
+      console.error("❌ Error HTTP:", response.status, response.statusText);
+      return false;
+    }
     
-    console.log("🚀 Enviando a:", URL_APPS_SCRIPT);
-    form.submit();
-  });
+  } catch (error) {
+    console.error("❌ Error de red:", error);
+    return false;
+  }
 }
 
 // ------------------------
