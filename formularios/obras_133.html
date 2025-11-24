@@ -1778,24 +1778,25 @@ button:hover {
 </div>
 
 <script>
-// ------------------------
-// CONFIGURACIÓN
-// ------------------------
+// ==========================================
+// CONFIGURACIÓN Y VARIABLES GLOBALES
+// ==========================================
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
-// Almacén local de archivos para mostrar en la lista antes de enviar el formulario final
+// Almacén de archivos (Clave = ID Obra, Valor = Array de archivos)
 let adjuntosObras = {};
 
-// ------------------------
-// UTILIDADES (Base64)
-// ------------------------
+// ==========================================
+// 1. UTILIDADES
+// ==========================================
+
+// Convierte archivo a Base64 puro
 function getBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      // Quitamos la cabecera "data:image/png;base64,"
       let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
       if ((encoded.length % 4) > 0) {
         encoded += '='.repeat(4 - (encoded.length % 4));
@@ -1806,37 +1807,111 @@ function getBase64(file) {
   });
 }
 
-// ------------------------
-// GESTIÓN DE INTERFAZ (Listado de archivos)
-// ------------------------
+// ==========================================
+// 2. FUNCIÓN DE SUBIDA (CORREGIDA)
+// ==========================================
+async function subirAdjunto(munCode, obraId) {
+  console.log(`🖱️ Click en adjuntar: Obra ${obraId}, Mun ${munCode}`);
+
+  // TRUCO: Crear el input y añadirlo al body (invisible) para asegurar que funcione el click
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.multiple = true;
+  fileInput.style.display = "none"; // Invisible
+  document.body.appendChild(fileInput); // <-- Importante para algunos navegadores
+
+  fileInput.onchange = async () => {
+    const files = Array.from(fileInput.files);
+    
+    // Si no hay archivos, limpiamos y salimos
+    if (!files.length) {
+      document.body.removeChild(fileInput);
+      return;
+    }
+
+    // 1. Añadir visualmente
+    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
+    adjuntosObras[obraId].push(...files);
+    renderAdjuntosObra(obraId);
+
+    // 2. Preparar zona de mensajes
+    const statusDiv = document.getElementById("adjuntos_" + obraId);
+    let msgBox = document.createElement("div");
+    msgBox.style.fontSize = "12px"; 
+    msgBox.style.fontWeight = "bold";
+    msgBox.style.marginTop = "5px";
+    statusDiv.appendChild(msgBox);
+
+    // 3. Subir uno a uno
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      msgBox.style.color = "#f57c00"; // Naranja
+
+      try {
+        const base64 = await getBase64(file);
+
+        const payload = {
+          tipo: "obra",
+          mun: munCode,
+          obra: obraId,
+          filename: file.name,
+          mimeType: file.type,
+          file: base64
+        };
+
+        const resp = await fetch(URL_APPS_SCRIPT, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        
+        // Intentar parsear respuesta, aunque Apps Script a veces redirige
+        const data = await resp.json().catch(() => ({ status: "unknown" })); 
+
+        if (data.status === "error") throw new Error(data.message);
+        
+        console.log(`✅ ${file.name} subido.`);
+
+      } catch (err) {
+        console.error(err);
+        msgBox.textContent = `⚠️ Error subiendo ${file.name} (Puede estar en Drive)`;
+        msgBox.style.color = "red";
+        // Pequeña pausa para ver el error
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    msgBox.textContent = "✅ Archivos procesados";
+    msgBox.style.color = "green";
+    setTimeout(() => msgBox.remove(), 3000);
+
+    // Limpieza final del DOM
+    document.body.removeChild(fileInput);
+  };
+
+  // Disparar el selector
+  fileInput.click();
+}
+
+// Renderiza la lista de archivos debajo del botón
 function renderAdjuntosObra(obraId) {
   const cont = document.getElementById("adjuntos_" + obraId);
   const files = adjuntosObras[obraId] || [];
-
-  // Mantenemos el div de estado si existe, o limpiamos para repintar la lista
-  // Para simplificar, repintamos la lista y dejamos espacio para mensajes
   
-  // Guardar mensajes temporales si los hubiera
-  const existingMsgs = Array.from(cont.querySelectorAll('.msg-status'));
+  // Guardamos mensajes temporales si los hay para no borrarlos
+  const mensajes = cont.querySelectorAll("div:not(.file-item)"); 
   
-  cont.innerHTML = files
-    .map((f, i) => `
-      <div style="display:flex; align-items:center; gap:6px; margin-top:3px; background:#f9f9f9; padding:2px 5px; border-radius:4px;">
-        <span style="font-size:12px;">📎 ${f.name}</span>
-        <button 
-          type="button" 
-          onclick="eliminarAdjunto('${obraId}', ${i})"
-          style="background:none; color:#b71c1c; border:none; font-size:12px; cursor:pointer; padding:0;"
-          title="Eliminar de la lista (no borra de Drive)"
-        >
-          ✖
-        </button>
-      </div>
-    `)
-    .join("");
+  let html = files.map((f, i) => `
+    <div class="file-item" style="display:flex; align-items:center; gap:5px; margin-top:2px; font-size:12px; background:#eee; padding:2px 5px; border-radius:3px;">
+      <span>📎 ${f.name}</span>
+      <button type="button" onclick="eliminarAdjunto('${obraId}', ${i})" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">✖</button>
+    </div>
+  `).join("");
 
-  // Re-insertar mensajes de estado (cargando/exito) al final
-  existingMsgs.forEach(msg => cont.appendChild(msg));
+  cont.innerHTML = html;
+  
+  // Restaurar mensajes
+  mensajes.forEach(m => cont.appendChild(m));
 }
 
 function eliminarAdjunto(obraId, index) {
@@ -1844,956 +1919,85 @@ function eliminarAdjunto(obraId, index) {
   renderAdjuntosObra(obraId);
 }
 
-// ------------------------
-// LÓGICA DE SUBIDA (AJAX + JSON)
-// ------------------------
-async function subirAdjunto(munCode, obraId) {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.multiple = true;
-  // fileInput.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx"; // Opcional: limitar tipos
-
-  fileInput.onchange = async () => {
-    const files = Array.from(fileInput.files);
-    if (!files.length) return;
-
-    // 1. Añadir a la lista visual inmediatamente
-    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
-    adjuntosObras[obraId].push(...files);
-    renderAdjuntosObra(obraId);
-
-    // 2. Preparar zona de mensajes
-    const statusDiv = document.getElementById("adjuntos_" + obraId);
-    const msgBox = document.createElement("div");
-    msgBox.className = "msg-status";
-    msgBox.style.fontSize = "11px";
-    msgBox.style.marginTop = "4px";
-    msgBox.style.fontWeight = "bold";
-    statusDiv.appendChild(msgBox);
-
-    // 3. Subir archivos UNO A UNO
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
-      msgBox.style.color = "#f57c00"; // Naranja
-
-      try {
-        // A. Convertir
-        const base64 = await getBase64(file);
-
-        // B. Payload JSON
-        const payload = {
-          tipo: "obra",      // Importante para tu script
-          mun: munCode,
-          obra: obraId,      // El ID o índice de la obra (para la subcarpeta)
-          filename: file.name,
-          mimeType: file.type,
-          file: base64
-        };
-
-        // C. Enviar
-        const resp = await fetch(URL_APPS_SCRIPT, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        
-        const data = await resp.json();
-
-        if (data.status === "success") {
-          console.log(`✅ ${file.name} subido.`);
-        } else {
-          throw new Error(data.message || "Error desconocido");
-        }
-
-      } catch (err) {
-        console.error(err);
-        msgBox.textContent = `❌ Error con ${file.name}`;
-        msgBox.style.color = "red";
-        // Pausa para leer el error antes de seguir
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    }
-
-    // 4. Finalización
-    msgBox.textContent = "✅ Todos los archivos subidos.";
-    msgBox.style.color = "green";
-    
-    // Borrar mensaje de éxito tras 4 segundos
-    setTimeout(() => {
-      try { msgBox.remove(); } catch(e){}
-    }, 4000);
-  };
-
-  fileInput.click();
-}
-
-
-// ------------------------
-// ENVIAR FORMULARIO FINAL (DATOS A GOOGLE FORM)
-// ------------------------
+// ==========================================
+// 3. ENVÍO FINAL DEL FORMULARIO
+// ==========================================
 document.getElementById("frmObras").addEventListener("submit", async (e) => {
   e.preventDefault();
-  
-  const btnSubmit = e.target.querySelector("button[type='submit']");
-  const originalText = btnSubmit.textContent;
-  btnSubmit.disabled = true;
-  btnSubmit.textContent = "Enviando datos...";
-
-  // Recopilar estados de las obras
-  const estados = [];
-  const form = e.target;
-  
-  // NOTA: Asegúrate de que este bucle de Jinja2 renderiza correctamente los índices
-  // JS no interpreta Jinja, esto debe venir renderizado del servidor.
-  
-    
-      // Capturamos el valor del select
-      const select1 = form.querySelector('[name="estado_1"]');
-      const val1 = select1 ? select1.value : "";
-      
-      estados.push({
-        obra: "CEIP INMACULADA CONCEPCIÓN. REPOSICIÓ 2I+6I+12P+MENJ (400, 2T)",
-        plan: "GVA (Actuaciones centros enseñanza NO EDIFICANT)",
-        estado: val1,
-        archivos: (adjuntosObras["1"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select2 = form.querySelector('[name="estado_2"]');
-      const val2 = select2 ? select2.value : "";
-      
-      estados.push({
-        obra: "RECINTO MULTIUSOS CON DESTINO PRINCIPAL A LA CELEBRACIÓN DEL CERTAMEN INTERNACIONAL DE HABANERAS, ASÍ COMO SUS INFRAESTRUCTURAS COMPLEMENTARIAS",
-        plan: "PLAN PLANIFICA 2020-23 BOP: 20/07/2022",
-        estado: val2,
-        archivos: (adjuntosObras["2"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select3 = form.querySelector('[name="estado_3"]');
-      const val3 = select3 ? select3.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN PARA LAS OBRAS DE IMPLANTACIÓN DEL COLEGIO PREFABRICADO INMACULADA",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val3,
-        archivos: (adjuntosObras["3"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select4 = form.querySelector('[name="estado_4"]');
-      const val4 = select4 ? select4.value : "";
-      
-      estados.push({
-        obra: "LAS ACTUACIONES URGENTES EN EL ALUMBRADO PÚBICO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val4,
-        archivos: (adjuntosObras["4"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select5 = form.querySelector('[name="estado_5"]');
-      const val5 = select5 ? select5.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVESTECNOLÓGICOS 2024 POLÍGONO INDUSTRIAL CASA GRANDE II - TORREVIEJA",
-        plan: "IVACE: PARQUES EMPRESARIALES 2024",
-        estado: val5,
-        archivos: (adjuntosObras["5"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select6 = form.querySelector('[name="estado_6"]');
-      const val6 = select6 ? select6.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DEL ALBERGUE MUNICIPAL DE ANIMALES, SEGÚN PROYECTO REDACTADO EN EL EXPTE. 22259/2020 (AM-55501-L04-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val6,
-        archivos: (adjuntosObras["6"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select7 = form.querySelector('[name="estado_7"]');
-      const val7 = select7 ? select7.value : "";
-      
-      estados.push({
-        obra: "REPARACIÓN, SANEADO, PINTADO Y PROTECCIÓN DEL ALUMBRADO PÚBLICO EN DIFERENTES ZONAS DEL MUNICIPIO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val7,
-        archivos: (adjuntosObras["7"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select8 = form.querySelector('[name="estado_8"]');
-      const val8 = select8 ? select8.value : "";
-      
-      estados.push({
-        obra: "OBRAS PARA LA MEJORA DE LA EFICIENCIA ENERGÉTICA DEL ALUMBRADO PÚBLICO SEGÚN PROYECTOS DE LOS EXPEDIENTES 21917/2022 Y 55992/2022",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val8,
-        archivos: (adjuntosObras["8"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select9 = form.querySelector('[name="estado_9"]');
-      const val9 = select9 ? select9.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES TECNOLÓGICOS 20232023",
-        plan: "IVACE: PARQUES EMPRESARIALES 2023",
-        estado: val9,
-        archivos: (adjuntosObras["9"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select10 = form.querySelector('[name="estado_10"]');
-      const val10 = select10 ? select10.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES  TECNOLÓGICOS 20232023",
-        plan: "IVACE: PARQUES EMPRESARIALES 2023",
-        estado: val10,
-        archivos: (adjuntosObras["10"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select11 = form.querySelector('[name="estado_11"]');
-      const val11 = select11 ? select11.value : "";
-      
-      estados.push({
-        obra: "ADAPTACIÓN DE MEJORA DE EFICIENCIA ENERGÉTICA EN LA INSTALACIÓN DE ALUMBRADO PÚBLICO DE LA CV-905 Y OTRAS CALLES",
-        plan: "PLAN +CERCA 2022 BOP: 14/11/2022",
-        estado: val11,
-        archivos: (adjuntosObras["11"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select12 = form.querySelector('[name="estado_12"]');
-      const val12 = select12 ? select12.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DE LAS OBRAS DE LA SENDA PEATONAL DE LA MATA, SEGÚN PROYECTO DEL EXPTE. 2928/2020, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L11-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val12,
-        archivos: (adjuntosObras["12"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select13 = form.querySelector('[name="estado_13"]');
-      const val13 = select13 ? select13.value : "";
-      
-      estados.push({
-        obra: "IES TORREVIGÍA. AMPLIACIÓN. CONSTRUCCIÓN NUEVO AULARIO.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val13,
-        archivos: (adjuntosObras["13"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select14 = form.querySelector('[name="estado_14"]');
-      const val14 = select14 ? select14.value : "";
-      
-      estados.push({
-        obra: "CEP MAESTRO SALVADOR RUSO. REFORMAS VARIAS: ADECUACIÓN LOGSE (CONSTRUCCIÓN DE GIMNASIO, DOTACIÓN DE ASCENSOR, ..). REPARACIÓN PISTAS DEPORTIVAS",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val14,
-        archivos: (adjuntosObras["14"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select15 = form.querySelector('[name="estado_15"]');
-      const val15 = select15 ? select15.value : "";
-      
-      estados.push({
-        obra: "CEIP CUBA. REFORMAS VARIAS: DOTARLO DE ASCENSOR, ELIMINACIÓN DE BARRERAS ARQUITECTÓNICAS, SUSTITUCIÓN DEL DEPÓSITO DE GASOIL",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val15,
-        archivos: (adjuntosObras["15"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select16 = form.querySelector('[name="estado_16"]');
-      const val16 = select16 ? select16.value : "";
-      
-      estados.push({
-        obra: "EI MAESTRO GRATINIANO BACHES. REFORMAS VARIAS: SUSTITUCIÓN DEL DEPÓSITO DE GASOIL, SUSTITUCIÓN DE LA VALLA DEL COLEGIO, DOTAR ZONAS SOMBRA PATIOS EXTERIORES",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val16,
-        archivos: (adjuntosObras["16"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select17 = form.querySelector('[name="estado_17"]');
-      const val17 = select17 ? select17.value : "";
-      
-      estados.push({
-        obra: "CEIP VIRGEN DEL CARMEN. REHABILITACION Y ACONDICIONAMIENTO",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val17,
-        archivos: (adjuntosObras["17"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select18 = form.querySelector('[name="estado_18"]');
-      const val18 = select18 ? select18.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVESTECNOLÓGICOS 2024- POLÍGONO INDUSTRIAL CASA GRANDE I",
-        plan: "IVACE: PARQUES EMPRESARIALES 2024",
-        estado: val18,
-        archivos: (adjuntosObras["18"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select19 = form.querySelector('[name="estado_19"]');
-      const val19 = select19 ? select19.value : "";
-      
-      estados.push({
-        obra: "IES NÚM. 6. NOVA COSNTRUCCIÓ",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val19,
-        archivos: (adjuntosObras["19"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select20 = form.querySelector('[name="estado_20"]');
-      const val20 = select20 ? select20.value : "";
-      
-      estados.push({
-        obra: "RENOVACIÓN DEL ALUMBRADO PÚBLICO EN AVDA. BALEARES Y ADYACENTES (CM-66)",
-        plan: "PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2019",
-        estado: val20,
-        archivos: (adjuntosObras["20"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select21 = form.querySelector('[name="estado_21"]');
-      const val21 = select21 ? select21.value : "";
-      
-      estados.push({
-        obra: "ALUMBRADO PÚBLICO SUSTITUCIÓN LUMINARIAS LED Y AMPLIACIÓN DE CIRCUITOS",
-        plan: "PLAN +CERCA. 2023. BOP: 26/9/2023.",
-        estado: val21,
-        archivos: (adjuntosObras["21"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select22 = form.querySelector('[name="estado_22"]');
-      const val22 = select22 ? select22.value : "";
-      
-      estados.push({
-        obra: "IES LAS LAGUNAS. REMODELACIÓN INTEGRAL DEL CENTRO.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val22,
-        archivos: (adjuntosObras["22"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select23 = form.querySelector('[name="estado_23"]');
-      const val23 = select23 ? select23.value : "";
-      
-      estados.push({
-        obra: "CEIP NÚM.14. CONSTRUCCIÓ 3EI + 9 EI + 18 EP + MENJ (600, 2T)",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val23,
-        archivos: (adjuntosObras["23"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select24 = form.querySelector('[name="estado_24"]');
-      const val24 = select24 ? select24.value : "";
-      
-      estados.push({
-        obra: "IES NÚMERO 1 - LIBERTAS. REPARACIÓN ESTRUCTURAL Y AMPLIACIÓN.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val24,
-        archivos: (adjuntosObras["24"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select25 = form.querySelector('[name="estado_25"]');
-      const val25 = select25 ? select25.value : "";
-      
-      estados.push({
-        obra: "REURBANIZACIÓN DE LOS SECTORES PLAN PARCIAL MAR AZUL, CONVENIO MAR AZUL Y NÚCLEO DE FERRIS",
-        plan: "None",
-        estado: val25,
-        archivos: (adjuntosObras["25"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select26 = form.querySelector('[name="estado_26"]');
-      const val26 = select26 ? select26.value : "";
-      
-      estados.push({
-        obra: "MEJORA EN EL POLÍGONO INDUSTRIAL CASA GRANDE I Y CASA GRANDE II",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val26,
-        archivos: (adjuntosObras["26"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select27 = form.querySelector('[name="estado_27"]');
-      const val27 = select27 ? select27.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DE ZONAS DE ASEOS PÚBLICOS MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L02-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val27,
-        archivos: (adjuntosObras["27"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select28 = form.querySelector('[name="estado_28"]');
-      const val28 = select28 ? select28.value : "";
-      
-      estados.push({
-        obra: "URBANIZACIÓN DESCRITAS EN LOS PROYECTOS APROBADOS EN LOS EXPEDIENTES 1807/2023 Y 1112/2023, SITAS EN EL ENCLAVE 13 (AM-55501-L09-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val28,
-        archivos: (adjuntosObras["28"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select29 = form.querySelector('[name="estado_29"]');
-      const val29 = select29 ? select29.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DEL PABELLÓN DE LA MATA, SITUADO EN LA AVENIDA DE LOS DANESES, 14 DE TORREVIEJA (AM-55501-L05-CB), MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val29,
-        archivos: (adjuntosObras["29"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select30 = form.querySelector('[name="estado_30"]');
-      const val30 = select30 ? select30.value : "";
-      
-      estados.push({
-        obra: "REFORMA Y ADAPTACIÓN A NUEVAS NECESIDADES DE USO DEL CENTRO PARA PERSONAS CON DIVERSIDAD FUNCIONAL Y CENTRO DE ACOGIDA DE MENORES DELFINA VIUDES DE TORREVIEJA (ALICANTE)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val30,
-        archivos: (adjuntosObras["30"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select31 = form.querySelector('[name="estado_31"]');
-      const val31 = select31 ? select31.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE ASFALTADO Y MEJORAS DE ITINERARIOS PEATONALES Y ACCESIBILIDAD, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO, (PROYECTOS DE LOS EXPEDIENTES 23757/2022 Y 37223/2021) (AM-55501-L11-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val31,
-        archivos: (adjuntosObras["31"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select32 = form.querySelector('[name="estado_32"]');
-      const val32 = select32 ? select32.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE AMPLIACIÓN DE LA PLANTA DESALADORA DE TORREVIEJA (ALICANTE) DESCRITAS EN EL PROYECTO CONSTRUCTIVO DENOMINADO PROYECTO DE AMPLIACIÓN DE LA PLANTA DESALADORA DE TORREVIEJA (ALICANTE).",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val32,
-        archivos: (adjuntosObras["32"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select33 = form.querySelector('[name="estado_33"]');
-      const val33 = select33 ? select33.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN DE LAS OBRAS DE REPARACIÓN DEL DIQUE DE LEVANTE SEGÚN PROYECTO DEL EXPEDIENTE 8040/2020, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L12-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val33,
-        archivos: (adjuntosObras["33"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select34 = form.querySelector('[name="estado_34"]');
-      const val34 = select34 ? select34.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN DE LAS OBRAS DEL CAMBIO CÉSPED ARTIFICIAL DEL ESTADIO MUNICIPAL "NELSON MANDELA", MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO, FINANCIADO PARCIALMENTE MEDIANTE SUBVENCIÓN SOLICITADA EN EL EXPEDIENTE 22269/2022 (AM-55501-L09-CB). EXPD. DEL PROYE",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val34,
-        archivos: (adjuntosObras["34"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select35 = form.querySelector('[name="estado_35"]');
-      const val35 = select35 ? select35.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN DE LAS OBRAS DE TERMINACIÓN DEL PABELLÓN BLANCO, SEGÚN PROYECTO EN EXPTE. 22127/2021, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L03-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val35,
-        archivos: (adjuntosObras["35"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select36 = form.querySelector('[name="estado_36"]');
-      const val36 = select36 ? select36.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN DE LAS OBRAS DE ACCESO PROVISIONAL AL PUERTO DE TORREVIEJA SEGÚN PROYECTO OBRANTE EN EL EXPEDIENTE 61634/2022 (2024-E-RE-4159), MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM55501-L08-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val36,
-        archivos: (adjuntosObras["36"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select37 = form.querySelector('[name="estado_37"]');
-      const val37 = select37 ? select37.value : "";
-      
-      estados.push({
-        obra: "EJECUCIÓN DE LAS OBRAS DE REPAVIMENTACIÓN Y REPARACIÓN DEL DIQUE DE LEVANTE SEGÚN PROYECTO APROBADO EN EXPTE. 8040/2020. PRTR. NEXT GENERATION EU.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val37,
-        archivos: (adjuntosObras["37"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select38 = form.querySelector('[name="estado_38"]');
-      const val38 = select38 ? select38.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN DE DIVERSAS CALLES DEL T.M.",
-        plan: "PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2017",
-        estado: val38,
-        archivos: (adjuntosObras["38"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select39 = form.querySelector('[name="estado_39"]');
-      const val39 = select39 ? select39.value : "";
-      
-      estados.push({
-        obra: "ACTUACIÓN SOBRE LA FÁBRICA DE HIELO PARA LA RESTAURACIÓN Y PUESTA EN VALOR DEL EDIFICIO Y UBICACIÓN DE LA CONCEJALÍA DE TURISMO",
-        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-        estado: val39,
-        archivos: (adjuntosObras["39"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select40 = form.querySelector('[name="estado_40"]');
-      const val40 = select40 ? select40.value : "";
-      
-      estados.push({
-        obra: "MEJORAS DIVERSAS EN EL PASEO MARÍTIMO Y SU ENTORNO",
-        plan: "SUBVENCION NOMINATIVA 2017",
-        estado: val40,
-        archivos: (adjuntosObras["40"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select41 = form.querySelector('[name="estado_41"]');
-      const val41 = select41 ? select41.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES TECNOLÓGICOS 2022 - 2 2022",
-        plan: "IVACE: PARQUES EMPRESARIALES 2022",
-        estado: val41,
-        archivos: (adjuntosObras["41"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select42 = form.querySelector('[name="estado_42"]');
-      const val42 = select42 ? select42.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN PARCIAL DEL MUELLE DE LA SAL. TRAMO PASEO VISTALEGRE. TORREVIEJA (ALICANTE)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val42,
-        archivos: (adjuntosObras["42"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select43 = form.querySelector('[name="estado_43"]');
-      const val43 = select43 ? select43.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE URBANIZACIÓN DEL PUERTO DE TORREVIEJA Y ZONAS ADYACENTES, RECUPERACIÓN DEL MUELLE MÍNGUEZ Y REMODELACIÓN DE SU ENTORNO PORTUARIO (AM-55501-L10-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val43,
-        archivos: (adjuntosObras["43"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select44 = form.querySelector('[name="estado_44"]');
-      const val44 = select44 ? select44.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE URBANIZACIÓN PARA LA PUESTA EN MARCHA DEL IES Nº 6 (SECCIÓN DEL IES 6 TORREVIGÍA) SITA EN CALLE MARGARITA S/N",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val44,
-        archivos: (adjuntosObras["44"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select45 = form.querySelector('[name="estado_45"]');
-      const val45 = select45 ? select45.value : "";
-      
-      estados.push({
-        obra: "REDAC. PROY. OBRA INST. RENOV. ALUMBRADO PÚBL. CASCO URB. Y PARTE RESTO DE LA MATA",
-        plan: "SUBVENCION NOMINATIVA 2019",
-        estado: val45,
-        archivos: (adjuntosObras["45"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select46 = form.querySelector('[name="estado_46"]');
-      const val46 = select46 ? select46.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DE PISTA DEPORTIVA EN PLAZA DE ORIENTE",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val46,
-        archivos: (adjuntosObras["46"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select47 = form.querySelector('[name="estado_47"]');
-      const val47 = select47 ? select47.value : "";
-      
-      estados.push({
-        obra: "LA OBRA DE REPARACIÓN INTEGRAL DEL CENTRO MUNICIPAL DE OCIO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val47,
-        archivos: (adjuntosObras["47"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select48 = form.querySelector('[name="estado_48"]');
-      const val48 = select48 ? select48.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN DE LA OBRA CIVIL DE LA EBAR “HOMBRE DEL MAR”, SEGÚN PROYECTO DEL EXPTE. 61634/2022 (AM-55501-L08-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val48,
-        archivos: (adjuntosObras["48"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select49 = form.querySelector('[name="estado_49"]');
-      const val49 = select49 ? select49.value : "";
-      
-      estados.push({
-        obra: "REPARACIÓN DE LAS PISTAS DE PÁDEL EN LA CIUDAD DEPORTIVA SEGÚN PROYECTO DEL EXPEDIENTE 70512/2022, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val49,
-        archivos: (adjuntosObras["49"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select50 = form.querySelector('[name="estado_50"]');
-      const val50 = select50 ? select50.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN Y EXPLOTACIÓN DE UN CENTRO DE OCIO Y EL DIQUE DE LEVANTE, SEGÚN PROYECTO DEL EXPTE. 61634/2022 (AM-55501-L05-CB)",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val50,
-        archivos: (adjuntosObras["50"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select51 = form.querySelector('[name="estado_51"]');
-      const val51 = select51 ? select51.value : "";
-      
-      estados.push({
-        obra: "DIVERSAS OBRAS DESCRITAS EN MEMORIAS TÉCNICAS DE INTERVENCIONES EN EL ALUMBRADO PÚBLICO, SEGÚN EXPEDIENTE 60354/2021, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val51,
-        archivos: (adjuntosObras["51"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select52 = form.querySelector('[name="estado_52"]');
-      const val52 = select52 ? select52.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN DEL CENTRO DE INTERPRETACIÓN DE LA INDUSTRIA SALINERA. PRTR. NEXT GENERATION EU.",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
-        estado: val52,
-        archivos: (adjuntosObras["52"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select53 = form.querySelector('[name="estado_53"]');
-      const val53 = select53 ? select53.value : "";
-      
-      estados.push({
-        obra: "URBANIZACIÓN PARA LA PUESTA EN MARCHA DEL COLEGIO Nº 14.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val53,
-        archivos: (adjuntosObras["53"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select54 = form.querySelector('[name="estado_54"]');
-      const val54 = select54 ? select54.value : "";
-      
-      estados.push({
-        obra: "LUMINARIAS EN LA SENDA PEATONAL DE LA MATA-PARAJE NATURAL MUNICIPAL MOLINO DEL AGUA",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
-        estado: val54,
-        archivos: (adjuntosObras["54"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select55 = form.querySelector('[name="estado_55"]');
-      const val55 = select55 ? select55.value : "";
-      
-      estados.push({
-        obra: "INFRAESTRUCTURA PARA LA AMPLIACIÓN DEL COLEGIO Nº 14.",
-        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-        estado: val55,
-        archivos: (adjuntosObras["55"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select56 = form.querySelector('[name="estado_56"]');
-      const val56 = select56 ? select56.value : "";
-      
-      estados.push({
-        obra: "REFUERZO DEL ALUMBRADO PÚBLICO EN PLAZA DE ORIENTE.",
-        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-        estado: val56,
-        archivos: (adjuntosObras["56"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select57 = form.querySelector('[name="estado_57"]');
-      const val57 = select57 ? select57.value : "";
-      
-      estados.push({
-        obra: "SUMINISTRO Y COLOCACIÓN DE DOS ZONAS DE CALISTENIA ENTRE CALLE EMIL Y CALLE SANTA PETRA DE TORREVIEJA",
-        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-        estado: val57,
-        archivos: (adjuntosObras["57"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select58 = form.querySelector('[name="estado_58"]');
-      const val58 = select58 ? select58.value : "";
-      
-      estados.push({
-        obra: "MODIFICACIÓN DE LA ROTONDA DE ACCESO AL RECINTO D MERCADOS EN AVDA. DELFINA VIUDES.",
-        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-        estado: val58,
-        archivos: (adjuntosObras["58"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select59 = form.querySelector('[name="estado_59"]');
-      const val59 = select59 ? select59.value : "";
-      
-      estados.push({
-        obra: "CONDUCCIÓN DE PLUVIALES EN EL ÁMBITO DE LA CALA DE LA ZORRA.",
-        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-        estado: val59,
-        archivos: (adjuntosObras["59"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select60 = form.querySelector('[name="estado_60"]');
-      const val60 = select60 ? select60.value : "";
-      
-      estados.push({
-        obra: "CONSOLIDACIÓN Y REHABILITACIÓN DEL ANTIGUO PARVULARIO LA PURÍSIMA Y EL EDIFICIO USADO POR LA CORAL TORREVEJENSE FRANCISCO VALLEJOS PARA DESTINARLO A LA PROYECCIÓN ESTRATÉGICA SOCIOECONÓMICA.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val60,
-        archivos: (adjuntosObras["60"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select61 = form.querySelector('[name="estado_61"]');
-      const val61 = select61 ? select61.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN DEL EDIFICIO SITO EN AZORÍN, R. CÉSPEDES, CHAPAPRIETA Y P. ISABEL II, "LA PLASA", MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val61,
-        archivos: (adjuntosObras["61"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select62 = form.querySelector('[name="estado_62"]');
-      const val62 = select62 ? select62.value : "";
-      
-      estados.push({
-        obra: "REPARACIONES EN LA CASA DE LA TERCERA EDAD DE LA CALLE SAN PASCUAL",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val62,
-        archivos: (adjuntosObras["62"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select63 = form.querySelector('[name="estado_63"]');
-      const val63 = select63 ? select63.value : "";
-      
-      estados.push({
-        obra: "ADAPTACIÓN DE DOS PLANTAS DEL CENTRO MUNICIPAL PARA DESTINARLAS A CENTRO DE FORMACIÓN Y CENTRO DE OCIO JUVENIL, TRAMITACIÓN ANTICIPADA DEL GASTO.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val63,
-        archivos: (adjuntosObras["63"] || []).map(f => f.name)
-      });
-    
-  
-
-  // Enviar a Google Forms
-  const formData = new FormData();
-  formData.append("entry.1317069794", "133"); 
-  formData.append("entry.1523598469", JSON.stringify(estados)); 
+  const btn = e.target.querySelector("button[type='submit']");
+  const txtOriginal = btn.textContent;
+  
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando datos...";
 
   try {
+    const estados = [];
+    // Leemos la tabla HTML directamente (más seguro que usar Jinja aquí)
+    const filas = document.querySelectorAll("tbody tr");
+
+    filas.forEach((tr, index) => {
+      // El índice visual empieza en 1, pero JS es 0. 
+      // Tu lógica usa indices basados en 1 (loop.index), así que ajustamos:
+      const loopIndex = index + 1; 
+
+      // Buscar celdas
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 3) return; // Fila inválida
+
+      const nombreObra = tds[0].textContent.trim();
+      const planObra = tds[1].textContent.trim();
+      
+      // Buscar el select de estado
+      const select = tr.querySelector("select");
+      let estadoValor = "";
+
+      if (select) {
+        estadoValor = select.value;
+      } else {
+        // Si no hay select, puede ser texto fijo (ej. "Finalizada")
+        estadoValor = tds[2].textContent.trim();
+        if (estadoValor === "-") stateValue = "";
+      }
+
+      // Solo añadimos si tiene estado relevante
+      if (estadoValor && estadoValor !== "-- Seleccione --" && estadoValor !== "-") {
+        estados.push({
+          obra: nombreObra,
+          plan: planObra,
+          estado: estadoValor,
+          archivos: (adjuntosObras[loopIndex] || []).map(f => f.name)
+        });
+      }
+    });
+
+    console.log("Enviando payload:", estados);
+
+    const formData = new FormData();
+    // REVISA ESTAS IDs CON TU FORMULARIO REAL DE GOOGLE
+    formData.append("entry.1317069794", "133"); 
+    formData.append("entry.1523598469", JSON.stringify(estados)); 
+
     await fetch(URL_GOOGLE_FORMS, { 
       method: "POST", 
       body: formData, 
       mode: "no-cors" 
     });
+
+    btn.textContent = "✅ Datos Enviados";
+    btn.style.backgroundColor = "#2e7d32";
     
-    btnSubmit.textContent = "✅ ¡Enviado!";
-    btnSubmit.style.background = "green";
-    
-    // Opcional: Redirigir o limpiar
     setTimeout(() => {
-       alert("Datos de obras registrados correctamente.");
-       // window.location.reload(); 
+       alert("Formulario enviado correctamente.");
+       // Opcional: window.location.reload(); 
     }, 500);
 
-  } catch(error) {
-    alert("❌ Error al enviar formulario: " + error.message);
-    btnSubmit.disabled = false;
-    btnSubmit.textContent = originalText;
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar: " + error.message);
+    btn.disabled = false;
+    btn.textContent = txtOriginal;
   }
 });
-
 </script>
 </body>
 </html>

@@ -239,24 +239,25 @@ button:hover {
 </div>
 
 <script>
-// ------------------------
-// CONFIGURACIÓN
-// ------------------------
+// ==========================================
+// CONFIGURACIÓN Y VARIABLES GLOBALES
+// ==========================================
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
-// Almacén local de archivos para mostrar en la lista antes de enviar el formulario final
+// Almacén de archivos (Clave = ID Obra, Valor = Array de archivos)
 let adjuntosObras = {};
 
-// ------------------------
-// UTILIDADES (Base64)
-// ------------------------
+// ==========================================
+// 1. UTILIDADES
+// ==========================================
+
+// Convierte archivo a Base64 puro
 function getBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      // Quitamos la cabecera "data:image/png;base64,"
       let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
       if ((encoded.length % 4) > 0) {
         encoded += '='.repeat(4 - (encoded.length % 4));
@@ -267,37 +268,111 @@ function getBase64(file) {
   });
 }
 
-// ------------------------
-// GESTIÓN DE INTERFAZ (Listado de archivos)
-// ------------------------
+// ==========================================
+// 2. FUNCIÓN DE SUBIDA (CORREGIDA)
+// ==========================================
+async function subirAdjunto(munCode, obraId) {
+  console.log(`🖱️ Click en adjuntar: Obra ${obraId}, Mun ${munCode}`);
+
+  // TRUCO: Crear el input y añadirlo al body (invisible) para asegurar que funcione el click
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.multiple = true;
+  fileInput.style.display = "none"; // Invisible
+  document.body.appendChild(fileInput); // <-- Importante para algunos navegadores
+
+  fileInput.onchange = async () => {
+    const files = Array.from(fileInput.files);
+    
+    // Si no hay archivos, limpiamos y salimos
+    if (!files.length) {
+      document.body.removeChild(fileInput);
+      return;
+    }
+
+    // 1. Añadir visualmente
+    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
+    adjuntosObras[obraId].push(...files);
+    renderAdjuntosObra(obraId);
+
+    // 2. Preparar zona de mensajes
+    const statusDiv = document.getElementById("adjuntos_" + obraId);
+    let msgBox = document.createElement("div");
+    msgBox.style.fontSize = "12px"; 
+    msgBox.style.fontWeight = "bold";
+    msgBox.style.marginTop = "5px";
+    statusDiv.appendChild(msgBox);
+
+    // 3. Subir uno a uno
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      msgBox.style.color = "#f57c00"; // Naranja
+
+      try {
+        const base64 = await getBase64(file);
+
+        const payload = {
+          tipo: "obra",
+          mun: munCode,
+          obra: obraId,
+          filename: file.name,
+          mimeType: file.type,
+          file: base64
+        };
+
+        const resp = await fetch(URL_APPS_SCRIPT, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        
+        // Intentar parsear respuesta, aunque Apps Script a veces redirige
+        const data = await resp.json().catch(() => ({ status: "unknown" })); 
+
+        if (data.status === "error") throw new Error(data.message);
+        
+        console.log(`✅ ${file.name} subido.`);
+
+      } catch (err) {
+        console.error(err);
+        msgBox.textContent = `⚠️ Error subiendo ${file.name} (Puede estar en Drive)`;
+        msgBox.style.color = "red";
+        // Pequeña pausa para ver el error
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    msgBox.textContent = "✅ Archivos procesados";
+    msgBox.style.color = "green";
+    setTimeout(() => msgBox.remove(), 3000);
+
+    // Limpieza final del DOM
+    document.body.removeChild(fileInput);
+  };
+
+  // Disparar el selector
+  fileInput.click();
+}
+
+// Renderiza la lista de archivos debajo del botón
 function renderAdjuntosObra(obraId) {
   const cont = document.getElementById("adjuntos_" + obraId);
   const files = adjuntosObras[obraId] || [];
-
-  // Mantenemos el div de estado si existe, o limpiamos para repintar la lista
-  // Para simplificar, repintamos la lista y dejamos espacio para mensajes
   
-  // Guardar mensajes temporales si los hubiera
-  const existingMsgs = Array.from(cont.querySelectorAll('.msg-status'));
+  // Guardamos mensajes temporales si los hay para no borrarlos
+  const mensajes = cont.querySelectorAll("div:not(.file-item)"); 
   
-  cont.innerHTML = files
-    .map((f, i) => `
-      <div style="display:flex; align-items:center; gap:6px; margin-top:3px; background:#f9f9f9; padding:2px 5px; border-radius:4px;">
-        <span style="font-size:12px;">📎 ${f.name}</span>
-        <button 
-          type="button" 
-          onclick="eliminarAdjunto('${obraId}', ${i})"
-          style="background:none; color:#b71c1c; border:none; font-size:12px; cursor:pointer; padding:0;"
-          title="Eliminar de la lista (no borra de Drive)"
-        >
-          ✖
-        </button>
-      </div>
-    `)
-    .join("");
+  let html = files.map((f, i) => `
+    <div class="file-item" style="display:flex; align-items:center; gap:5px; margin-top:2px; font-size:12px; background:#eee; padding:2px 5px; border-radius:3px;">
+      <span>📎 ${f.name}</span>
+      <button type="button" onclick="eliminarAdjunto('${obraId}', ${i})" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">✖</button>
+    </div>
+  `).join("");
 
-  // Re-insertar mensajes de estado (cargando/exito) al final
-  existingMsgs.forEach(msg => cont.appendChild(msg));
+  cont.innerHTML = html;
+  
+  // Restaurar mensajes
+  mensajes.forEach(m => cont.appendChild(m));
 }
 
 function eliminarAdjunto(obraId, index) {
@@ -305,215 +380,85 @@ function eliminarAdjunto(obraId, index) {
   renderAdjuntosObra(obraId);
 }
 
-// ------------------------
-// LÓGICA DE SUBIDA (AJAX + JSON)
-// ------------------------
-async function subirAdjunto(munCode, obraId) {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.multiple = true;
-  // fileInput.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx"; // Opcional: limitar tipos
-
-  fileInput.onchange = async () => {
-    const files = Array.from(fileInput.files);
-    if (!files.length) return;
-
-    // 1. Añadir a la lista visual inmediatamente
-    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
-    adjuntosObras[obraId].push(...files);
-    renderAdjuntosObra(obraId);
-
-    // 2. Preparar zona de mensajes
-    const statusDiv = document.getElementById("adjuntos_" + obraId);
-    const msgBox = document.createElement("div");
-    msgBox.className = "msg-status";
-    msgBox.style.fontSize = "11px";
-    msgBox.style.marginTop = "4px";
-    msgBox.style.fontWeight = "bold";
-    statusDiv.appendChild(msgBox);
-
-    // 3. Subir archivos UNO A UNO
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
-      msgBox.style.color = "#f57c00"; // Naranja
-
-      try {
-        // A. Convertir
-        const base64 = await getBase64(file);
-
-        // B. Payload JSON
-        const payload = {
-          tipo: "obra",      // Importante para tu script
-          mun: munCode,
-          obra: obraId,      // El ID o índice de la obra (para la subcarpeta)
-          filename: file.name,
-          mimeType: file.type,
-          file: base64
-        };
-
-        // C. Enviar
-        const resp = await fetch(URL_APPS_SCRIPT, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        
-        const data = await resp.json();
-
-        if (data.status === "success") {
-          console.log(`✅ ${file.name} subido.`);
-        } else {
-          throw new Error(data.message || "Error desconocido");
-        }
-
-      } catch (err) {
-        console.error(err);
-        msgBox.textContent = `❌ Error con ${file.name}`;
-        msgBox.style.color = "red";
-        // Pausa para leer el error antes de seguir
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    }
-
-    // 4. Finalización
-    msgBox.textContent = "✅ Todos los archivos subidos.";
-    msgBox.style.color = "green";
-    
-    // Borrar mensaje de éxito tras 4 segundos
-    setTimeout(() => {
-      try { msgBox.remove(); } catch(e){}
-    }, 4000);
-  };
-
-  fileInput.click();
-}
-
-
-// ------------------------
-// ENVIAR FORMULARIO FINAL (DATOS A GOOGLE FORM)
-// ------------------------
+// ==========================================
+// 3. ENVÍO FINAL DEL FORMULARIO
+// ==========================================
 document.getElementById("frmObras").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const btn = e.target.querySelector("button[type='submit']");
+  const txtOriginal = btn.textContent;
   
-  const btnSubmit = e.target.querySelector("button[type='submit']");
-  const originalText = btnSubmit.textContent;
-  btnSubmit.disabled = true;
-  btnSubmit.textContent = "Enviando datos...";
-
-  // Recopilar estados de las obras
-  const estados = [];
-  const form = e.target;
-  
-  // NOTA: Asegúrate de que este bucle de Jinja2 renderiza correctamente los índices
-  // JS no interpreta Jinja, esto debe venir renderizado del servidor.
-  
-    
-      // Capturamos el valor del select
-      const select1 = form.querySelector('[name="estado_1"]');
-      const val1 = select1 ? select1.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE AMPLIACIÓN DE LA CAPACIDAD DE ALMACENAMIENTO PARA MEJOR APROVECHAMIENTO DE LOS EXCEDENTES INVERNALES GENERADOS POR LOS MANANTIALES EN LOS MUNICIPIOS DEL VALLE DEL CETA, PARA FACHECA, FAMORCA Y TOLLOS",
-        plan: "None",
-        estado: val1,
-        archivos: (adjuntosObras["1"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select2 = form.querySelector('[name="estado_2"]');
-      const val2 = select2 ? select2.value : "";
-      
-      estados.push({
-        obra: "REURBANIZACIÓN DEL CASCO URBANO DE TOLLOS",
-        plan: "PLAN +CERCA 2023 BOP: 19/12/2023",
-        estado: val2,
-        archivos: (adjuntosObras["2"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select3 = form.querySelector('[name="estado_3"]');
-      const val3 = select3 ? select3.value : "";
-      
-      estados.push({
-        obra: "ASFALTADO Y MEJORA DE CAMINOS RURALES",
-        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-        estado: val3,
-        archivos: (adjuntosObras["3"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select4 = form.querySelector('[name="estado_4"]');
-      const val4 = select4 ? select4.value : "";
-      
-      estados.push({
-        obra: "ADQ. DE TRES LUMINARIAS SOLARES EN CAMI VELL DE BENIMASSOT",
-        plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <20000 HAB. 2024. BOP: 19/07/2024.",
-        estado: val4,
-        archivos: (adjuntosObras["4"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select5 = form.querySelector('[name="estado_5"]');
-      const val5 = select5 ? select5.value : "";
-      
-      estados.push({
-        obra: "ADECUACIÓN DEL CAMÍ DEL VERTEDERO",
-        plan: "INVERSIONES EN ZONAS VERDES DE TIT. MUNICIPAL 2025 Línea B BOP: 05/08/2025",
-        estado: val5,
-        archivos: (adjuntosObras["5"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select6 = form.querySelector('[name="estado_6"]');
-      const val6 = select6 ? select6.value : "";
-      
-      estados.push({
-        obra: "ADQUISICIÓN LUMINARIAS LED SOLARES",
-        plan: "INVERSIONES EN ZONAS VERDES DE TIT. MUNICIPAL 2025 Línea C BOP: 05/08/2025",
-        estado: val6,
-        archivos: (adjuntosObras["6"] || []).map(f => f.name)
-      });
-    
-  
-
-  // Enviar a Google Forms
-  const formData = new FormData();
-  formData.append("entry.1317069794", "130"); 
-  formData.append("entry.1523598469", JSON.stringify(estados)); 
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando datos...";
 
   try {
+    const estados = [];
+    // Leemos la tabla HTML directamente (más seguro que usar Jinja aquí)
+    const filas = document.querySelectorAll("tbody tr");
+
+    filas.forEach((tr, index) => {
+      // El índice visual empieza en 1, pero JS es 0. 
+      // Tu lógica usa indices basados en 1 (loop.index), así que ajustamos:
+      const loopIndex = index + 1; 
+
+      // Buscar celdas
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 3) return; // Fila inválida
+
+      const nombreObra = tds[0].textContent.trim();
+      const planObra = tds[1].textContent.trim();
+      
+      // Buscar el select de estado
+      const select = tr.querySelector("select");
+      let estadoValor = "";
+
+      if (select) {
+        estadoValor = select.value;
+      } else {
+        // Si no hay select, puede ser texto fijo (ej. "Finalizada")
+        estadoValor = tds[2].textContent.trim();
+        if (estadoValor === "-") stateValue = "";
+      }
+
+      // Solo añadimos si tiene estado relevante
+      if (estadoValor && estadoValor !== "-- Seleccione --" && estadoValor !== "-") {
+        estados.push({
+          obra: nombreObra,
+          plan: planObra,
+          estado: estadoValor,
+          archivos: (adjuntosObras[loopIndex] || []).map(f => f.name)
+        });
+      }
+    });
+
+    console.log("Enviando payload:", estados);
+
+    const formData = new FormData();
+    // REVISA ESTAS IDs CON TU FORMULARIO REAL DE GOOGLE
+    formData.append("entry.1317069794", "130"); 
+    formData.append("entry.1523598469", JSON.stringify(estados)); 
+
     await fetch(URL_GOOGLE_FORMS, { 
       method: "POST", 
       body: formData, 
       mode: "no-cors" 
     });
+
+    btn.textContent = "✅ Datos Enviados";
+    btn.style.backgroundColor = "#2e7d32";
     
-    btnSubmit.textContent = "✅ ¡Enviado!";
-    btnSubmit.style.background = "green";
-    
-    // Opcional: Redirigir o limpiar
     setTimeout(() => {
-       alert("Datos de obras registrados correctamente.");
-       // window.location.reload(); 
+       alert("Formulario enviado correctamente.");
+       // Opcional: window.location.reload(); 
     }, 500);
 
-  } catch(error) {
-    alert("❌ Error al enviar formulario: " + error.message);
-    btnSubmit.disabled = false;
-    btnSubmit.textContent = originalText;
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar: " + error.message);
+    btn.disabled = false;
+    btn.textContent = txtOriginal;
   }
 });
-
 </script>
 </body>
 </html>

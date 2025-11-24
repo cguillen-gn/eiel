@@ -1424,24 +1424,25 @@ button:hover {
 </div>
 
 <script>
-// ------------------------
-// CONFIGURACIÓN
-// ------------------------
+// ==========================================
+// CONFIGURACIÓN Y VARIABLES GLOBALES
+// ==========================================
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
-// Almacén local de archivos para mostrar en la lista antes de enviar el formulario final
+// Almacén de archivos (Clave = ID Obra, Valor = Array de archivos)
 let adjuntosObras = {};
 
-// ------------------------
-// UTILIDADES (Base64)
-// ------------------------
+// ==========================================
+// 1. UTILIDADES
+// ==========================================
+
+// Convierte archivo a Base64 puro
 function getBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => {
-      // Quitamos la cabecera "data:image/png;base64,"
       let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
       if ((encoded.length % 4) > 0) {
         encoded += '='.repeat(4 - (encoded.length % 4));
@@ -1452,37 +1453,111 @@ function getBase64(file) {
   });
 }
 
-// ------------------------
-// GESTIÓN DE INTERFAZ (Listado de archivos)
-// ------------------------
+// ==========================================
+// 2. FUNCIÓN DE SUBIDA (CORREGIDA)
+// ==========================================
+async function subirAdjunto(munCode, obraId) {
+  console.log(`🖱️ Click en adjuntar: Obra ${obraId}, Mun ${munCode}`);
+
+  // TRUCO: Crear el input y añadirlo al body (invisible) para asegurar que funcione el click
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.multiple = true;
+  fileInput.style.display = "none"; // Invisible
+  document.body.appendChild(fileInput); // <-- Importante para algunos navegadores
+
+  fileInput.onchange = async () => {
+    const files = Array.from(fileInput.files);
+    
+    // Si no hay archivos, limpiamos y salimos
+    if (!files.length) {
+      document.body.removeChild(fileInput);
+      return;
+    }
+
+    // 1. Añadir visualmente
+    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
+    adjuntosObras[obraId].push(...files);
+    renderAdjuntosObra(obraId);
+
+    // 2. Preparar zona de mensajes
+    const statusDiv = document.getElementById("adjuntos_" + obraId);
+    let msgBox = document.createElement("div");
+    msgBox.style.fontSize = "12px"; 
+    msgBox.style.fontWeight = "bold";
+    msgBox.style.marginTop = "5px";
+    statusDiv.appendChild(msgBox);
+
+    // 3. Subir uno a uno
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      msgBox.style.color = "#f57c00"; // Naranja
+
+      try {
+        const base64 = await getBase64(file);
+
+        const payload = {
+          tipo: "obra",
+          mun: munCode,
+          obra: obraId,
+          filename: file.name,
+          mimeType: file.type,
+          file: base64
+        };
+
+        const resp = await fetch(URL_APPS_SCRIPT, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        
+        // Intentar parsear respuesta, aunque Apps Script a veces redirige
+        const data = await resp.json().catch(() => ({ status: "unknown" })); 
+
+        if (data.status === "error") throw new Error(data.message);
+        
+        console.log(`✅ ${file.name} subido.`);
+
+      } catch (err) {
+        console.error(err);
+        msgBox.textContent = `⚠️ Error subiendo ${file.name} (Puede estar en Drive)`;
+        msgBox.style.color = "red";
+        // Pequeña pausa para ver el error
+        await new Promise(r => setTimeout(r, 1000));
+      }
+    }
+
+    msgBox.textContent = "✅ Archivos procesados";
+    msgBox.style.color = "green";
+    setTimeout(() => msgBox.remove(), 3000);
+
+    // Limpieza final del DOM
+    document.body.removeChild(fileInput);
+  };
+
+  // Disparar el selector
+  fileInput.click();
+}
+
+// Renderiza la lista de archivos debajo del botón
 function renderAdjuntosObra(obraId) {
   const cont = document.getElementById("adjuntos_" + obraId);
   const files = adjuntosObras[obraId] || [];
-
-  // Mantenemos el div de estado si existe, o limpiamos para repintar la lista
-  // Para simplificar, repintamos la lista y dejamos espacio para mensajes
   
-  // Guardar mensajes temporales si los hubiera
-  const existingMsgs = Array.from(cont.querySelectorAll('.msg-status'));
+  // Guardamos mensajes temporales si los hay para no borrarlos
+  const mensajes = cont.querySelectorAll("div:not(.file-item)"); 
   
-  cont.innerHTML = files
-    .map((f, i) => `
-      <div style="display:flex; align-items:center; gap:6px; margin-top:3px; background:#f9f9f9; padding:2px 5px; border-radius:4px;">
-        <span style="font-size:12px;">📎 ${f.name}</span>
-        <button 
-          type="button" 
-          onclick="eliminarAdjunto('${obraId}', ${i})"
-          style="background:none; color:#b71c1c; border:none; font-size:12px; cursor:pointer; padding:0;"
-          title="Eliminar de la lista (no borra de Drive)"
-        >
-          ✖
-        </button>
-      </div>
-    `)
-    .join("");
+  let html = files.map((f, i) => `
+    <div class="file-item" style="display:flex; align-items:center; gap:5px; margin-top:2px; font-size:12px; background:#eee; padding:2px 5px; border-radius:3px;">
+      <span>📎 ${f.name}</span>
+      <button type="button" onclick="eliminarAdjunto('${obraId}', ${i})" style="border:none; background:none; color:red; cursor:pointer; font-weight:bold;">✖</button>
+    </div>
+  `).join("");
 
-  // Re-insertar mensajes de estado (cargando/exito) al final
-  existingMsgs.forEach(msg => cont.appendChild(msg));
+  cont.innerHTML = html;
+  
+  // Restaurar mensajes
+  mensajes.forEach(m => cont.appendChild(m));
 }
 
 function eliminarAdjunto(obraId, index) {
@@ -1490,778 +1565,85 @@ function eliminarAdjunto(obraId, index) {
   renderAdjuntosObra(obraId);
 }
 
-// ------------------------
-// LÓGICA DE SUBIDA (AJAX + JSON)
-// ------------------------
-async function subirAdjunto(munCode, obraId) {
-  const fileInput = document.createElement("input");
-  fileInput.type = "file";
-  fileInput.multiple = true;
-  // fileInput.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx"; // Opcional: limitar tipos
-
-  fileInput.onchange = async () => {
-    const files = Array.from(fileInput.files);
-    if (!files.length) return;
-
-    // 1. Añadir a la lista visual inmediatamente
-    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
-    adjuntosObras[obraId].push(...files);
-    renderAdjuntosObra(obraId);
-
-    // 2. Preparar zona de mensajes
-    const statusDiv = document.getElementById("adjuntos_" + obraId);
-    const msgBox = document.createElement("div");
-    msgBox.className = "msg-status";
-    msgBox.style.fontSize = "11px";
-    msgBox.style.marginTop = "4px";
-    msgBox.style.fontWeight = "bold";
-    statusDiv.appendChild(msgBox);
-
-    // 3. Subir archivos UNO A UNO
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
-      msgBox.style.color = "#f57c00"; // Naranja
-
-      try {
-        // A. Convertir
-        const base64 = await getBase64(file);
-
-        // B. Payload JSON
-        const payload = {
-          tipo: "obra",      // Importante para tu script
-          mun: munCode,
-          obra: obraId,      // El ID o índice de la obra (para la subcarpeta)
-          filename: file.name,
-          mimeType: file.type,
-          file: base64
-        };
-
-        // C. Enviar
-        const resp = await fetch(URL_APPS_SCRIPT, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        
-        const data = await resp.json();
-
-        if (data.status === "success") {
-          console.log(`✅ ${file.name} subido.`);
-        } else {
-          throw new Error(data.message || "Error desconocido");
-        }
-
-      } catch (err) {
-        console.error(err);
-        msgBox.textContent = `❌ Error con ${file.name}`;
-        msgBox.style.color = "red";
-        // Pausa para leer el error antes de seguir
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    }
-
-    // 4. Finalización
-    msgBox.textContent = "✅ Todos los archivos subidos.";
-    msgBox.style.color = "green";
-    
-    // Borrar mensaje de éxito tras 4 segundos
-    setTimeout(() => {
-      try { msgBox.remove(); } catch(e){}
-    }, 4000);
-  };
-
-  fileInput.click();
-}
-
-
-// ------------------------
-// ENVIAR FORMULARIO FINAL (DATOS A GOOGLE FORM)
-// ------------------------
+// ==========================================
+// 3. ENVÍO FINAL DEL FORMULARIO
+// ==========================================
 document.getElementById("frmObras").addEventListener("submit", async (e) => {
   e.preventDefault();
+  const btn = e.target.querySelector("button[type='submit']");
+  const txtOriginal = btn.textContent;
   
-  const btnSubmit = e.target.querySelector("button[type='submit']");
-  const originalText = btnSubmit.textContent;
-  btnSubmit.disabled = true;
-  btnSubmit.textContent = "Enviando datos...";
-
-  // Recopilar estados de las obras
-  const estados = [];
-  const form = e.target;
-  
-  // NOTA: Asegúrate de que este bucle de Jinja2 renderiza correctamente los índices
-  // JS no interpreta Jinja, esto debe venir renderizado del servidor.
-  
-    
-      // Capturamos el valor del select
-      const select1 = form.querySelector('[name="estado_1"]');
-      const val1 = select1 ? select1.value : "";
-      
-      estados.push({
-        obra: "CONTRATACIÓN CONJUNTA DE REDACCIÓN DEL PROYECTO CONSTRUCTIVO Y EJECUCIÓN MATERIAL DE LAS OBRAS DE ADECUACIÓN Y REFORMA DE LA PLAZA DE TOROS DE ELDA Y SU ENTORNO PARA SU REHABILITACIÓN Y ADECUACIÓN COMO ESPACIO DE USO PÚBLICO. PLAN RENACE.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val1,
-        archivos: (adjuntosObras["1"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select2 = form.querySelector('[name="estado_2"]');
-      const val2 = select2 ? select2.value : "";
-      
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA REHABILITARÁ LAS PLAZAS DEL MATADERO Y DE SANTIAGO CON UNA INVERSIÓN DE 250.000 EUROS",
-        plan: "None",
-        estado: val2,
-        archivos: (adjuntosObras["2"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select3 = form.querySelector('[name="estado_3"]');
-      const val3 = select3 ? select3.value : "";
-      
-      estados.push({
-        obra: "BARRIO DE LA FERIA",
-        plan: "None",
-        estado: val3,
-        archivos: (adjuntosObras["3"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select4 = form.querySelector('[name="estado_4"]');
-      const val4 = select4 ? select4.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE  REFORMA DEL  ESPACIO PÚBLICO DEL RECINTO DEL JARDÍN DE LA MÚSICA, SITUADO EN LA ZONA CENTRAL DEL MUNICIPIO, DENTRO DE LA MANZANA DELIMITADA POR LAS CALLES HILARIÓN ESLAVA, RAMÓN GORGE, ANTONINO VERA Y PADRE MANJÓN, PLAN ELDA RENACE.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val4,
-        archivos: (adjuntosObras["4"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select5 = form.querySelector('[name="estado_5"]');
-      const val5 = select5 ? select5.value : "";
-      
-      estados.push({
-        obra: "EI NUEVO ALMAFRÁ (03011215). AULA PSICOMOTRICIDAD,ACCESIBILIDAD,VENTANAS Y LUMINARIAS,ALICATADO,FONTANERÍA,PATIO Y JUEGOS,PINTURA.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val5,
-        archivos: (adjuntosObras["5"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select6 = form.querySelector('[name="estado_6"]');
-      const val6 = select6 ? select6.value : "";
-      
-      estados.push({
-        obra: "CENTRO PÚBLICO FPA ANTONIO PORPETTA (03011771). REPARACIÓN CUBIERTA, ASCENSOR Y BAÑO ADAPTADO.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val6,
-        archivos: (adjuntosObras["6"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select7 = form.querySelector('[name="estado_7"]');
-      const val7 = select7 ? select7.value : "";
-      
-      estados.push({
-        obra: "IES LA TORRETA (03005768). VALLADO PERIMETRAL, NUEVAS AULAS PARA TALLERES, PLACAS FOTOVOLTAICAS.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val7,
-        archivos: (adjuntosObras["7"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select8 = form.querySelector('[name="estado_8"]');
-      const val8 = select8 ? select8.value : "";
-      
-      estados.push({
-        obra: "CEIP SANTO NEGRO (03010247). ASCENSOR,NUEVO SALÓN ACTOS,VENTANAS Y LUMINARIAS,MEJORA PATIO,ALICATADO,FONTANERÍA,ALBAÑILERIA.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val8,
-        archivos: (adjuntosObras["8"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select9 = form.querySelector('[name="estado_9"]');
-      const val9 = select9 ? select9.value : "";
-      
-      estados.push({
-        obra: "IES LA MELVA (03005720). ASCENSOR Y ESCALERA DE EMERGENCIA, CAMBIO INSTALACIÓN ELÉCTRICA, CONSTRUCCIÓN GIMNASIO.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val9,
-        archivos: (adjuntosObras["9"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select10 = form.querySelector('[name="estado_10"]');
-      const val10 = select10 ? select10.value : "";
-      
-      estados.push({
-        obra: "CEIP VIRGEN DE LA SALUD (03012074). GIMNASIO,ASCENSOR,INSTALACIÓN ELEC,VALLADO,VENTANAS Y LUMINARIAS,PATIO,RADIADORES,ALICATADO,FONTANER.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val10,
-        archivos: (adjuntosObras["10"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select11 = form.querySelector('[name="estado_11"]');
-      const val11 = select11 ? select11.value : "";
-      
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA REFORMA EL MURO DE LA CALLE RAMÓN NOCEDAL PARA AUMENTAR LA SEGURIDAD DE LOS USUARIOS DE LA ASOCIACIÓN DE ALZHEIMER",
-        plan: "None",
-        estado: val11,
-        archivos: (adjuntosObras["11"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select12 = form.querySelector('[name="estado_12"]');
-      const val12 = select12 ? select12.value : "";
-      
-      estados.push({
-        obra: "RENOVACIÓN DE LA RED DE AGUA POTABLE QUE SE LLEVARAN A CABO EN EL ENTORNO DEL PARQUE DE LA CONCORDIA, ASÍ COMO LA RESTITUCIÓN DE LOS DIFERENTES ELEMENTOS DE LA VÍA PÚBLICA E INSTALACIONES AFECTADAS POR LA RENOVACIÓN DE LA RED",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val12,
-        archivos: (adjuntosObras["12"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select13 = form.querySelector('[name="estado_13"]');
-      const val13 = select13 ? select13.value : "";
-      
-      estados.push({
-        obra: "RENOVACIÓN URBANA CALLE DAHELLOS DE ELDA. NEXT GENERATION EU.",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2023 (PTSTD CV 23)",
-        estado: val13,
-        archivos: (adjuntosObras["13"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select14 = form.querySelector('[name="estado_14"]');
-      const val14 = select14 ? select14.value : "";
-      
-      estados.push({
-        obra: "REFORMA DE GRADERÍOS Y VESTUARIOS EN PABELLÓN JUAN CARLOS VERDÚ DE ELDA.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val14,
-        archivos: (adjuntosObras["14"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select15 = form.querySelector('[name="estado_15"]');
-      const val15 = select15 ? select15.value : "";
-      
-      estados.push({
-        obra: "REFORMA ASEOS MERCADO CENTRAL DE ELDA, SEGÚN EL PROYECTO REDACTADO AL EFECTO POR EL ARQUITECTO TÉCNICO D. RUBÉN NAVARRO MONZÓ Y APROBADO POR LA ADMINISTRACIÓN",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val15,
-        archivos: (adjuntosObras["15"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select16 = form.querySelector('[name="estado_16"]');
-      const val16 = select16 ? select16.value : "";
-      
-      estados.push({
-        obra: "MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN EL POLÍGONO INDUSTRIAL FINCA LACY 2024",
-        plan: "IVACE: PARQUES EMPRESARIALES 2024",
-        estado: val16,
-        archivos: (adjuntosObras["16"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select17 = form.querySelector('[name="estado_17"]');
-      const val17 = select17 ? select17.value : "";
-      
-      estados.push({
-        obra: "EJECUCIÓN DEL “PROYECTO BÁSICO Y DE EJECUCIÓN DE REFORMA, ADECUACIÓN Y AMPLIACIÓN EN EL CEE MIGUEL DE CERVANTES II” ADHERIDOS AL PROGRAMA “EDIFICANT” DE LA GENERALITAT VALENCIANA (DECRETO-LEY 5/2017, DE 20 DE OCTUBRE, DEL CONSELL).",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val17,
-        archivos: (adjuntosObras["17"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select18 = form.querySelector('[name="estado_18"]');
-      const val18 = select18 ? select18.value : "";
-      
-      estados.push({
-        obra: "TRABAJOS DE EJECUCIÓN DE LAS OBRAS DE ADAPTACIÓN DEL ECOPARQUE DE ELDA EN EL MARCO DEL PROYECTO DE GESTIÓN DE LA RED DE ECOPARQUES CONSORCIADA DEL CONSORCIO CREA, ÁREA DE GESTIÓN A3.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val18,
-        archivos: (adjuntosObras["18"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select19 = form.querySelector('[name="estado_19"]');
-      const val19 = select19 ? select19.value : "";
-      
-      estados.push({
-        obra: "EI 1ER CICLO SANTA INFANCIA (03009774). REPOSICIÓN.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val19,
-        archivos: (adjuntosObras["19"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select20 = form.querySelector('[name="estado_20"]');
-      const val20 = select20 ? select20.value : "";
-      
-      estados.push({
-        obra: "MEMORA, MODERNIZACION Y REFORMA POLIGONO CAMPO ALTO 2024",
-        plan: "IVACE: PARQUES EMPRESARIALES 2024",
-        estado: val20,
-        archivos: (adjuntosObras["20"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select21 = form.querySelector('[name="estado_21"]');
-      const val21 = select21 ? select21.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE AMPLIACIÓN DEL CEMENTERIO VIRGEN DE LOS DOLORES DE ELDA, FASES 1 Y 2.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val21,
-        archivos: (adjuntosObras["21"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select22 = form.querySelector('[name="estado_22"]');
-      const val22 = select22 ? select22.value : "";
-      
-      estados.push({
-        obra: "IES LA MELVA DE ELDA. ADECUACIÓN DE ESPACIOS E INFRAESTRUCTURAS PARA LA IMPLANTACIÓN DEL CICLO FORMATIVO DE GRADO SUPERIOR DE PRÓTESIS DENTALES DE LA FAMILIA PROFESIONAL DE SANITARIA.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val22,
-        archivos: (adjuntosObras["22"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select23 = form.querySelector('[name="estado_23"]');
-      const val23 = select23 ? select23.value : "";
-      
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA MEJORARÁ LA ACCESIBILIDAD DEL BARRIO VIRGEN DE LA SALUD CON LA CONSTRUCCIÓN DE LAS ACERAS DE LA CALLE ASTRONOMÍA Y EL PASEO DE LAS DELICIAS",
-        plan: "None",
-        estado: val23,
-        archivos: (adjuntosObras["23"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select24 = form.querySelector('[name="estado_24"]');
-      const val24 = select24 ? select24.value : "";
-      
-      estados.push({
-        obra: "PASARELA PEATONAL DE ACCESO A LA ERMITA DE SAN ANTÓN (PLAN ELDA RENACE).",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val24,
-        archivos: (adjuntosObras["24"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select25 = form.querySelector('[name="estado_25"]');
-      const val25 = select25 ? select25.value : "";
-      
-      estados.push({
-        obra: "PROYECTO PARA LA MEJORA, MODERNIZACIÓN Y REURBANIZACIÓN DE LAS INFRAESTRUCTURAS DEL POLIGONO INDUSTRIAL CAMPO ALTO, ELDA. PARA ACOMETER EN 2022. 2022",
-        plan: "IVACE: PARQUES EMPRESARIALES 2022",
-        estado: val25,
-        archivos: (adjuntosObras["25"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select26 = form.querySelector('[name="estado_26"]');
-      const val26 = select26 ? select26.value : "";
-      
-      estados.push({
-        obra: "CEE PÚB. MIGUEL DE CERVANTES (03010806). ASEOS, ACCESIBILIDAD, EFICIENCIA ENERGÉTICA,INSTALACIÓN ELÉCTRICA Y GRUA ALUMNOS NECESIDADES EDUCATIVAS ESPECIALES.",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: val26,
-        archivos: (adjuntosObras["26"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select27 = form.querySelector('[name="estado_27"]');
-      const val27 = select27 ? select27.value : "";
-      
-      estados.push({
-        obra: "REURBANIZACIÓN PEATONAL DEL ENTORNO DEL AYUNTAMIENTO Y LA IGLESIA SANTA ANA EN EL CENTRO HISTÓRICO",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2023 (PTSTD CV 23)",
-        estado: val27,
-        archivos: (adjuntosObras["27"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select28 = form.querySelector('[name="estado_28"]');
-      const val28 = select28 ? select28.value : "";
-      
-      estados.push({
-        obra: "ACONDICIONAMIENTO DE SENDEROS EN CAMINOS HISTÓRICOS: VÍA AUGUSTA",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2023 (PTSTD CV 23)",
-        estado: val28,
-        archivos: (adjuntosObras["28"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select29 = form.querySelector('[name="estado_29"]');
-      const val29 = select29 ? select29.value : "";
-      
-      estados.push({
-        obra: "PROYECTO INTERPRETATIVO DEL REFUGIO ANTIAÉREO A TRAVÉS DE LAS NUEVAS TECNOLOGÍAS",
-        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2023 (PTSTD CV 23)",
-        estado: val29,
-        archivos: (adjuntosObras["29"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select30 = form.querySelector('[name="estado_30"]');
-      const val30 = select30 ? select30.value : "";
-      
-      estados.push({
-        obra: "PROYECTO DE ADECUACIÓN DE LA EDAR DEL VALLE DEL VINALOPÓ Y DE LAS INFRAESTRUCTURAS PARA LA REUTILIZACIÓN DE SU EFLUENTE. PRTR. NEXT GENERATION EU.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val30,
-        archivos: (adjuntosObras["30"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select31 = form.querySelector('[name="estado_31"]');
-      const val31 = select31 ? select31.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE ADECUACIÓN Y REFORMA DE LA PLAZA DE TOROS DE ELDA Y SU ENTORNO PARA SU REHABILITACIÓN Y ADECUACIÓN COMO ESPACIO DE USO PÚBLICO",
-        plan: "PLAN PLANIFICA 2024-27 BOP: 07/01/2025",
-        estado: val31,
-        archivos: (adjuntosObras["31"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select32 = form.querySelector('[name="estado_32"]');
-      const val32 = select32 ? select32.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN DE AMBAS ESCALERAS, NUEVO MURO Y JARDÍN EN CALLE CLÉRIGOS EN SU CONFLUENCIA CON AVDA. NOVO HAMBURGO DE ELDA, INCLUIDA DENTRO DEL PLAN "ELDA PARTE DE TI"",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val32,
-        archivos: (adjuntosObras["32"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select33 = form.querySelector('[name="estado_33"]');
-      const val33 = select33 ? select33.value : "";
-      
-      estados.push({
-        obra: "RENOVACIÓN, ADECUACIÓN Y MANTENIMIENTO LOS ELEMENTOS DEL PARQUE DE NUEVA FRATERNIDAD DE ELDA Y LAS ZONAS DE JUEGO EXISTENTES, INCLUIDAS DENTRO DEL PLAN "ELDA PARTE DE TI".",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val33,
-        archivos: (adjuntosObras["33"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select34 = form.querySelector('[name="estado_34"]');
-      const val34 = select34 ? select34.value : "";
-      
-      estados.push({
-        obra: "CONSTRUCCIÓN DEL NUEVO PARQUE DE BOMBEROS EN ELDA",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val34,
-        archivos: (adjuntosObras["34"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select35 = form.querySelector('[name="estado_35"]');
-      const val35 = select35 ? select35.value : "";
-      
-      estados.push({
-        obra: "DERRIBO Y CONSTRUCCIÓN DE NUEVO EDIFICIO PARA LA POLICÍA LOCAL DE ELDA.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val35,
-        archivos: (adjuntosObras["35"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select36 = form.querySelector('[name="estado_36"]');
-      const val36 = select36 ? select36.value : "";
-      
-      estados.push({
-        obra: "REURBANIZACIÓN DE LAS CALLES UBICADAS EN EL ENTORNO DE LA IGLESIA DE SANTA ANA FINANCIADO POR LA UNIÓN EUROPEA CON LOS FONDOS NEXT GENERATION EU.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val36,
-        archivos: (adjuntosObras["36"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select37 = form.querySelector('[name="estado_37"]');
-      const val37 = select37 ? select37.value : "";
-      
-      estados.push({
-        obra: "MEJORA MODERNIZACION Y DOTACION DEINFRAESTRUCTURAS Y SERVICIOS EN PI CAMPOALTO",
-        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-        estado: val37,
-        archivos: (adjuntosObras["37"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select38 = form.querySelector('[name="estado_38"]');
-      const val38 = select38 ? select38.value : "";
-      
-      estados.push({
-        obra: "MEJORA MODERNIZACION Y DOTACION DEINFRAESTRUCTURAS Y SERVICIOS EN PI FINCALACY",
-        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-        estado: val38,
-        archivos: (adjuntosObras["38"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select39 = form.querySelector('[name="estado_39"]');
-      const val39 = select39 ? select39.value : "";
-      
-      estados.push({
-        obra: "OBRAS PARA LA AMPLIACIÓN DEL SERVICIO DE URGENCIAS DEL HOSPITAL GENERAL UNIVERSITARIO DE ELDA, RESPETUOSAS CON EL MEDIO AMBIENTE.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val39,
-        archivos: (adjuntosObras["39"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select40 = form.querySelector('[name="estado_40"]');
-      const val40 = select40 ? select40.value : "";
-      
-      estados.push({
-        obra: "REHABILITACIÓN DEL ANTIGUO CONSERVATORIO DE MÚSICA DE ELDA",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val40,
-        archivos: (adjuntosObras["40"] || []).map(f => f.name)
-      });
-    
-  
-    
-      // Capturamos el valor del select
-      const select41 = form.querySelector('[name="estado_41"]');
-      const val41 = select41 ? select41.value : "";
-      
-      estados.push({
-        obra: "OBRAS DE REHABILITACIÓN DE LA PLAZA UBICADA ENTRE CALLE NUEVA Y CALLE SAN JOSÉ DE CALASANZ, INCLUIDA DENTRO DEL PLAN "ELDA PARTE DE TI".",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: val41,
-        archivos: (adjuntosObras["41"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA REPARA Y ASFALTA EL CAMINO QUE UNE EL POLÍGONO CAMPO ALTO CON LA ESTACIÓN DE MONÓVAR PARA MEJORAR EL PASO DE LOS VEHÍCULOS",
-        plan: "None",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["42"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA REPARA EL PAVIMENTO Y EL SANEAMIENTO DE LA CALLE VIRGEN DEL MILAGRO",
-        plan: "None",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["43"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "MEJORA MODERNIZACION Y DOTACION DE INFRAESTRUCTURAS CAMPO ALTO 20232023",
-        plan: "IVACE: PARQUES EMPRESARIALES 2023",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["44"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "ALMACÉN Y TORRE",
-        plan: "PLAN +DEPORTE 2021 BOP: 17/08/2021",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["45"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "RENOVACIÓN DE LAS INSTALACIONES DE ALUMBRADO PÚBLICO EN ELDA. FEDER DE CRECIMIENTO SOSTENIBLE 2014-2020.",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["46"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "CEIP JUAN RICO Y AMAT. ASCENSOR,RADIADORES,INSTALACIÓN ELÉCTRICA,VENTANAS Y LUMINARIAS,ACCESIBILIDAD,ALICATADO,PATIO,VALLAD",
-        plan: "GVA (PROGRAMA EDIFICANT)",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["47"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "APEO DE VIGUETAS DE FORMADO EN CUBIERTA EN EL EDIFICIO DE LA POLICÍA LOCAL DE ELDA",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["48"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "REURBANIZACIÓN DE LA CALLE RAMÓN GORGÉ ENTRE LAS CALLES HILARIÓN ESLAVA Y PADRE MANJÓN, Y LA ACERA DE LOS NÚMEROS IMPARES DE LA CALLE PADRE MANJÓN ENTRE LA CALLE RAMÓN GORGÉ Y LA CALLE ZORRILLA DE ELDA (PLAN RENACE).",
-        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["49"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "EL AYUNTAMIENTO DE ELDA INICIA LOS TRABAJOS DE REMODELACIÓN DEL CAMPO DE FÚTBOL NÚMERO 3 DE LAS INSTALACIONES DE LA SISMAT",
-        plan: "None",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["50"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "PLAN INDUSTRIA 4.0 - MEJORA DE LA EFICIENCIA ENERGÉTICA Y DE LA IMAGEN PÚBLICA DEL POLÍGONO INDUSTRIAL TORRETA RÍO 2021",
-        plan: "IVACE: PARQUES EMPRESARIALES 2021",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["51"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "PLAN INDUSTRIA 4.0 - MEJORA INFRAESTRUCTURA POLÍGONO INDUSTRIAL CAMPO ALTO 2021",
-        plan: "IVACE: PARQUES EMPRESARIALES 2021",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["52"] || []).map(f => f.name)
-      });
-    
-  
-    
-      estados.push({
-        obra: "PLAN INDUSTRIA 4.0 - MEJORA DE LA EFICIENCIA ENERGÉTICA Y DE LA IMAGEN PÚBLICA DEL POLÍGONO INDUSTRIAL FINCA LACY 2021",
-        plan: "IVACE: PARQUES EMPRESARIALES 2021",
-        estado: "Finalizada",
-        archivos: (adjuntosObras["53"] || []).map(f => f.name)
-      });
-    
-  
-
-  // Enviar a Google Forms
-  const formData = new FormData();
-  formData.append("entry.1317069794", "066"); 
-  formData.append("entry.1523598469", JSON.stringify(estados)); 
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando datos...";
 
   try {
+    const estados = [];
+    // Leemos la tabla HTML directamente (más seguro que usar Jinja aquí)
+    const filas = document.querySelectorAll("tbody tr");
+
+    filas.forEach((tr, index) => {
+      // El índice visual empieza en 1, pero JS es 0. 
+      // Tu lógica usa indices basados en 1 (loop.index), así que ajustamos:
+      const loopIndex = index + 1; 
+
+      // Buscar celdas
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 3) return; // Fila inválida
+
+      const nombreObra = tds[0].textContent.trim();
+      const planObra = tds[1].textContent.trim();
+      
+      // Buscar el select de estado
+      const select = tr.querySelector("select");
+      let estadoValor = "";
+
+      if (select) {
+        estadoValor = select.value;
+      } else {
+        // Si no hay select, puede ser texto fijo (ej. "Finalizada")
+        estadoValor = tds[2].textContent.trim();
+        if (estadoValor === "-") stateValue = "";
+      }
+
+      // Solo añadimos si tiene estado relevante
+      if (estadoValor && estadoValor !== "-- Seleccione --" && estadoValor !== "-") {
+        estados.push({
+          obra: nombreObra,
+          plan: planObra,
+          estado: estadoValor,
+          archivos: (adjuntosObras[loopIndex] || []).map(f => f.name)
+        });
+      }
+    });
+
+    console.log("Enviando payload:", estados);
+
+    const formData = new FormData();
+    // REVISA ESTAS IDs CON TU FORMULARIO REAL DE GOOGLE
+    formData.append("entry.1317069794", "066"); 
+    formData.append("entry.1523598469", JSON.stringify(estados)); 
+
     await fetch(URL_GOOGLE_FORMS, { 
       method: "POST", 
       body: formData, 
       mode: "no-cors" 
     });
+
+    btn.textContent = "✅ Datos Enviados";
+    btn.style.backgroundColor = "#2e7d32";
     
-    btnSubmit.textContent = "✅ ¡Enviado!";
-    btnSubmit.style.background = "green";
-    
-    // Opcional: Redirigir o limpiar
     setTimeout(() => {
-       alert("Datos de obras registrados correctamente.");
-       // window.location.reload(); 
+       alert("Formulario enviado correctamente.");
+       // Opcional: window.location.reload(); 
     }, 500);
 
-  } catch(error) {
-    alert("❌ Error al enviar formulario: " + error.message);
-    btnSubmit.disabled = false;
-    btnSubmit.textContent = originalText;
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar: " + error.message);
+    btn.disabled = false;
+    btn.textContent = txtOriginal;
   }
 });
-
 </script>
 </body>
 </html>
