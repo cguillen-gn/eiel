@@ -40,6 +40,18 @@ def conectar():
     )
     return conn
 
+def obtener_fase_actual(conn):
+    try:
+        cur = conn.cursor()
+        # Selecciona la fase máxima (ej. 2024)
+        cur.execute("SELECT max(fase) FROM geonet_fase;")
+        fase = cur.fetchone()[0]
+        cur.close()
+        return int(fase)
+    except Exception as e:
+        print(f"❌ Error al obtener fase actual: {e}")
+        return 0 # Valor por defecto si falla
+        
 def cargar_mapado_municipios(path):
     d = {}
     if not os.path.exists(path):
@@ -161,6 +173,9 @@ def main():
 
     conn = conectar()
     try:
+        fase_actual = obtener_fase_actual(conn) # <--- LLAMAR A LA NUEVA FUNCIÓN
+        fase_anterior = fase_actual - 1         # <--- CALCULAR EL AÑO ANTERIOR
+        
         municipios = obtener_municipios(conn)
         print("Municipios detectados en BD:", municipios)
         for mun in municipios:
@@ -182,7 +197,8 @@ def main():
                 muni_display = muni_display,
                 depositos_json = depositos_json,
                 url_apps_script = URL_APPS_SCRIPT,
-                url_google_forms = URL_GOOGLE_FORMS
+                url_google_forms = URL_GOOGLE_FORMS,
+                fase_anterior = fase_anterior 
             )
             
             fname_agua = f"agua_{mun_code}.html"
