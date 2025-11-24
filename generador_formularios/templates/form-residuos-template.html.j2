@@ -11,7 +11,7 @@
 body { font-family: 'Inter', Arial, sans-serif; padding: 16px; background:#e8f5e9; }
 .container {
 background: white; padding: 25px; border-radius: 12px;
-max-width: 1000px;
+max-width: 1100px;
 margin: 20px auto;
 box-shadow:0 6px 20px rgba(0,0,0,0.15);
 border-top: 5px solid #3F51B5; / Color de acento azul */
@@ -35,65 +35,69 @@ padding: 12px 20px;
 button:hover { background:#303F9F; }
 
 /* ------------------------------------------- /
-/ ESTILOS DE LA TABLA (IMPLEMENTACIÓN CON CSS GRID) /
-/ ------------------------------------------- /
-table {
-width:100%;
-border-collapse: collapse;
-font-size: 14px;
-table-layout: fixed;
-}
-table th {
-background: #3F51B5; / Fondo de cabecera azul */
-color: white;
-padding: 12px 8px;
-text-align: center;
-border-bottom: 3px solid #303F9F;
-font-weight: 600;
-}
+/ ESTILOS DE LA TABLA (CSS GRID PURO) /
+/ ------------------------------------------- */
 
-/* Contenedor Grid que simula el cuerpo de la tabla /
-.grid-table {
+/* Contenedor principal que actúa como tabla /
+.residuos-table-container {
 display: grid;
-/ Define 5 columnas con los anchos del header /
+/ Define 5 columnas con anchos fijos y asegura la alineación /
 grid-template-columns: 25% 15% 15% 20% 25%;
-border: 1px solid #e0e0e0;
-border-top: none; / Se une con el header */
+border: 1px solid #c0c0c0;
+border-radius: 4px;
+overflow: hidden; / Para contener los bordes internos */
+margin-top: 20px;
 }
 
-/* Cada fila /
-.grid-row {
-display: contents; / Hace que los hijos (divs) se comporten como celdas de la cuadrícula padre */
+/* Estilo para las celdas de la cabecera /
+.grid-header-cell {
+background: #3F51B5; / Fondo de cabecera azul /
+color: white;
+padding: 10px 8px;
+text-align: center;
+font-weight: 600;
+border-right: 1px solid #303F9F; / Borde de separación entre TH /
+}
+/ Quitar borde derecho a la última celda de cabecera */
+.grid-header-cell:last-child {
+border-right: none;
 }
 
-/* Cada celda /
-.grid-table > div {
-border-bottom: 1px solid #e0e0e0;
+/* Estilo para TODAS las celdas de datos (filas) /
+.grid-data-cell {
 padding: 6px;
-vertical-align: middle;
-/ Estilo flex para centrar contenido verticalmente /
-display: flex;
+border-top: 1px solid #e0e0e0;
+border-right: 1px solid #e0e0e0; / Borde de separación entre TD /
+display: flex; / Para centrar contenido */
 align-items: center;
 box-sizing: border-box;
 }
-.grid-table > div:nth-child(5n+1) { / La primera celda de cada fila */
+
+/* La última celda de cada fila (columna 'Vertedero') no tiene borde derecho /
+.grid-data-cell:nth-child(5n) {
+border-right: none;
+}
+/ La primera celda de cada fila ('Tipo de residuo') */
+.grid-data-cell:nth-child(5n+1) {
 background-color: #f7f7f7;
 text-align: left;
 font-weight: 500;
 padding-left: 10px;
 }
 
-/* Estilo para los inputs dentro de las celdas Grid */
-.grid-table input[type="number"], .grid-table input[type="text"], .grid-table select {
+/* Estilo para los inputs y selects dentro de las celdas */
+.grid-data-cell input[type="number"],
+.grid-data-cell input[type="text"],
+.grid-data-cell select {
 width: 100%;
 max-width: none;
 margin: 0;
-padding: 8px 4px;
+padding: 6px 4px;
 border-radius: 3px;
-border: 1px solid #999;
+border: 1px solid #c0c0c0;
 background-color: white;
 text-align: center;
-font-size: 14px;
+font-size: 13px;
 display: block;
 }
 
@@ -113,20 +117,23 @@ align-items: center;
 #mensaje { font-weight:bold; margin-top:15px; text-align: center; }
 
 /* Estilos de responsividad simple /
-@media (max-width: 600px) {
+@media (max-width: 800px) {
 .container {
 padding: 15px;
-margin: 0;
-border-radius: 0;
 }
-.grid-table {
-/ Desactiva la cuadrícula en pantallas muy pequeñas, mostrando como lista */
-grid-template-columns: 1fr;
-border-right: none;
+.residuos-table-container {
+/ Desactiva la cuadrícula en pantallas pequeñas y permite scroll horizontal /
+display: block;
+overflow-x: auto;
+white-space: nowrap; / Mantiene los contenidos de la fila juntos /
+width: 100%;
+min-width: 800px; / Asegura un ancho mínimo para que se vea como tabla /
 }
-.grid-table > div {
-border-right: none;
-border-left: none;
+.grid-header-cell, .grid-data-cell {
+display: inline-block;
+width: 150px; / Ancho fijo en mobile si no se usa Grid */
+border-right: 1px solid #c0c0c0;
+vertical-align: top;
 }
 }
 </style>
@@ -143,141 +150,125 @@ border-left: none;
 
 <h3>Recogida de residuos en el año {{ fase_anterior }}</h3>
 
-<!-- TABLA: SOLO CABECERA REAL -->
+<!-- TABLA COMPLETA IMPLEMENTADA CON CSS GRID -->
 
-<table id="tablaResiduosHeader" style="margin-bottom: 0;">
-<thead>
-<tr>
-<th style="width: 25%;">Tipo de residuo</th>
-<th style="width: 15%;">Producción (t/año)</th>
-<th style="width: 15%;">Nº contenedores</th>
-<th style="width: 20%;">Periodicidad de recogida</th>
-<th style="width: 25%;">Vertedero o planta de tratamiento de destino</th>
-</tr>
-</thead>
-</table>
+<div id="tablaResiduosContent" class="residuos-table-container">
 
-<!-- CUERPO DE LA TABLA: HARDCODEADO CON GRID/DIVS -->
+<!-- CABECERA DE LA TABLA (Primera Fila del Grid) -->
+<div class="grid-header-cell">Tipo de residuo</div>
+<div class="grid-header-cell">Producción (t/año)</div>
+<div class="grid-header-cell">Nº contenedores</div>
+<div class="grid-header-cell">Periodicidad de recogida</div>
+<div class="grid-header-cell" style="border-right: none;">Vertedero o planta de tratamiento de destino</div>
 
-<div id="tablaResiduosContent" class="grid-table">
 <!-- Fila 1: Plásticos y Envases (amarillo) -->
-<div class="grid-row">
-<div>Plásticos y Envases (amarillo)</div>
-<div>
-<input type="number" id="prod_plastico" placeholder="t/año" min="0" step="any">
+<div class="grid-data-cell">Plásticos y Envases (amarillo)</div>
+<div class="grid-data-cell">
+    <input type="number" id="prod_plastico" placeholder="t/año" min="0" step="any">
 </div>
-<div>
-<input type="number" id="cont_plastico" placeholder="Nº" min="0">
+<div class="grid-data-cell">
+    <input type="number" id="cont_plastico" placeholder="Nº" min="0">
 </div>
-<div>
-<select id="period_plastico">
-<option value="diaria">diaria</option>
-<option value="semanal">semanal</option>
-<option value="quincenal">quincenal</option>
-<option value="dias alternos">dias alternos</option>
-<option value="otros">otros</option>
-<option value="sin periodicidad">sin periodicidad</option>
-</select>
+<div class="grid-data-cell">
+    <select id="period_plastico">
+        <option value="diaria">diaria</option>
+        <option value="semanal">semanal</option>
+        <option value="quincenal">quincenal</option>
+        <option value="dias alternos">dias alternos</option>
+        <option value="otros">otros</option>
+        <option value="sin periodicidad">sin periodicidad</option>
+    </select>
 </div>
-<div>
-<input type="text" id="dest_plastico" placeholder="Vertedero/Planta">
-</div>
+<div class="grid-data-cell">
+    <input type="text" id="dest_plastico" placeholder="Vertedero/Planta">
 </div>
 
 <!-- Fila 2: Papel y Cartón (azul) -->
-<div class="grid-row">
-    <div>Papel y Cartón (azul)</div>
-    <div>
-        <input type="number" id="prod_papel" placeholder="t/año" min="0" step="any">
-    </div>
-    <div>
-        <input type="number" id="cont_papel" placeholder="Nº" min="0">
-    </div>
-    <div>
-        <select id="period_papel">
-            <option value="diaria">diaria</option>
-            <option value="semanal">semanal</option>
-            <option value="quincenal">quincenal</option>
-            <option value="dias alternos">dias alternos</option>
-            <option value="otros">otros</option>
-            <option value="sin periodicidad">sin periodicidad</option>
-        </select>
-    </div>
-    <div>
-        <input type="text" id="dest_papel" placeholder="Vertedero/Planta">
-    </div>
+<div class="grid-data-cell">Papel y Cartón (azul)</div>
+<div class="grid-data-cell">
+    <input type="number" id="prod_papel" placeholder="t/año" min="0" step="any">
+</div>
+<div class="grid-data-cell">
+    <input type="number" id="cont_papel" placeholder="Nº" min="0">
+</div>
+<div class="grid-data-cell">
+    <select id="period_papel">
+        <option value="diaria">diaria</option>
+        <option value="semanal">semanal</option>
+        <option value="quincenal">quincenal</option>
+        <option value="dias alternos">dias alternos</option>
+        <option value="otros">otros</option>
+        <option value="sin periodicidad">sin periodicidad</option>
+    </select>
+</div>
+<div class="grid-data-cell">
+    <input type="text" id="dest_papel" placeholder="Vertedero/Planta">
 </div>
 
 <!-- Fila 3: Vidrio (verde) -->
-<div class="grid-row">
-    <div>Vidrio (verde)</div>
-    <div>
-        <input type="number" id="prod_vidrio" placeholder="t/año" min="0" step="any">
-    </div>
-    <div>
-        <input type="number" id="cont_vidrio" placeholder="Nº" min="0">
-    </div>
-    <div>
-        <select id="period_vidrio">
-            <option value="diaria">diaria</option>
-            <option value="semanal">semanal</option>
-            <option value="quincenal">quincenal</option>
-            <option value="dias alternos">dias alternos</option>
-            <option value="otros">otros</option>
-            <option value="sin periodicidad">sin periodicidad</option>
-        </select>
-    </div>
-    <div>
-        <input type="text" id="dest_vidrio" placeholder="Vertedero/Planta">
-    </div>
+<div class="grid-data-cell">Vidrio (verde)</div>
+<div class="grid-data-cell">
+    <input type="number" id="prod_vidrio" placeholder="t/año" min="0" step="any">
+</div>
+<div class="grid-data-cell">
+    <input type="number" id="cont_vidrio" placeholder="Nº" min="0">
+</div>
+<div class="grid-data-cell">
+    <select id="period_vidrio">
+        <option value="diaria">diaria</option>
+        <option value="semanal">semanal</option>
+        <option value="quincenal">quincenal</option>
+        <option value="dias alternos">dias alternos</option>
+        <option value="otros">otros</option>
+        <option value="sin periodicidad">sin periodicidad</option>
+    </select>
+</div>
+<div class="grid-data-cell">
+    <input type="text" id="dest_vidrio" placeholder="Vertedero/Planta">
 </div>
 
 <!-- Fila 4: Orgánico (marrón) -->
-<div class="grid-row">
-    <div>Orgánico (marrón)</div>
-    <div>
-        <input type="number" id="prod_organico" placeholder="t/año" min="0" step="any">
-    </div>
-    <div>
-        <input type="number" id="cont_organico" placeholder="Nº" min="0">
-    </div>
-    <div>
-        <select id="period_organico">
-            <option value="diaria">diaria</option>
-            <option value="semanal">semanal</option>
-            <option value="quincenal">quincenal</option>
-            <option value="dias alternos">dias alternos</option>
-            <option value="otros">otros</option>
-            <option value="sin periodicidad">sin periodicidad</option>
-        </select>
-    </div>
-    <div>
-        <input type="text" id="dest_organico" placeholder="Vertedero/Planta">
-    </div>
+<div class="grid-data-cell">Orgánico (marrón)</div>
+<div class="grid-data-cell">
+    <input type="number" id="prod_organico" placeholder="t/año" min="0" step="any">
+</div>
+<div class="grid-data-cell">
+    <input type="number" id="cont_organico" placeholder="Nº" min="0">
+</div>
+<div class="grid-data-cell">
+    <select id="period_organico">
+        <option value="diaria">diaria</option>
+        <option value="semanal">semanal</option>
+        <option value="quincenal">quincenal</option>
+        <option value="dias alternos">dias alternos</option>
+        <option value="otros">otros</option>
+        <option value="sin periodicidad">sin periodicidad</option>
+    </select>
+</div>
+<div class="grid-data-cell">
+    <input type="text" id="dest_organico" placeholder="Vertedero/Planta">
 </div>
 
 <!-- Fila 5: No selectiva/resto -->
-<div class="grid-row">
-    <div>No selectiva/resto</div>
-    <div>
-        <input type="number" id="prod_resto" placeholder="t/año" min="0" step="any">
-    </div>
-    <div>
-        <input type="number" id="cont_resto" placeholder="Nº" min="0">
-    </div>
-    <div>
-        <select id="period_resto">
-            <option value="diaria">diaria</option>
-            <option value="semanal">semanal</option>
-            <option value="quincenal">quincenal</option>
-            <option value="dias alternos">dias alternos</option>
-            <option value="otros">otros</option>
-            <option value="sin periodicidad">sin periodicidad</option>
-        </select>
-    </div>
-    <div>
-        <input type="text" id="dest_resto" placeholder="Vertedero/Planta">
-    </div>
+<div class="grid-data-cell">No selectiva/resto</div>
+<div class="grid-data-cell">
+    <input type="number" id="prod_resto" placeholder="t/año" min="0" step="any">
+</div>
+<div class="grid-data-cell">
+    <input type="number" id="cont_resto" placeholder="Nº" min="0">
+</div>
+<div class="grid-data-cell">
+    <select id="period_resto">
+        <option value="diaria">diaria</option>
+        <option value="semanal">semanal</option>
+        <option value="quincenal">quincenal</option>
+        <option value="dias alternos">dias alternos</option>
+        <option value="otros">otros</option>
+        <option value="sin periodicidad">sin periodicidad</option>
+    </select>
+</div>
+<div class="grid-data-cell">
+    <input type="text" id="dest_resto" placeholder="Vertedero/Planta">
 </div>
 
 
