@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Formulario Residuos - 043</title>
+<style>
+body { font-family: 'Inter', Arial, sans-serif; padding: 16px; background:#e8f5e9; }
+.container {
+background: white; padding: 25px; border-radius: 12px;
+max-width: 900px; margin: auto; box-shadow:0 6px 20px rgba(0,0,0,0.15);
+border-top: 5px solid #4CAF50; /* Green accent */
+}
+input, button, select {
+padding: 10px; margin: 8px 0; border-radius: 6px; border: 1px solid #ccc;
+box-sizing: border-box;
+}
+button { cursor:pointer; background:#4CAF50; color:white; border:none; transition: background 0.3s; }
+button:hover { background:#388E3C; }
+
+/* Tabla Estilos /
+table { width:100%; border-collapse: collapse; margin-top:20px; font-size: 14px; }
+table th {
+background: #f1f8e9; / Light green header /
+padding: 12px 8px;
+text-align: center;
+border-bottom: 2px solid #4CAF50;
+}
+table td {
+border:1px solid #ddd;
+padding: 8px;
+text-align: center;
+}
+table input[type="number"], table input[type="text"], table select {
+width: 95%; / Adjust width inside cells */
+max-width: none;
+margin: 0;
+padding: 5px;
+}
+.file-list { margin-top:8px; }
+.file-item {
+background:#f0f4f7;
+padding:6px 10px;
+margin:3px 0;
+border-radius:4px;
+display:flex;
+justify-content:space-between;
+align-items: center;
+}
+#mensaje { font-weight:bold; margin-top:15px; text-align: center; }
+</style>
+
+</head>
+
+<body>
+<div class="container">
+
+<h2>Formulario — Residuos</h2>
+<p>Municipio: <span id="muniName">043</span></p>
+
+<!-- APARTADO 1: RECOGIDA DE RESIDUOS -->
+
+<h3>Recogida de residuos en el año 2024</h3>
+
+<table id="tablaResiduos">
+<thead>
+<tr>
+<th style="width: 25%;">Tipo de residuo</th>
+<th style="width: 15%;">Producción (t/año)</th>
+<th style="width: 15%;">Nº contenedores</th>
+<th style="width: 20%;">Periodicidad de recogida</th>
+<th style="width: 25%;">Vertedero o planta de tratamiento de destino</th>
+</tr>
+</thead>
+<tbody>
+<!-- Las filas se pintarán con JavaScript -->
+</tbody>
+</table>
+
+<!-- APARTADO 2: LIMPIEZA VIARIA -->
+
+<h3 style="margin-top: 30px;">Limpieza Viaria</h3>
+<label for="personasLimpieza" style="display:block; font-weight:bold; margin-bottom:5px;">
+Número de personas dedicadas a la limpieza viaria:
+</label>
+<input
+type="number"
+id="personasLimpieza"
+placeholder="Ej: 5"
+min="0"
+style="max-width: 250px;"
+>
+
+<!-- APARTADO 3: ADJUNTAR ARCHIVOS (Copiado de la lógica de Obras/Agua) -->
+
+<h3 style="margin-top: 30px;">Adjuntar Archivos (Opcional)</h3>
+<button type="button" onclick="iniciarSubida()">
+Adjuntar Archivos
+</button>
+<div id="adjuntos_residuos" style="font-size:13px; margin-top:4px;"></div>
+<div id="fileList" class="file-list"></div>
+
+<button id="firmarBtn" style="margin-top: 25px;">Firmar y enviar</button>
+
+<div id="mensaje"></div>
+</div>
+
+<script>
+// ------------------------
+
+const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec";
+const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
+
+// MUNICIPIO inyectado por el generador (código INE)
+let municipio = "043";
+let municipioNombre = "043";
+
+// ------------------------
+// DATOS INICIALES Y LÓGICA DE TABLA
+// ------------------------
+
+// Inicializamos los datos fijos de la tabla
+let residuosData = [
+{ tipo: "Plásticos y Envases (amarillo)", produccion: null, contenedores: null, periodicidad: "diaria", destino: "" },
+{ tipo: "Papel y Cartón (azul)", produccion: null, contenedores: null, periodicidad: "diaria", destino: "" },
+{ tipo: "Vidrio (verde)", produccion: null, contenedores: null, periodicidad: "diaria", destino: "" },
+{ tipo: "Orgánico (marrón)", produccion: null, contenedores: null, periodicidad: "diaria", destino: "" },
+{ tipo: "No selectiva/resto", produccion: null, contenedores: null, periodicidad: "diaria", destino: "" },
+];
+
+const opcionesPeriodicidad = ["diaria", "semanal", "quincenal", "dias alternos", "otros", "sin periodicidad"];
+
+function pintarTabla(){
+let html = "";
+residuosData.forEach((r, i) => {
+// Generar opciones de Periodicidad
+const selectOptions = opcionesPeriodicidad.map(opt =>
+&lt;option value=&quot;${opt}&quot; ${r.periodicidad === opt ? &#39;selected&#39; : &#39;&#39;}&gt;${opt}&lt;/option&gt;
+).join('');
+
+html += `
+  &lt;tr&gt;
+    &lt;td&gt;${r.tipo}&lt;/td&gt;
+    &lt;td&gt;
+      &lt;input 
+        type=&quot;number&quot; 
+        placeholder=&quot;t/año&quot;
+        onchange=&quot;actualizarDato(${i}, &#39;produccion&#39;, this.value)&quot; 
+        value=&quot;${r.produccion || &#39;&#39;}&quot;
+        min=&quot;0&quot;
+      &gt;
+    &lt;/td&gt;
+    &lt;td&gt;
+      &lt;input 
+        type=&quot;number&quot; 
+        placeholder=&quot;Nº&quot;
+        onchange=&quot;actualizarDato(${i}, &#39;contenedores&#39;, this.value)&quot; 
+        value=&quot;${r.contenedores || &#39;&#39;}&quot;
+        min=&quot;0&quot;
+      &gt;
+    &lt;/td&gt;
+    &lt;td&gt;
+      &lt;select onchange=&quot;actualizarDato(${i}, &#39;periodicidad&#39;, this.value)&quot;&gt;
+        ${selectOptions}
+      &lt;/select&gt;
+    &lt;/td&gt;
+    &lt;td&gt;
+      &lt;input 
+        type=&quot;text&quot; 
+        placeholder=&quot;Vertedero/Planta&quot;
+        onchange=&quot;actualizarDato(${i}, &#39;destino&#39;, this.value)&quot; 
+        value=&quot;${r.destino || &#39;&#39;}&quot;
+      &gt;
+    &lt;/td&gt;
+  &lt;/tr&gt;
+`;
+
+
+});
+document.getElementById("tablaResiduos").querySelector("tbody").innerHTML = html;
+}
+
+function actualizarDato(i, campo, valor){
+// Convertir a número si es un campo numérico
+if (campo === 'produccion' || campo === 'contenedores') {
+residuosData[i][campo] = valor !== '' ? parseFloat(valor) : null;
+} else {
+residuosData[i][campo] = valor;
+}
+}
+
+pintarTabla();
+
+// ----------------------------------------------------------------------
+// LÓGICA DE SUBIDA DE ARCHIVOS (COPIADA DE FORMULARIO AGUA/OBRAS)
+// ----------------------------------------------------------------------
+
+let archivos = [];
+const fileList = document.getElementById("fileList");
+
+function getBase64(file) {
+return new Promise((resolve, reject) => {
+const reader = new FileReader();
+reader.readAsDataURL(file);
+reader.onload = () => {
+let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
+if ((encoded.length % 4) > 0) {
+encoded += '='.repeat(4 - (encoded.length % 4));
+}
+resolve(encoded);
+};
+reader.onerror = error => reject(error);
+});
+}
+
+async function iniciarSubida() {
+const fileInput = document.createElement("input");
+fileInput.type = "file";
+fileInput.multiple = true;
+fileInput.style.display = "none";
+document.body.appendChild(fileInput);
+
+fileInput.onchange = async () =&gt; {
+    const files = Array.from(fileInput.files);
+    
+    if (!files.length) {
+        document.body.removeChild(fileInput);
+        return;
+    }
+
+    archivos.push(...files);
+    renderArchivos();
+
+    const statusDiv = document.getElementById(&quot;adjuntos_residuos&quot;);
+    let msgBox = document.createElement(&quot;div&quot;);
+    msgBox.style.fontSize = &quot;12px&quot;;
+    msgBox.style.fontWeight = &quot;bold&quot;;
+    msgBox.style.marginTop = &quot;5px&quot;;
+    statusDiv.innerHTML = &#39;&#39;; 
+    statusDiv.appendChild(msgBox);
+
+    for (let i = 0; i &lt; files.length; i++) {
+        const file = files[i];
+        msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+        msgBox.style.color = &quot;#f57c00&quot;; // Naranja
+
+        try {
+            const base64 = await getBase64(file);
+
+            // ** IMPORTANTE: tipo: &quot;residuos&quot; para la carpeta Drive [municipio]/residuos
+            const payload = {
+                tipo: &quot;residuos&quot;,
+                mun: municipio,     
+                filename: file.name,
+                mimeType: file.type,
+                file: base64
+            };
+            
+            const resp = await fetch(URL_APPS_SCRIPT, {
+                method: &quot;POST&quot;,
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await resp.json().catch(() =&gt; ({ status: &quot;unknown&quot; }));
+
+            if (data.status === &quot;error&quot;) throw new Error(data.message);
+            
+            console.log(`✅ ${file.name} subido.`);
+
+        } catch (err) {
+            console.error(err);
+            msgBox.textContent = `⚠️ Error subiendo ${file.name}`;
+            msgBox.style.color = &quot;red&quot;;
+            await new Promise(r =&gt; setTimeout(r, 1000));
+        }
+    }
+
+    msgBox.textContent = &quot;✅ Archivos procesados&quot;;
+    msgBox.style.color = &quot;green&quot;;
+    setTimeout(() =&gt; msgBox.remove(), 3000);
+
+    document.body.removeChild(fileInput);
+};
+
+fileInput.click();
+
+
+}
+
+function renderArchivos() {
+fileList.innerHTML = archivos
+.map((f, i) => &lt;div class=&quot;file-item&quot;&gt; &lt;span&gt;📎 ${f.name}&lt;/span&gt; &lt;button  type=&quot;button&quot;  onclick=&quot;eliminarArchivo(${i})&quot;  style=&quot;border:none; background:none; color:red; cursor:pointer; font-weight:bold; padding:0 5px;&quot; &gt; ✖ &lt;/button&gt; &lt;/div&gt;)
+.join("");
+}
+
+function eliminarArchivo(i) {
+archivos.splice(i, 1);
+renderArchivos();
+}
+
+// ------------------------
+// LÓGICA DE ENVÍO
+// ------------------------
+document.getElementById("firmarBtn").addEventListener("click", async () => {
+try {
+if (archivos.length === 0) {
+document.getElementById("mensaje").textContent = "⚠️ No hay archivos adjuntos (opcional)";
+}
+
+    document.getElementById(&quot;mensaje&quot;).textContent = &quot;⏳ Enviando datos...&quot;;
+    document.getElementById(&quot;firmarBtn&quot;).disabled = true;
+    document.getElementById(&quot;firmarBtn&quot;).style.backgroundColor = &quot;#BDBDBD&quot;; 
+
+    // 1. CAPTURAR DATOS
+    const personasLimpieza = document.getElementById(&quot;personasLimpieza&quot;).value;
+
+    // 2. PREPARAR FORM DATA
+    const formData = new FormData();
+    formData.append(&quot;entry.960913048&quot;, municipioNombre); // Municipio Nombre
+    
+    // **NOTA: REEMPLAZAR entry.RESIDUOS_FIELD_ID_AQUI con la ID de la tabla de residuos
+    formData.append(&quot;entry.RESIDUOS_FIELD_ID_AQUI&quot;, JSON.stringify(residuosData));
+    
+    // **NOTA: REEMPLAZAR entry.LIMPIEZA_FIELD_ID_AQUI con la ID del campo de Limpieza Viaria
+    formData.append(&quot;entry.LIMPIEZA_FIELD_ID_AQUI&quot;, personasLimpieza); 
+
+    // **NOTA: REEMPLAZAR entry.ARCHIVOS_RESIDUOS_FIELD_ID_AQUI con la ID de la lista de archivos
+    formData.append(&quot;entry.ARCHIVOS_RESIDUOS_FIELD_ID_AQUI&quot;, archivos.map(a=&gt;a.name).join(&quot;\n&quot;));
+
+    // 3. ENVIAR
+    await fetch(URL_GOOGLE_FORMS, { method:&quot;POST&quot;, body: formData, mode:&quot;no-cors&quot; });
+
+    document.getElementById(&quot;mensaje&quot;).textContent = &quot;✅ Datos enviados correctamente&quot;;
+    document.getElementById(&quot;firmarBtn&quot;).style.backgroundColor = &quot;#2e7d32&quot;;
+    
+    // Limpiar
+    archivos = [];
+    renderArchivos();
+    document.getElementById(&quot;personasLimpieza&quot;).value = &#39;&#39;;
+    pintarTabla(); // Resetear la tabla
+    
+} catch(error) {
+    document.getElementById(&quot;mensaje&quot;).textContent = &quot;❌ Error: &quot; + error.message;
+    document.getElementById(&quot;firmarBtn&quot;).disabled = false;
+    document.getElementById(&quot;firmarBtn&quot;).style.backgroundColor = &quot;#4CAF50&quot;;
+}
+
+
+});
+
+// --- Control de acceso ---
+municipioLogin = localStorage.getItem("usuarioActual");
+
+if (!municipioLogin) {
+  window.location.href = "login.html";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const muniName = document.getElementById("muniName");
+  if (muniName) { 
+    muniName.textContent = localStorage.getItem("usuarioNombre") || municipioLogin;  }
+
+  const formMunicipio = "043";
+  if (municipioLogin !== formMunicipio) {
+    // Usamos console.error en lugar de alert()
+console.error("No tienes permiso para este municipio. Redirigiendo a login.");
+    window.location.href = "login.html";
+  }
+});
+
+</script>
+
+</body>
+</html>

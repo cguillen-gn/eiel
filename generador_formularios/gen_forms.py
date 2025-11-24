@@ -16,6 +16,7 @@ DB = {
 TEMPLATE_DIR = "templates"
 TEMPLATE_AGUA = "form-agua-template.html.j2"
 TEMPLATE_OBRAS = "form-obras-template.html.j2"
+TEMPLATE_RESIDUOS = "form-residuos-template.html.j2"
 # Ruta de salida final que me diste (Windows). Asegúrate de que existe o se creará.
 OUT_DIR = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo\formularios"
 # Opcional: mapping fichero (code[TAB]name). Si no existe, se usa el código como nombre.
@@ -32,6 +33,7 @@ env = Environment(
 )
 template_agua = env.get_template(TEMPLATE_AGUA)
 template_obras = env.get_template(TEMPLATE_OBRAS)
+template_residuos = env.get_template(TEMPLATE_RESIDUOS)
 
 def conectar():
     conn = psycopg2.connect(
@@ -200,6 +202,19 @@ def main():
                 url_google_forms = URL_GOOGLE_FORMS,
                 fase_anterior = fase_anterior 
             )
+            
+            # ---- RESIDUOS ----
+            rendered_residuos = template_residuos.render(
+                muni_code = mun_code,
+                muni_display = muni_display,
+                url_apps_script = URL_APPS_SCRIPT,
+                url_google_forms = URL_GOOGLE_FORMS,
+                fase_anterior = fase_anterior # Pasa el año (fase_anterior)
+            )
+            
+            # Guardar el archivo de residuos
+            with open(os.path.join(OUT_DIR, f'residuos_{mun_code}.html'), 'w', encoding='utf-8') as f:
+                f.write(rendered_residuos)
             
             fname_agua = f"agua_{mun_code}.html"
             outpath_agua = os.path.join(OUT_DIR, fname_agua)
