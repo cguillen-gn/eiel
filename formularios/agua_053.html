@@ -50,7 +50,7 @@ button:hover { background:#145a9c; }
 <script>
 // ------------------------
 
-const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyZlrz2L-HTwXucLwIFMxtL173n8DJRYgyG_gCKbKQfCsMQheB2rXrP0K-q_9M5-3mBaw/exec"; 
+const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
 // MUNICIPIO inyectado por el generador (código INE)
@@ -58,7 +58,7 @@ let municipio = "053";
 let municipioNombre = "053";
 
 // Inyectamos depositos desde la BD en formato JS
-let depositos = [{"nombre": "DEPOSITO LA ESPARTOSA I", "limpieza": "2008"}, {"nombre": "DEPOSITO LES VOLTES", "limpieza": "2007"}, {"nombre": "DEPOSITO LES VOLTES II", "limpieza": "2008"}, {"nombre": "DEPOSITO CABEZO DEL PLA", "limpieza": "2012"}, {"nombre": "DEPOSITO CATÍ", "limpieza": "2012"}, {"nombre": "DEPOSITO LA ESPARTOSA II", "limpieza": "2014"}];
+let depositos = [{"nombre": "DEPOSITO LA ESPARTOSA I", "limpieza": "2008"}, {"nombre": "DEPOSITO LES VOLTES", "limpieza": "2007"}, {"nombre": "DEPOSITO LES VOLTES II", "limpieza": "2008"}, {"nombre": "DEPOSITO CABEZO DEL PLA", "limpieza": "2012"}, {"nombre": "DEPOSITO CATI", "limpieza": "2012"}, {"nombre": "DEPOSITO LA ESPARTOSA II", "limpieza": "2014"}];
 
 // Pintar tabla
 function pintarTabla(){
@@ -118,150 +118,75 @@ function renderArchivos() {
     .join("");
 }
 
+// ==========================================
+// NUEVA LÓGICA DE SUBIDA (BASE64)
+// ==========================================
+
+// Función auxiliar para convertir archivo a Base64
+function getBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Quitamos la cabecera "data:image/png;base64," para enviar solo los datos
+      let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
+      if ((encoded.length % 4) > 0) {
+        encoded += '='.repeat(4 - (encoded.length % 4));
+      }
+      resolve(encoded);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
+
 async function subirArchivos() {
   if (!archivos.length) return true;
 
-  console.log("📤 Subiendo", archivos.length, "archivo(s) individualmente...");
-
+  console.log("📤 Iniciando subida inteligente...");
   let exitosos = 0;
 
-  // Subir cada archivo por separado
   for (let i = 0; i < archivos.length; i++) {
     const file = archivos[i];
-    console.log(`[${i+1}/${archivos.length}] Subiendo: ${file.name} (${file.size} bytes)`);
+    console.log(`[${i+1}/${archivos.length}] Subiendo: ${file.name}`);
     
-    const success = await subirArchivoIndividual(file);
-    
-    if (success) {
-      exitosos++;
-      console.log(`  ✅ Subido correctamente`);
-    } else {
-      console.error(`  ❌ Error en la subida`);
+    try {
+      // 1. Convertimos a Base64
+      const base64Content = await getBase64(file);
+
+      // 2. Preparamos el paquete de datos (JSON)
+      // Aquí enviamos 'mun' y 'tipo' para que tu script sepa dónde guardar
+      const payload = {
+        tipo: "agua",         // O "obra", según tu formulario
+        mun: municipio,       // Variable global de tu script
+        // obra: "ID_OBRA",   // Descomentar si tuvieras una variable obra
+        filename: file.name,
+        mimeType: file.type,
+        file: base64Content
+      };
+
+      // 3. Enviamos usando fetch (sin iframe)
+      const response = await fetch(URL_APPS_SCRIPT, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await response.json();
+
+      if (data.status === "success") {
+        console.log(" ✅ Subido correctamente:", data.url);
+        exitosos++;
+      } else {
+        console.error(" ❌ Error en servidor:", data.message);
+      }
+
+    } catch (err) {
+      console.error(" ❌ Error de comunicación:", err);
+      // Nota: Si da error de CORS pero el archivo aparece en Drive, es un falso positivo.
     }
   }
 
-  console.log(`✅ Proceso completado: ${exitosos}/${archivos.length} archivo(s) subido(s)`);
-  return exitosos > 0;
-}
-
-function subirArchivoIndividual(file) {
-  return new Promise((resolve) => {
-    const iframeName = "upload_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    const iframe = document.createElement("iframe");
-    iframe.name = iframeName;
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = URL_APPS_SCRIPT;
-    form.target = iframeName;
-    form.enctype = "multipart/form-data";
-
-    // Parámetros ocultos
-    const addHidden = (name, value) => {
-      const inp = document.createElement("input");
-      inp.type = "hidden";
-      inp.name = name;
-      inp.value = value;
-      form.appendChild(inp);
-    };
-
-    addHidden("tipo", "agua");
-    addHidden("mun", municipio);
-
-    // Crear input file con DataTransfer
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.name = "file0";
-    
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
-    
-    form.appendChild(fileInput);
-    document.body.appendChild(form);
-
-    let procesado = false;
-    let timeoutId;
-
-    // Handler de carga
-    iframe.onload = () => {
-      if (procesado) return;
-      procesado = true;
-      clearTimeout(timeoutId);
-
-      setTimeout(() => {
-        let subidaExitosa = false;
-
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          const txt = doc.body.textContent || doc.body.innerText;
-          
-          if (txt && txt.trim()) {
-            try {
-              const data = JSON.parse(txt);
-              
-              if (data.logs) {
-                console.log("    === Logs del servidor ===");
-                data.logs.forEach(l => console.log(`    ${l}`));
-              }
-              
-              if (data.status === "ok" && data.archivos > 0) {
-                subidaExitosa = true;
-              } else {
-                console.warn(`    Respuesta: ${data.msg || 'Sin archivos'}`);
-              }
-            } catch(jsonErr) {
-              console.log("    Respuesta no JSON:", txt.substring(0, 100));
-            }
-          }
-        } catch(err) {
-          // No se puede leer el iframe (CORS)
-          // Si no hay error 403 visible, asumimos éxito
-          console.log("    Respuesta no legible (CORS) - verificar Drive");
-          subidaExitosa = true; // Asumir éxito si no hay errores evidentes
-        }
-
-        // Limpiar
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        
-        resolve(subidaExitosa);
-      }, 2000);
-    };
-
-    // Handler de error
-    iframe.onerror = () => {
-      if (procesado) return;
-      procesado = true;
-      clearTimeout(timeoutId);
-      
-      console.log("    Error en iframe (puede ser normal)");
-      
-      try { form.remove(); } catch(e) {}
-      try { iframe.remove(); } catch(e) {}
-      
-      // En caso de error, asumir que puede haberse subido igual
-      resolve(true);
-    };
-
-    // Timeout de seguridad
-    timeoutId = setTimeout(() => {
-      if (!procesado) {
-        procesado = true;
-        console.log("    ⏱️ Timeout alcanzado");
-        
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        
-        resolve(false);
-      }
-    }, 20000); // 20 segundos por archivo
-
-    // Enviar
-    form.submit();
-  });
+  // Devolvemos true solo si TODOS se subieron
+  return exitosos === archivos.length;
 }
 
 // ------------------------
