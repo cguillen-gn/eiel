@@ -211,10 +211,7 @@ def main():
                 url_google_forms = URL_GOOGLE_FORMS,
                 fase_anterior = fase_anterior # Pasa el año (fase_anterior)
             )
-            
-            # Guardar el archivo de residuos
-            with open(os.path.join(OUT_DIR, f'residuos_{mun_code}.html'), 'w', encoding='utf-8') as f:
-                f.write(rendered_residuos)
+                        
             
             fname_agua = f"agua_{mun_code}.html"
             outpath_agua = os.path.join(OUT_DIR, fname_agua)
@@ -236,6 +233,10 @@ def main():
             with open(outpath_obras, "w", encoding="utf-8") as f:
                 f.write(rendered_obras)
             print("Generado:", outpath_obras)
+            
+            
+            with open(os.path.join(OUT_DIR, f'residuos_{mun_code}.html'), 'w', encoding='utf-8') as f:
+                f.write(rendered_residuos)
 
     finally:
         conn.close()
