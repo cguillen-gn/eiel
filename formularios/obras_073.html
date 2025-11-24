@@ -550,36 +550,82 @@ function eliminarAdjunto(obraId, index) {
 // ==========================================
 // 3. ENVÍO FINAL DEL FORMULARIO
 // ==========================================
+document.getElementById("frmObras").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = e.target.querySelector("button[type='submit']");
+  const txtOriginal = btn.textContent;
+  
+  btn.disabled = true;
+  btn.textContent = "⏳ Enviando datos...";
 
+  try {
+    const estados = [];
+    // Leemos la tabla HTML directamente (más seguro que usar Jinja aquí)
+    const filas = document.querySelectorAll("tbody tr");
 
-    console.log("Enviando payload:", estados);
+    filas.forEach((tr, index) => {
+      // El índice visual empieza en 1, pero JS es 0. 
+      // Tu lógica usa indices basados en 1 (loop.index), así que ajustamos:
+      const loopIndex = index + 1; 
 
-    const formData = new FormData();
-    // REVISA ESTAS IDs CON TU FORMULARIO REAL DE GOOGLE
-    formData.append("entry.1317069794", "073"); 
-    formData.append("entry.1523598469", JSON.stringify(estados)); 
+      // Buscar celdas
+      const tds = tr.querySelectorAll("td");
+      if (tds.length < 3) return; // Fila inválida
 
-    await fetch(URL_GOOGLE_FORMS, { 
-      method: "POST", 
-      body: formData, 
-      mode: "no-cors" 
-    });
+      const nombreObra = tds[0].textContent.trim();
+      const planObra = tds[1].textContent.trim();
+      
+      // Buscar el select de estado
+      const select = tr.querySelector("select");
+      let estadoValor = "";
 
-    btn.textContent = "✅ Datos Enviados";
-    btn.style.backgroundColor = "#2e7d32";
-    
-    setTimeout(() => {
-       alert("Formulario enviado correctamente.");
-       // Opcional: window.location.reload(); 
-    }, 500);
+      if (select) {
+        estadoValor = select.value;
+      } else {
+        // Si no hay select, puede ser texto fijo (ej. "Finalizada")
+        estadoValor = tds[2].textContent.trim();
+        // *** CORRECCIÓN CRÍTICA AQUÍ: El nombre de la variable estaba mal ***
+        if (estadoValor === "-") estadoValor = ""; // Corregido: Usar estadoValor
+      }
 
-  } catch (error) {
-    console.error(error);
-    alert("Error al enviar: " + error.message);
-    btn.disabled = false;
-    btn.textContent = txtOriginal;
-  }
-});
+      // Solo añadimos si tiene estado relevante
+      if (estadoValor && estadoValor !== "-- Seleccione --" && estadoValor !== "-") {
+        estados.push({
+          obra: nombreObra,
+          plan: planObra,
+          estado: estadoValor,
+          archivos: (adjuntosObras[loopIndex] || []).map(f => f.name)
+        });
+      }
+    });
+
+    console.log("Enviando payload:", estados);
+
+    const formData = new FormData();
+    formData.append("entry.1317069794", "073"); 
+    formData.append("entry.1523598469", JSON.stringify(estados)); 
+
+    await fetch(URL_GOOGLE_FORMS, { 
+      method: "POST", 
+      body: formData, 
+      mode: "no-cors" 
+    });
+
+    btn.textContent = "✅ Datos Enviados";
+    btn.style.backgroundColor = "#2e7d32";
+    
+    setTimeout(() => {
+       alert("Formulario enviado correctamente.");
+       // Opcional: window.location.reload(); 
+    }, 500);
+
+  } catch (error) {
+    console.error(error);
+    alert("Error al enviar: " + error.message);
+    btn.disabled = false;
+    btn.textContent = txtOriginal;
+  }
+}); 
+
 </script>
 </body>
-</html>
