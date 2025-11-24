@@ -36,8 +36,8 @@ padding: 12px 20px;
 button:hover { background:#303F9F; }
 
 /* ------------------------------------------- /
-/ ESTILOS DE LA TABLA HTML ESTÁNDAR */
-/* ------------------------------------------- /
+/ ESTILOS DE LA TABLA HTML ESTÁNDAR /
+/ ------------------------------------------- /
 .residuos-table {
 width:100%;
 border-collapse: collapse;
@@ -45,6 +45,10 @@ font-size: 14px;
 table-layout: fixed; / Asegura que los anchos de columna se mantengan */
 margin-top: 20px;
 border: 1px solid #c0c0c0;
+}
+
+.residuos-table tr {
+height: 40px; /* FUERZA UNA ALTURA CONSISTENTE PARA TODAS LAS FILAS */
 }
 
 .residuos-table th {
@@ -71,6 +75,7 @@ border-right: none;
 padding: 0;
 border: 1px solid #e0e0e0;
 vertical-align: middle; /* Aseguramos alineación vertical */
+height: 100%; /* Asegura que la celda toma la altura de la fila */
 }
 
 /* Columna 'Tipo de residuo' - Fila de encabezado /
@@ -104,8 +109,7 @@ display: block;
 .residuos-table select {
 appearance: none; / Mejorar el look de los selects /
 padding-right: 30px; / Espacio para la flecha nativa */
-/* Forzar la altura mínima para que la flecha se vea bien */
-min-height: 36px;
+/* Eliminamos min-height para depender de height: 100% */
 }
 
 /* ------------------------------------------- /
@@ -372,35 +376,35 @@ msgBox.textContent = ⏳ Subiendo ${i+1}/${files.length}: ${file.name}...;
 msgBox.style.color = "#f57c00"; // Naranja
 
 try {
-    const base64 = await getBase64(file);
+const base64 = await getBase64(file);
 
-    // IMPORTANTE: tipo: "residuos" para la carpeta Drive [municipio]/residuos
-    const payload = {
-        tipo: "residuos",
-        mun: municipio,     
-        filename: file.name,
-        mimeType: file.type,
-        file: base64
-    };
-    
-    const resp = await fetch(URL\_APPS\_SCRIPT, {
-        method: "POST",
-        body: JSON.stringify(payload)
-    });
-    
-    const data = await resp.json().catch(() =\> ({ status: "unknown" }));
+// IMPORTANTE: tipo: "residuos" para la carpeta Drive [municipio]/residuos
+const payload = {
+    tipo: "residuos",
+    mun: municipio,     
+    filename: file.name,
+    mimeType: file.type,
+    file: base64
+};
 
-    if (data.status === "error") throw new Error(data.message);
-    
-    console.log(`✅ ${file.name} subido.`);
+const resp = await fetch(URL\_APPS\_SCRIPT, {
+    method: "POST",
+    body: JSON.stringify(payload)
+});
+
+const data = await resp.json().catch(() =\> ({ status: "unknown" }));
+
+if (data.status === "error") throw new Error(data.message);
+
+console.log(`✅ ${file.name} subido.`);
+
 
 } catch (err) {
-    console.error(err);
-    msgBox.textContent = `⚠️ Error subiendo ${file.name}`;
-    msgBox.style.color = "red";
-    await new Promise(r =\> setTimeout(r, 1000));
+console.error(err);
+msgBox.textContent = ⚠️ Error subiendo ${file.name};
+msgBox.style.color = "red";
+await new Promise(r => setTimeout(r, 1000));
 }
-
 
 }
 
