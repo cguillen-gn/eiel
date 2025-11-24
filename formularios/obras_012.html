@@ -595,92 +595,150 @@ button:hover {
 </div>
 
 <script>
-
 // ------------------------
-
+// CONFIGURACIÓN
+// ------------------------
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
-
+// Almacén local de archivos para mostrar en la lista antes de enviar el formulario final
 let adjuntosObras = {};
 
-function renderAdjuntosObra(obra) {
-  const cont = document.getElementById("adjuntos_" + obra);
-  const files = adjuntosObras[obra] || [];
+// ------------------------
+// UTILIDADES (Base64)
+// ------------------------
+function getBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Quitamos la cabecera "data:image/png;base64,"
+      let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
+      if ((encoded.length % 4) > 0) {
+        encoded += '='.repeat(4 - (encoded.length % 4));
+      }
+      resolve(encoded);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
 
+// ------------------------
+// GESTIÓN DE INTERFAZ (Listado de archivos)
+// ------------------------
+function renderAdjuntosObra(obraId) {
+  const cont = document.getElementById("adjuntos_" + obraId);
+  const files = adjuntosObras[obraId] || [];
+
+  // Mantenemos el div de estado si existe, o limpiamos para repintar la lista
+  // Para simplificar, repintamos la lista y dejamos espacio para mensajes
+  
+  // Guardar mensajes temporales si los hubiera
+  const existingMsgs = Array.from(cont.querySelectorAll('.msg-status'));
+  
   cont.innerHTML = files
     .map((f, i) => `
-      <div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
-        <span>📎 ${f.name}</span>
+      <div style="display:flex; align-items:center; gap:6px; margin-top:3px; background:#f9f9f9; padding:2px 5px; border-radius:4px;">
+        <span style="font-size:12px;">📎 ${f.name}</span>
         <button 
           type="button" 
-          onclick="eliminarAdjunto('${obra}', ${i})"
-          style="background:none; color:#b71c1c; border:none; font-size:14px; cursor:pointer;"
-          title="Eliminar archivo"
+          onclick="eliminarAdjunto('${obraId}', ${i})"
+          style="background:none; color:#b71c1c; border:none; font-size:12px; cursor:pointer; padding:0;"
+          title="Eliminar de la lista (no borra de Drive)"
         >
-          ❌
+          ✖
         </button>
       </div>
     `)
     .join("");
+
+  // Re-insertar mensajes de estado (cargando/exito) al final
+  existingMsgs.forEach(msg => cont.appendChild(msg));
 }
 
-function eliminarAdjunto(obra, index) {
-  adjuntosObras[obra].splice(index, 1);
-  renderAdjuntosObra(obra);
+function eliminarAdjunto(obraId, index) {
+  adjuntosObras[obraId].splice(index, 1);
+  renderAdjuntosObra(obraId);
 }
 
-async function subirAdjunto(mun, obra) {
+// ------------------------
+// LÓGICA DE SUBIDA (AJAX + JSON)
+// ------------------------
+async function subirAdjunto(munCode, obraId) {
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.multiple = true;
-  fileInput.accept = "*/*";
+  // fileInput.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx"; // Opcional: limitar tipos
 
   fileInput.onchange = async () => {
     const files = Array.from(fileInput.files);
     if (!files.length) return;
 
-    if (!adjuntosObras[obra]) adjuntosObras[obra] = [];
-    adjuntosObras[obra].push(...files);
-    renderAdjuntosObra(obra);
+    // 1. Añadir a la lista visual inmediatamente
+    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
+    adjuntosObras[obraId].push(...files);
+    renderAdjuntosObra(obraId);
 
-    // ← AÑADIR FEEDBACK VISUAL
-    const statusDiv = document.getElementById("adjuntos_" + obra);
-    const loading = document.createElement("div");
-    loading.textContent = "⏳ Subiendo archivos...";
-    loading.style.color = "orange";
-    statusDiv.appendChild(loading);
+    // 2. Preparar zona de mensajes
+    const statusDiv = document.getElementById("adjuntos_" + obraId);
+    const msgBox = document.createElement("div");
+    msgBox.className = "msg-status";
+    msgBox.style.fontSize = "11px";
+    msgBox.style.marginTop = "4px";
+    msgBox.style.fontWeight = "bold";
+    statusDiv.appendChild(msgBox);
 
-    const formData = new FormData();
-    formData.append("tipo", "obra");
-    formData.append("mun", mun);
-    formData.append("obra", obra);
+    // 3. Subir archivos UNO A UNO
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      msgBox.style.color = "#f57c00"; // Naranja
 
-    files.forEach((f, idx) => formData.append(`file${idx}`, f));
+      try {
+        // A. Convertir
+        const base64 = await getBase64(file);
 
-    try {
-      const resp = await fetch(URL_APPS_SCRIPT, {  // ← Usar variable
-        method: "POST",
-        body: formData
-      });
+        // B. Payload JSON
+        const payload = {
+          tipo: "obra",      // Importante para tu script
+          mun: munCode,
+          obra: obraId,      // El ID o índice de la obra (para la subcarpeta)
+          filename: file.name,
+          mimeType: file.type,
+          file: base64
+        };
 
-      const data = await resp.json();
-      loading.remove();  // ← Quitar mensaje de carga
-      
-      if (data.status !== "ok") {
-        alert("❌ Error al subir archivo");
-      } else {
-        // ← MENSAJE DE ÉXITO
-        const success = document.createElement("div");
-        success.textContent = "✅ Archivos subidos correctamente";
-        success.style.color = "green";
-        statusDiv.appendChild(success);
-        setTimeout(() => success.remove(), 3000);  // Desaparece en 3s
+        // C. Enviar
+        const resp = await fetch(URL_APPS_SCRIPT, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await resp.json();
+
+        if (data.status === "success") {
+          console.log(`✅ ${file.name} subido.`);
+        } else {
+          throw new Error(data.message || "Error desconocido");
+        }
+
+      } catch (err) {
+        console.error(err);
+        msgBox.textContent = `❌ Error con ${file.name}`;
+        msgBox.style.color = "red";
+        // Pausa para leer el error antes de seguir
+        await new Promise(r => setTimeout(r, 2000));
       }
-    } catch(e) {
-      loading.remove();
-      alert("❌ Error de conexión");
     }
+
+    // 4. Finalización
+    msgBox.textContent = "✅ Todos los archivos subidos.";
+    msgBox.style.color = "green";
+    
+    // Borrar mensaje de éxito tras 4 segundos
+    setTimeout(() => {
+      try { msgBox.remove(); } catch(e){}
+    }, 4000);
   };
 
   fileInput.click();
@@ -688,233 +746,294 @@ async function subirAdjunto(mun, obra) {
 
 
 // ------------------------
-// ENVIAR
+// ENVIAR FORMULARIO FINAL (DATOS A GOOGLE FORM)
+// ------------------------
 document.getElementById("frmObras").addEventListener("submit", async (e) => {
   e.preventDefault();
   
+  const btnSubmit = e.target.querySelector("button[type='submit']");
+  const originalText = btnSubmit.textContent;
+  btnSubmit.disabled = true;
+  btnSubmit.textContent = "Enviando datos...";
+
   // Recopilar estados de las obras
   const estados = [];
   const form = e.target;
   
+  // NOTA: Asegúrate de que este bucle de Jinja2 renderiza correctamente los índices
+  // JS no interpreta Jinja, esto debe venir renderizado del servidor.
   
+    
+      // Capturamos el valor del select
+      const select1 = form.querySelector('[name="estado_1"]');
+      const val1 = select1 ? select1.value : "";
+      
+      estados.push({
+        obra: "CENTRO DEPORTIVO MUNICIPAL",
+        plan: "PLAN PLANIFICA 2020-23 BOP: 20/07/2022",
+        estado: val1,
+        archivos: (adjuntosObras["1"] || []).map(f => f.name)
+      });
+    
   
-  const estado1 = form.querySelector('[name="estado_1"]').value;
-  estados.push({
-    obra: "CENTRO DEPORTIVO MUNICIPAL",
-    plan: "PLAN PLANIFICA 2020-23 BOP: 20/07/2022",
-    estado: estado1,
-    archivos: (adjuntosObras["1"] || []).map(f => f.name)
-  });
+    
+      // Capturamos el valor del select
+      const select2 = form.querySelector('[name="estado_2"]');
+      const val2 = select2 ? select2.value : "";
+      
+      estados.push({
+        obra: "PROYECTO DE CONSTRUCCIÓN DE LAS OBRAS PARA LA RESTITUCIÓN DEL PUNTO DE VERTIDO DEL EFLUENTE DE LA E.D.A.R. DE ALGORFA EN EL RÍO SEGURA (ALICANTE)",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val2,
+        archivos: (adjuntosObras["2"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select3 = form.querySelector('[name="estado_3"]');
+      const val3 = select3 ? select3.value : "";
+      
+      estados.push({
+        obra: "MALLADO DE RED EN C/CONSTITUCIÓN Y ADYACENTES EN ALGORFA (EXPTE. 2021/074-IDCH).",
+        plan: "PLAN +AGUA 2021 [LÍNEA 1] BOP: 31/05/2022",
+        estado: val3,
+        archivos: (adjuntosObras["3"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select4 = form.querySelector('[name="estado_4"]');
+      const val4 = select4 ? select4.value : "";
+      
+      estados.push({
+        obra: "RENOVACIÓN BOMBEO EBAR LA RELLANA SUR (EXPTE. 2023/061- IACH).",
+        plan: "REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2023 BOP: 24/11/2023",
+        estado: val4,
+        archivos: (adjuntosObras["4"] || []).map(f => f.name)
+      });
+    
   
-  const estado2 = form.querySelector('[name="estado_2"]').value;
-  estados.push({
-    obra: "PROYECTO DE CONSTRUCCIÓN DE LAS OBRAS PARA LA RESTITUCIÓN DEL PUNTO DE VERTIDO DEL EFLUENTE DE LA E.D.A.R. DE ALGORFA EN EL RÍO SEGURA (ALICANTE)",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado2,
-    archivos: (adjuntosObras["2"] || []).map(f => f.name)
-  });
+    
+      // Capturamos el valor del select
+      const select5 = form.querySelector('[name="estado_5"]');
+      const val5 = select5 ? select5.value : "";
+      
+      estados.push({
+        obra: "REPOSICIÓN DE RED DE AGUA POTABLE EN VARIAS CALLES DE LA URBANIZACIÓN MONTEMAR DE ALGORFA (EXPTE. 2023/071-IDCH)",
+        plan: "REALIZACIÓN Y MEJORA INFRAS DE ABAST. Y SANEAM. A EJEC. POR LA DIPUTACIÓN 2023 BOP: 23/04/2024",
+        estado: val5,
+        archivos: (adjuntosObras["5"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select6 = form.querySelector('[name="estado_6"]');
+      const val6 = select6 ? select6.value : "";
+      
+      estados.push({
+        obra: "CONSTRUCCIÓN DE LA JEFATURA DE LA POLICÍA LOCAL",
+        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
+        estado: val6,
+        archivos: (adjuntosObras["6"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select7 = form.querySelector('[name="estado_7"]');
+      const val7 = select7 ? select7.value : "";
+      
+      estados.push({
+        obra: "AMPLIACIÓN Y URBANIZACIÓN EXTERIOR DEL PABELLÓN MUNICIPAL DE DEPORTES.",
+        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
+        estado: val7,
+        archivos: (adjuntosObras["7"] || []).map(f => f.name)
+      });
+    
   
-  const estado3 = form.querySelector('[name="estado_3"]').value;
-  estados.push({
-    obra: "MALLADO DE RED EN C/CONSTITUCIÓN Y ADYACENTES EN ALGORFA (EXPTE. 2021/074-IDCH).",
-    plan: "PLAN +AGUA 2021 [LÍNEA 1] BOP: 31/05/2022",
-    estado: estado3,
-    archivos: (adjuntosObras["3"] || []).map(f => f.name)
-  });
+    
+      // Capturamos el valor del select
+      const select8 = form.querySelector('[name="estado_8"]');
+      const val8 = select8 ? select8.value : "";
+      
+      estados.push({
+        obra: "DESBROCE Y LIMPIEZA DEL CAMINO DE ENLACE ENTRE LA CV-935 Y LA URBANIZACIÓN MONTEBELLO, EN ALGORFA (ALICANTE).",
+        plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2024 LÍNEAS 1 Y 2. BOP: 18/07/2024",
+        estado: val8,
+        archivos: (adjuntosObras["8"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select9 = form.querySelector('[name="estado_9"]');
+      const val9 = select9 ? select9.value : "";
+      
+      estados.push({
+        obra: "ADQ. DE LUMINARIAS PARA LA MEJORA DE LA SEGURIDAD VIAL EN EL CAMINO DE LA ANILLA. ALGORFA (ALICANTE)",
+        plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <20000 HAB. 2024. BOP: 19/07/2024.",
+        estado: val9,
+        archivos: (adjuntosObras["9"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select10 = form.querySelector('[name="estado_10"]');
+      const val10 = select10 ? select10.value : "";
+      
+      estados.push({
+        obra: "MEJORA DEL CAMINO DEL INTERIOR DE LA ERMITA Y CASA PALACIO DE ALGORFA",
+        plan: "INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2021. BOP: 14/09/2021.",
+        estado: val10,
+        archivos: (adjuntosObras["10"] || []).map(f => f.name)
+      });
+    
   
-  const estado4 = form.querySelector('[name="estado_4"]').value;
-  estados.push({
-    obra: "RENOVACIÓN BOMBEO EBAR LA RELLANA SUR (EXPTE. 2023/061- IACH).",
-    plan: "REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2023 BOP: 24/11/2023",
-    estado: estado4,
-    archivos: (adjuntosObras["4"] || []).map(f => f.name)
-  });
+    
+      // Capturamos el valor del select
+      const select11 = form.querySelector('[name="estado_11"]');
+      const val11 = select11 ? select11.value : "";
+      
+      estados.push({
+        obra: "INSTALACIÓN DE FAROLAS SOLARES AUTÓNOMAS EN EL CAMINO DE LA YESERA. ALGORFA (ALICANTE)",
+        plan: "IMPULSO DE LAS INSTALACIONES FOTOVOLTAICAS PARA EL AUTOCONSUMO DE EDIFICIOS MUNICIPALES Y EL ALUMBRADO PÚBLICO EN MUNICIPIOS Y ENTIDADES LOCALES DE LA PROVINCIA DE ALICANTE, ANUALIDAD 2023. BOP: 25/08/2023",
+        estado: val11,
+        archivos: (adjuntosObras["11"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select12 = form.querySelector('[name="estado_12"]');
+      const val12 = select12 ? select12.value : "";
+      
+      estados.push({
+        obra: "REHABILITACIÓN DE ALMAZARA",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val12,
+        archivos: (adjuntosObras["12"] || []).map(f => f.name)
+      });
+    
   
+    
+      // Capturamos el valor del select
+      const select13 = form.querySelector('[name="estado_13"]');
+      const val13 = select13 ? select13.value : "";
+      
+      estados.push({
+        obra: "OBRAS DE MEJORA, MODERNIZACIÓN YDOTACIÓN DE INFRAESTRUCTURAS EN ELPOLÍGONO INDUSTRIAL DE ALGORFA (ALICANTE)",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val13,
+        archivos: (adjuntosObras["13"] || []).map(f => f.name)
+      });
+    
   
-  const estado5 = form.querySelector('[name="estado_5"]').value;
-  estados.push({
-    obra: "REPOSICIÓN DE RED DE AGUA POTABLE EN VARIAS CALLES DE LA URBANIZACIÓN MONTEMAR DE ALGORFA (EXPTE. 2023/071-IDCH)",
-    plan: "REALIZACIÓN Y MEJORA INFRAS DE ABAST. Y SANEAM. A EJEC. POR LA DIPUTACIÓN 2023 BOP: 23/04/2024",
-    estado: estado5,
-    archivos: (adjuntosObras["5"] || []).map(f => f.name)
-  });
+    
+      // Capturamos el valor del select
+      const select14 = form.querySelector('[name="estado_14"]');
+      const val14 = select14 ? select14.value : "";
+      
+      estados.push({
+        obra: "ADQUISICIÓN DE LUMINARIAS PARA LA MEJORA DE LA SEGURIDAD VIAL EN CAMINO ANTIGUA DEPURADORA - ALGORFA",
+        plan: "INVERSIONES EN ZONAS VERDES DE TIT. MUNICIPAL 2025 Línea C BOP: 05/08/2025",
+        estado: val14,
+        archivos: (adjuntosObras["14"] || []).map(f => f.name)
+      });
+    
   
+    
+      estados.push({
+        obra: "REPOSICIÓN DE RED DE AGUA POTABLE EN C/SALVADOR DALÍ, URBANIZACIÓN MONTEMAR (EXPTE. 2021/091-IACH).",
+        plan: "REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2021 BOP: 30/7/2021",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["15"] || []).map(f => f.name)
+      });
+    
   
+    
+      estados.push({
+        obra: "REPARACIÓN SUPERFICIAL DEL ENLACE PEATONAL ENTRE EL CASCO URBANO Y LA ERMITA DE ALGORFA (ALICANTE)",
+        plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL (LINEA 1 y 2), POB. <5000 HAB. BOP: 11/6/2021",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["16"] || []).map(f => f.name)
+      });
+    
   
-  const estado6 = form.querySelector('[name="estado_6"]').value;
-  estados.push({
-    obra: "CONSTRUCCIÓN DE LA JEFATURA DE LA POLICÍA LOCAL",
-    plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-    estado: estado6,
-    archivos: (adjuntosObras["6"] || []).map(f => f.name)
-  });
+    
+      estados.push({
+        obra: "REPARACIÓN DEL CAMINO DE ENLACE ENTRE EL CASCO URBANO Y LA ERMITA DE ALGORFA.",
+        plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2022 BOP: 26/8/2022",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["17"] || []).map(f => f.name)
+      });
+    
   
+    
+      estados.push({
+        obra: "REHABILITACIÓN DE LOS VESTUARIOS DEL POLIDEPORTIVO MUNICIPAL JUAN CARLOS I DE ALGORFA",
+        plan: "PLAN +DEPORTE 2022 BOP: 21/11/2022",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["18"] || []).map(f => f.name)
+      });
+    
   
+    
+      estados.push({
+        obra: "DOTACIÓN DE ALUMBRADO PÚBLICO EN EL CAMINO DE LA YESERA. ALGORFA (ALICANTE)",
+        plan: "INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2023. BOP: 24/7/2023.",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["19"] || []).map(f => f.name)
+      });
+    
   
-  const estado7 = form.querySelector('[name="estado_7"]').value;
-  estados.push({
-    obra: "AMPLIACIÓN Y URBANIZACIÓN EXTERIOR DEL PABELLÓN MUNICIPAL DE DEPORTES.",
-    plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-    estado: estado7,
-    archivos: (adjuntosObras["7"] || []).map(f => f.name)
-  });
+    
+      estados.push({
+        obra: "ADQ. DE LUMINARIAS PARA LA MEJORA DE LA SER. VIAL EN EL CAMINO DE LA ANILLA",
+        plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB. <20000 HAB. 2023. BOP: 05/09/2023.",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["20"] || []).map(f => f.name)
+      });
+    
   
-  
-  
-  const estado8 = form.querySelector('[name="estado_8"]').value;
-  estados.push({
-    obra: "DESBROCE Y LIMPIEZA DEL CAMINO DE ENLACE ENTRE LA CV-935 Y LA URBANIZACIÓN MONTEBELLO, EN ALGORFA (ALICANTE).",
-    plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2024 LÍNEAS 1 Y 2. BOP: 18/07/2024",
-    estado: estado8,
-    archivos: (adjuntosObras["8"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado9 = form.querySelector('[name="estado_9"]').value;
-  estados.push({
-    obra: "ADQ. DE LUMINARIAS PARA LA MEJORA DE LA SEGURIDAD VIAL EN EL CAMINO DE LA ANILLA. ALGORFA (ALICANTE)",
-    plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <20000 HAB. 2024. BOP: 19/07/2024.",
-    estado: estado9,
-    archivos: (adjuntosObras["9"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado10 = form.querySelector('[name="estado_10"]').value;
-  estados.push({
-    obra: "MEJORA DEL CAMINO DEL INTERIOR DE LA ERMITA Y CASA PALACIO DE ALGORFA",
-    plan: "INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2021. BOP: 14/09/2021.",
-    estado: estado10,
-    archivos: (adjuntosObras["10"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado11 = form.querySelector('[name="estado_11"]').value;
-  estados.push({
-    obra: "INSTALACIÓN DE FAROLAS SOLARES AUTÓNOMAS EN EL CAMINO DE LA YESERA. ALGORFA (ALICANTE)",
-    plan: "IMPULSO DE LAS INSTALACIONES FOTOVOLTAICAS PARA EL AUTOCONSUMO DE EDIFICIOS MUNICIPALES Y EL ALUMBRADO PÚBLICO EN MUNICIPIOS Y ENTIDADES LOCALES DE LA PROVINCIA DE ALICANTE, ANUALIDAD 2023. BOP: 25/08/2023",
-    estado: estado11,
-    archivos: (adjuntosObras["11"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado12 = form.querySelector('[name="estado_12"]').value;
-  estados.push({
-    obra: "REHABILITACIÓN DE ALMAZARA",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado12,
-    archivos: (adjuntosObras["12"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado13 = form.querySelector('[name="estado_13"]').value;
-  estados.push({
-    obra: "OBRAS DE MEJORA, MODERNIZACIÓN YDOTACIÓN DE INFRAESTRUCTURAS EN ELPOLÍGONO INDUSTRIAL DE ALGORFA (ALICANTE)",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado13,
-    archivos: (adjuntosObras["13"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado14 = form.querySelector('[name="estado_14"]').value;
-  estados.push({
-    obra: "ADQUISICIÓN DE LUMINARIAS PARA LA MEJORA DE LA SEGURIDAD VIAL EN CAMINO ANTIGUA DEPURADORA - ALGORFA",
-    plan: "INVERSIONES EN ZONAS VERDES DE TIT. MUNICIPAL 2025 Línea C BOP: 05/08/2025",
-    estado: estado14,
-    archivos: (adjuntosObras["14"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "REPOSICIÓN DE RED DE AGUA POTABLE EN C/SALVADOR DALÍ, URBANIZACIÓN MONTEMAR (EXPTE. 2021/091-IACH).",
-    plan: "REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2021 BOP: 30/7/2021",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["15"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "REPARACIÓN SUPERFICIAL DEL ENLACE PEATONAL ENTRE EL CASCO URBANO Y LA ERMITA DE ALGORFA (ALICANTE)",
-    plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL (LINEA 1 y 2), POB. <5000 HAB. BOP: 11/6/2021",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["16"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "REPARACIÓN DEL CAMINO DE ENLACE ENTRE EL CASCO URBANO Y LA ERMITA DE ALGORFA.",
-    plan: "REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2022 BOP: 26/8/2022",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["17"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "REHABILITACIÓN DE LOS VESTUARIOS DEL POLIDEPORTIVO MUNICIPAL JUAN CARLOS I DE ALGORFA",
-    plan: "PLAN +DEPORTE 2022 BOP: 21/11/2022",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["18"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "DOTACIÓN DE ALUMBRADO PÚBLICO EN EL CAMINO DE LA YESERA. ALGORFA (ALICANTE)",
-    plan: "INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2023. BOP: 24/7/2023.",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["19"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "ADQ. DE LUMINARIAS PARA LA MEJORA DE LA SER. VIAL EN EL CAMINO DE LA ANILLA",
-    plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB. <20000 HAB. 2023. BOP: 05/09/2023.",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["20"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "ADQ. DE LUMINARIAS Y ELEMENTOS PARA LA MEJORA DE LA SEGURIDAD VIAL EN ALGORFA (ALICANTE)",
-    plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM, DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <5000 HAB. 2022 BOP: 19/08/2022",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["21"] || []).map(f => f.name)
-  });
-  
+    
+      estados.push({
+        obra: "ADQ. DE LUMINARIAS Y ELEMENTOS PARA LA MEJORA DE LA SEGURIDAD VIAL EN ALGORFA (ALICANTE)",
+        plan: "ADQUISICIÓN DE LUMINARIAS Y ELEM, DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <5000 HAB. 2022 BOP: 19/08/2022",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["21"] || []).map(f => f.name)
+      });
+    
   
 
   // Enviar a Google Forms
   const formData = new FormData();
-  formData.append("entry.XXXXX", "012");  // ← Cambia XXXXX por tu entry ID
-  formData.append("entry.YYYYY", JSON.stringify(estados));  // ← Cambia YYYYY
+  formData.append("entry.1317069794", "012"); 
+  formData.append("entry.1523598469", JSON.stringify(estados)); 
 
   try {
-    await fetch("URL_GOOGLE_FORMS", { 
+    await fetch(URL_GOOGLE_FORMS, { 
       method: "POST", 
       body: formData, 
       mode: "no-cors" 
     });
-    alert("✅ Obras enviadas correctamente");
+    
+    btnSubmit.textContent = "✅ ¡Enviado!";
+    btnSubmit.style.background = "green";
+    
+    // Opcional: Redirigir o limpiar
+    setTimeout(() => {
+       alert("Datos de obras registrados correctamente.");
+       // window.location.reload(); 
+    }, 500);
+
   } catch(error) {
-    alert("❌ Error al enviar: " + error.message);
+    alert("❌ Error al enviar formulario: " + error.message);
+    btnSubmit.disabled = false;
+    btnSubmit.textContent = originalText;
   }
 });
 

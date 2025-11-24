@@ -1426,92 +1426,150 @@ button:hover {
 </div>
 
 <script>
-
 // ------------------------
-
+// CONFIGURACIÓN
+// ------------------------
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
 
-
+// Almacén local de archivos para mostrar en la lista antes de enviar el formulario final
 let adjuntosObras = {};
 
-function renderAdjuntosObra(obra) {
-  const cont = document.getElementById("adjuntos_" + obra);
-  const files = adjuntosObras[obra] || [];
+// ------------------------
+// UTILIDADES (Base64)
+// ------------------------
+function getBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // Quitamos la cabecera "data:image/png;base64,"
+      let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
+      if ((encoded.length % 4) > 0) {
+        encoded += '='.repeat(4 - (encoded.length % 4));
+      }
+      resolve(encoded);
+    };
+    reader.onerror = error => reject(error);
+  });
+}
 
+// ------------------------
+// GESTIÓN DE INTERFAZ (Listado de archivos)
+// ------------------------
+function renderAdjuntosObra(obraId) {
+  const cont = document.getElementById("adjuntos_" + obraId);
+  const files = adjuntosObras[obraId] || [];
+
+  // Mantenemos el div de estado si existe, o limpiamos para repintar la lista
+  // Para simplificar, repintamos la lista y dejamos espacio para mensajes
+  
+  // Guardar mensajes temporales si los hubiera
+  const existingMsgs = Array.from(cont.querySelectorAll('.msg-status'));
+  
   cont.innerHTML = files
     .map((f, i) => `
-      <div style="display:flex; align-items:center; gap:6px; margin-top:3px;">
-        <span>📎 ${f.name}</span>
+      <div style="display:flex; align-items:center; gap:6px; margin-top:3px; background:#f9f9f9; padding:2px 5px; border-radius:4px;">
+        <span style="font-size:12px;">📎 ${f.name}</span>
         <button 
           type="button" 
-          onclick="eliminarAdjunto('${obra}', ${i})"
-          style="background:none; color:#b71c1c; border:none; font-size:14px; cursor:pointer;"
-          title="Eliminar archivo"
+          onclick="eliminarAdjunto('${obraId}', ${i})"
+          style="background:none; color:#b71c1c; border:none; font-size:12px; cursor:pointer; padding:0;"
+          title="Eliminar de la lista (no borra de Drive)"
         >
-          ❌
+          ✖
         </button>
       </div>
     `)
     .join("");
+
+  // Re-insertar mensajes de estado (cargando/exito) al final
+  existingMsgs.forEach(msg => cont.appendChild(msg));
 }
 
-function eliminarAdjunto(obra, index) {
-  adjuntosObras[obra].splice(index, 1);
-  renderAdjuntosObra(obra);
+function eliminarAdjunto(obraId, index) {
+  adjuntosObras[obraId].splice(index, 1);
+  renderAdjuntosObra(obraId);
 }
 
-async function subirAdjunto(mun, obra) {
+// ------------------------
+// LÓGICA DE SUBIDA (AJAX + JSON)
+// ------------------------
+async function subirAdjunto(munCode, obraId) {
   const fileInput = document.createElement("input");
   fileInput.type = "file";
   fileInput.multiple = true;
-  fileInput.accept = "*/*";
+  // fileInput.accept = ".pdf,.jpg,.jpeg,.png,.doc,.docx"; // Opcional: limitar tipos
 
   fileInput.onchange = async () => {
     const files = Array.from(fileInput.files);
     if (!files.length) return;
 
-    if (!adjuntosObras[obra]) adjuntosObras[obra] = [];
-    adjuntosObras[obra].push(...files);
-    renderAdjuntosObra(obra);
+    // 1. Añadir a la lista visual inmediatamente
+    if (!adjuntosObras[obraId]) adjuntosObras[obraId] = [];
+    adjuntosObras[obraId].push(...files);
+    renderAdjuntosObra(obraId);
 
-    // ← AÑADIR FEEDBACK VISUAL
-    const statusDiv = document.getElementById("adjuntos_" + obra);
-    const loading = document.createElement("div");
-    loading.textContent = "⏳ Subiendo archivos...";
-    loading.style.color = "orange";
-    statusDiv.appendChild(loading);
+    // 2. Preparar zona de mensajes
+    const statusDiv = document.getElementById("adjuntos_" + obraId);
+    const msgBox = document.createElement("div");
+    msgBox.className = "msg-status";
+    msgBox.style.fontSize = "11px";
+    msgBox.style.marginTop = "4px";
+    msgBox.style.fontWeight = "bold";
+    statusDiv.appendChild(msgBox);
 
-    const formData = new FormData();
-    formData.append("tipo", "obra");
-    formData.append("mun", mun);
-    formData.append("obra", obra);
+    // 3. Subir archivos UNO A UNO
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      msgBox.textContent = `⏳ Subiendo ${i+1}/${files.length}: ${file.name}...`;
+      msgBox.style.color = "#f57c00"; // Naranja
 
-    files.forEach((f, idx) => formData.append(`file${idx}`, f));
+      try {
+        // A. Convertir
+        const base64 = await getBase64(file);
 
-    try {
-      const resp = await fetch(URL_APPS_SCRIPT, {  // ← Usar variable
-        method: "POST",
-        body: formData
-      });
+        // B. Payload JSON
+        const payload = {
+          tipo: "obra",      // Importante para tu script
+          mun: munCode,
+          obra: obraId,      // El ID o índice de la obra (para la subcarpeta)
+          filename: file.name,
+          mimeType: file.type,
+          file: base64
+        };
 
-      const data = await resp.json();
-      loading.remove();  // ← Quitar mensaje de carga
-      
-      if (data.status !== "ok") {
-        alert("❌ Error al subir archivo");
-      } else {
-        // ← MENSAJE DE ÉXITO
-        const success = document.createElement("div");
-        success.textContent = "✅ Archivos subidos correctamente";
-        success.style.color = "green";
-        statusDiv.appendChild(success);
-        setTimeout(() => success.remove(), 3000);  // Desaparece en 3s
+        // C. Enviar
+        const resp = await fetch(URL_APPS_SCRIPT, {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        
+        const data = await resp.json();
+
+        if (data.status === "success") {
+          console.log(`✅ ${file.name} subido.`);
+        } else {
+          throw new Error(data.message || "Error desconocido");
+        }
+
+      } catch (err) {
+        console.error(err);
+        msgBox.textContent = `❌ Error con ${file.name}`;
+        msgBox.style.color = "red";
+        // Pausa para leer el error antes de seguir
+        await new Promise(r => setTimeout(r, 2000));
       }
-    } catch(e) {
-      loading.remove();
-      alert("❌ Error de conexión");
     }
+
+    // 4. Finalización
+    msgBox.textContent = "✅ Todos los archivos subidos.";
+    msgBox.style.color = "green";
+    
+    // Borrar mensaje de éxito tras 4 segundos
+    setTimeout(() => {
+      try { msgBox.remove(); } catch(e){}
+    }, 4000);
   };
 
   fileInput.click();
@@ -1519,536 +1577,696 @@ async function subirAdjunto(mun, obra) {
 
 
 // ------------------------
-// ENVIAR
+// ENVIAR FORMULARIO FINAL (DATOS A GOOGLE FORM)
+// ------------------------
 document.getElementById("frmObras").addEventListener("submit", async (e) => {
   e.preventDefault();
   
+  const btnSubmit = e.target.querySelector("button[type='submit']");
+  const originalText = btnSubmit.textContent;
+  btnSubmit.disabled = true;
+  btnSubmit.textContent = "Enviando datos...";
+
   // Recopilar estados de las obras
   const estados = [];
   const form = e.target;
   
-  
-  
-  const estado1 = form.querySelector('[name="estado_1"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLÍGONO DE SANTIAGO PAYA Y SANT BENET 2021",
-    plan: "IVACE: PARQUES EMPRESARIALES 2021",
-    estado: estado1,
-    archivos: (adjuntosObras["1"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado2 = form.querySelector('[name="estado_2"]').value;
-  estados.push({
-    obra: "ACTUACIONES REHABILITACIÓN DEL CONJUNTO INDUSTRIAL RODES PARA EL CONJUNTO ADMINISTRATIVO”, CUYO PROYECTO HA SIDO REDACTADO POR RAMÓN ESTEVE ESTUDIO DE ARQUITECTURA SLP | UTE RE-CIVIC.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado2,
-    archivos: (adjuntosObras["2"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado3 = form.querySelector('[name="estado_3"]').value;
-  estados.push({
-    obra: "IES PARE VITÒRIA (03000394). DEMOLICIÓ DE LA SALA D'ACTES I CONSTRUCCIÓ DE GIMNÀS EN EIXE ESPAI I AULES EN SEGONA PLANTA. REFORÇ I REPARACIÓ ESTRUCTURAL. APARELLS AIRE CONDICIONAT.",
-    plan: "GVA (PROGRAMA EDIFICANT)",
-    estado: estado3,
-    archivos: (adjuntosObras["3"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado4 = form.querySelector('[name="estado_4"]').value;
-  estados.push({
-    obra: "REFORMA DEL EDIFICIO DE APARCAMIENTOS SUBTERRÁNEOS Y REPOSICIÓN DE ZONA VERDE EN SU CUBIERTA EN LA PLAZA DE LA CONSTITUCIÓN (LA ROSALEDA) PARA EL CUMPLIMIENTO DE LA STSJCV Nº 1504/2005",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado4,
-    archivos: (adjuntosObras["4"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado5 = form.querySelector('[name="estado_5"]').value;
-  estados.push({
-    obra: "VARIANTE DE TRAZADO EN LA CV-923 ENTRE LOS PK 1+300 A 1+650, TRAMO BIGASTRO A HURCHILLO EN ORIHUELA (ALICANTE).",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado5,
-    archivos: (adjuntosObras["5"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado6 = form.querySelector('[name="estado_6"]').value;
-  estados.push({
-    obra: "CONSTRUCCIÓN DE EDIFICIO DE 18 VIVIENDAS INTERGENERACIONALES EN EL BARRIO DEL PARTIDOR DE ALCOI, CALLE SANT MATEU 102 Y 104",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado6,
-    archivos: (adjuntosObras["6"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado7 = form.querySelector('[name="estado_7"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLIGONO COTES ALTES2023",
-    plan: "IVACE: PARQUES EMPRESARIALES 2023",
-    estado: estado7,
-    archivos: (adjuntosObras["7"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado8 = form.querySelector('[name="estado_8"]').value;
-  estados.push({
-    obra: "DEPURADORA DE ELS ALGARS (AMPLIACIÓN)",
-    plan: "None",
-    estado: estado8,
-    archivos: (adjuntosObras["8"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado9 = form.querySelector('[name="estado_9"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLIGONO INDUSTRIAL DE COTES BAIXES",
-    plan: "IVACE: PARQUES EMPRESARIALES 2024",
-    estado: estado9,
-    archivos: (adjuntosObras["9"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado10 = form.querySelector('[name="estado_10"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLÍGONO SANTIAGO PAYÁ - SANT BENET 2022",
-    plan: "IVACE: PARQUES EMPRESARIALES 2022",
-    estado: estado10,
-    archivos: (adjuntosObras["10"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado11 = form.querySelector('[name="estado_11"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLIGONO EL CASTELLAR",
-    plan: "IVACE: PARQUES EMPRESARIALES 2024",
-    estado: estado11,
-    archivos: (adjuntosObras["11"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado12 = form.querySelector('[name="estado_12"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLIGONO INDUSTRIAL COTES ALTES",
-    plan: "IVACE: PARQUES EMPRESARIALES 2024",
-    estado: estado12,
-    archivos: (adjuntosObras["12"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado13 = form.querySelector('[name="estado_13"]').value;
-  estados.push({
-    obra: "REHABILITACIÓN ENERGÉTICA DE LA CASA CONSISTORIAL Y DEL EDIFICIO ADMINISTRATIVO DEL AYUNTAMIENTO DE ALCOY",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado13,
-    archivos: (adjuntosObras["13"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado14 = form.querySelector('[name="estado_14"]').value;
-  estados.push({
-    obra: "EJECUCIÓN DE LAS OBRAS CONTENIDAS EN EL PROYECTO DE REHABILITACIÓN DE EDIFICIO PARA PINACOTECA MUNICIPAL EN LA CALLE EL CAMÍ, 40", CUYO PROYECTO HA SIDO REDACTADO POR LOS ARQUITECTOS IGNACIO COMPANY SELMA Y CRISTINA PICAZO MICÓ",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado14,
-    archivos: (adjuntosObras["14"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado15 = form.querySelector('[name="estado_15"]').value;
-  estados.push({
-    obra: "OBRAS DEL PROYECTO PARA LA ADECUACIÓN DEL TEATRO CALDERÓN A LA NORMATIVA VIGENTE",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado15,
-    archivos: (adjuntosObras["15"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado16 = form.querySelector('[name="estado_16"]').value;
-  estados.push({
-    obra: "EJECUCIÓN DE LAS OBRAS CONTENIDAS EN EL PROYECTO MODIFICADO DE REHABILITACIÓN DE LOS EDIFICIOS DE LA C/TIBI 4 Y 6, , CUYO PROYECTO HA SIDO REDACTADO POR RAMÓN ESTEVE ESTUDIO DE ARQUITECTURA SLP | UTE RE-CIVIC.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado16,
-    archivos: (adjuntosObras["16"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado17 = form.querySelector('[name="estado_17"]').value;
-  estados.push({
-    obra: "OBRES DE REORDENACIÓ I REURBANITZACIÓ DE LA PLAÇA JAUME EL CONQUERIDOR",
-    plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-    estado: estado17,
-    archivos: (adjuntosObras["17"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado18 = form.querySelector('[name="estado_18"]').value;
-  estados.push({
-    obra: "ESTABILIZACIÓN GEOTÉCNICA DE LADERA, DESMANTELAMIE NTO DE OBRA DE PASO Y EJECUCIÓN DE NUEVO VIAL DE ACCESO A LOS POLÍGONOS INDUSTRIALES DE SANT BENET Y DE SANTIAGO PAYÁ",
-    plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
-    estado: estado18,
-    archivos: (adjuntosObras["18"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado19 = form.querySelector('[name="estado_19"]').value;
-  estados.push({
-    obra: "REFORMA Y MEJORA DE INSTALACIONES Y DEL TALUD DE PROTECCIÓN DEL CAMPO DE FÚTBOL MUNICIPAL P. FRANCISCO LAPORTA",
-    plan: "PLAN +DEPORTE 2022 BOP: 21/11/2022",
-    estado: estado19,
-    archivos: (adjuntosObras["19"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado20 = form.querySelector('[name="estado_20"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLÍGONO DE LA BENIATA 2021",
-    plan: "IVACE: PARQUES EMPRESARIALES 2021",
-    estado: estado20,
-    archivos: (adjuntosObras["20"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado21 = form.querySelector('[name="estado_21"]').value;
-  estados.push({
-    obra: "REHABILITACIÓN DE EDIFICIO DE VIVIENDAS A ALOJAMIENTOS",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado21,
-    archivos: (adjuntosObras["21"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado22 = form.querySelector('[name="estado_22"]').value;
-  estados.push({
-    obra: "ACTUACIONES DE REHABILITACIÓN DEL EDIFICIO AGRES 5 PARA CENTRO DE TURISMO INTERIOR",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado22,
-    archivos: (adjuntosObras["22"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado23 = form.querySelector('[name="estado_23"]').value;
-  estados.push({
-    obra: "IES COTES BAIXES (03000400). CONSTRUCCIÓ DE NOU EDIFICI PER A AULES TALLER.",
-    plan: "GVA (PROGRAMA EDIFICANT)",
-    estado: estado23,
-    archivos: (adjuntosObras["23"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado24 = form.querySelector('[name="estado_24"]').value;
-  estados.push({
-    obra: "IES ANDREU SEMPERE (03010727). PROJECTE D'ADEQUACIÓ I AMPLIACIÓ.",
-    plan: "GVA (PROGRAMA EDIFICANT)",
-    estado: estado24,
-    archivos: (adjuntosObras["24"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado25 = form.querySelector('[name="estado_25"]').value;
-  estados.push({
-    obra: "PROYECTO CONSTRUCTIVO DE PUENTE SOBRE EL BARRANC DEL CINT EN ALCOI",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado25,
-    archivos: (adjuntosObras["25"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado26 = form.querySelector('[name="estado_26"]').value;
-  estados.push({
-    obra: "CONSTRUCCIÓN DEL PABELLÓN DE GIMNASIA ARTÍSTICA DE ALCOY",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado26,
-    archivos: (adjuntosObras["26"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado27 = form.querySelector('[name="estado_27"]').value;
-  estados.push({
-    obra: "MEJORAS EN POLIGONO EL CASTELLAR2023",
-    plan: "IVACE: PARQUES EMPRESARIALES 2023",
-    estado: estado27,
-    archivos: (adjuntosObras["27"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado28 = form.querySelector('[name="estado_28"]').value;
-  estados.push({
-    obra: "TRATAMIENTO PAISAJÍSTICO Y CONEXIÓN VERDE CICLO PEATONAL DEL BIC DEL MOLINAR EN ACCESO SUR",
-    plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
-    estado: estado28,
-    archivos: (adjuntosObras["28"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado29 = form.querySelector('[name="estado_29"]').value;
-  estados.push({
-    obra: "RENOVACIÓN DE ALUMBRADOS EFICIENTES Y EMBELLECEDORES EN EQUIPAMIENTOS PÚBLICOS TURÍSTICOS.",
-    plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
-    estado: estado29,
-    archivos: (adjuntosObras["29"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado30 = form.querySelector('[name="estado_30"]').value;
-  estados.push({
-    obra: "REHABILITACIÓN, MUSEALIZACIÓN Y CREACIÓN DE UN CENTRO DE INTERPRETACIÓN DE LA SOCIEDAD INDUSTRIAL EN CONJUNTO HISTÓRICO EL MOLINAR",
-    plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
-    estado: estado30,
-    archivos: (adjuntosObras["30"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado31 = form.querySelector('[name="estado_31"]').value;
-  estados.push({
-    obra: "CONSOLIDACIÓN Y PUESTA EN VALOR DEL MUSEO ARQUEOLÓGICO MUNICIPAL CAMILO VISEDO MOLTÓ",
-    plan: "REHAB. PATRIMONIO ARQUITECTÓNICO HISTÓRICO MUNICIPAL POB <75000 HAB 2022 2ª CONVOCATORIA BOP: 13/04/2023",
-    estado: estado31,
-    archivos: (adjuntosObras["31"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado32 = form.querySelector('[name="estado_32"]').value;
-  estados.push({
-    obra: "REPARACIÓN DE LA TUBERÍA DE IMPULSIÓN DE AGUA TRATADA DE LA EDAR DE ALCOY AL DEPÓSITO DE COCENTAINA",
-    plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-    estado: estado32,
-    archivos: (adjuntosObras["32"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado33 = form.querySelector('[name="estado_33"]').value;
-  estados.push({
-    obra: "PROPUESTA DE ACTUACIÓN DEL CEDEX SOBRE LAS PATOLOGÍAS DETECTADAS EN LA AUTOVÍA A-7 ENTRE LOS PP.KK. 445+000 Y 448+000, EN LA VARIANTE DE ALCOY.",
-    plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
-    estado: estado33,
-    archivos: (adjuntosObras["33"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado34 = form.querySelector('[name="estado_34"]').value;
-  estados.push({
-    obra: "REPAVIMENTACIÓN DE LA CALLE JOAN CANTÓ Y ENTORNO , FINANCIADO POR FONDOS EUROPEOS NEXT GENERATIONEU. PRTR.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado34,
-    archivos: (adjuntosObras["34"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado35 = form.querySelector('[name="estado_35"]').value;
-  estados.push({
-    obra: "MEJORAR LA ZONA VERDE LA AVD CARMEN VIDAL",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado35,
-    archivos: (adjuntosObras["35"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado36 = form.querySelector('[name="estado_36"]').value;
-  estados.push({
-    obra: "ADECUACIÓN DE LA ZONA DE REHABILITACIÓN EN LA DELEGACIÓN DE UNIÓN DE MUTUAS, MCSS, Nº 267 DE ALCOI.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado36,
-    archivos: (adjuntosObras["36"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado37 = form.querySelector('[name="estado_37"]').value;
-  estados.push({
-    obra: "DEMOLICIÓN DEL BLOQUE Nº 2 DEL CEMENTERIO DE SAN ANTONIO ABAD Y NUEVA CONSTRUCCIÓN DEL BLOQUE.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado37,
-    archivos: (adjuntosObras["37"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado38 = form.querySelector('[name="estado_38"]').value;
-  estados.push({
-    obra: "MEJORAS EN EL POL. IND. SANTIAGO PAYÁ -SANT BENET",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado38,
-    archivos: (adjuntosObras["38"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado39 = form.querySelector('[name="estado_39"]').value;
-  estados.push({
-    obra: "MEJORAS EN EL POL. IND. COTES BAIXES",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado39,
-    archivos: (adjuntosObras["39"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado40 = form.querySelector('[name="estado_40"]').value;
-  estados.push({
-    obra: "MEJORAS EN EL POL. IND. EL CASTELLAR",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado40,
-    archivos: (adjuntosObras["40"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado41 = form.querySelector('[name="estado_41"]').value;
-  estados.push({
-    obra: "MEJORAS EN EL POL. IND. COTES ALTES",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado41,
-    archivos: (adjuntosObras["41"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado42 = form.querySelector('[name="estado_42"]').value;
-  estados.push({
-    obra: "MEJORAS EN EL POL. IND. LA BENIATA",
-    plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
-    estado: estado42,
-    archivos: (adjuntosObras["42"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado43 = form.querySelector('[name="estado_43"]').value;
-  estados.push({
-    obra: "OBRAS DE ESTABILIZACIÓN GEOTÉCNICA DE LA LADERA, DESMANTELAMIENTO DE OBRA DE PASO Y REPOSICIÓN DE VIAL DE ACCESO A LOS POLÍGONOS INDUSTRIALES DE SANTIAGO PAYÁ Y SANT BENET.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado43,
-    archivos: (adjuntosObras["43"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado44 = form.querySelector('[name="estado_44"]').value;
-  estados.push({
-    obra: "EJECUCIÓN DE LAS OBRAS DEL PROYECTO  PARA LA MEJORA DE LA ACCESIBILIDAD VERTICAL ENTRE EL PASEO CERVANTES Y EL PASEO JUANA MORENO, FONDOS EUROPEOS NEXT GENERATIONEU",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado44,
-    archivos: (adjuntosObras["44"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado45 = form.querySelector('[name="estado_45"]').value;
-  estados.push({
-    obra: "RENATURALIZACIÓN, AUMENTO DE LA SUPERFICIE VEGETAL Y MEJORA DE LA BIODIVERSIDAD EN PARQUES, JARDINES Y CALLES DE LA CIUDAD DE ALCOY. FONDOS EUROPEOS NEXT GENERATIONEU",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado45,
-    archivos: (adjuntosObras["45"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado46 = form.querySelector('[name="estado_46"]').value;
-  estados.push({
-    obra: "ACTUACIÓN INTEGRAL PARA LA MEJORA DE LA ACCESIBILIDAD Y DE LA CALIDAD URBANA EN EL ESPACIO PÚBLICO DEL PASSEIG JUANA MORENO, FONDOS EUROPEOS NEXT GENERATIONEU",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado46,
-    archivos: (adjuntosObras["46"] || []).map(f => f.name)
-  });
-  
-  
-  
-  const estado47 = form.querySelector('[name="estado_47"]').value;
-  estados.push({
-    obra: "REURBANIZACIÓN DEL ACCESO OESTE E IMPLANTACIÓN Y CONEXIÓN CON LA RED EXISTENTE DE CARRIL BICI ENTRE EL BARRIO DE SANTA ROS AY BATOI, FINANCIADO POR FONDOS NEXTGENERATIONEU",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: estado47,
-    archivos: (adjuntosObras["47"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "ACTUACIONES DE CONSOLIDACIÓN Y PUESTA EN VALOR DE LA TORRE-PORTAL DE COCENTAINA",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["48"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "CONSTRUCCIÓN-REHABILITACIÓN DE VARIOS TRAMOS DE ALCANTARILLADO EN EL BARRIO DE BATOI",
-    plan: "PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2016",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["49"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "PROYECTO DE MEJORA DE EFICIENCIA ENERGÉTICA Y ADECUACIÓN DE LOS EQUIPAMIENTOS DE SEGURIDAD DEL TÚNEL DEL SALT AL RD 635/2006, EN LA CV-795",
-    plan: "PLAN ESPECIAL DE MEJORA DE ACCESOS A MUNICIPIOS 2023-2024. BOP 18/04/2023",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["50"] || []).map(f => f.name)
-  });
-  
-  
-  
-  estados.push({
-    obra: "EMERGENCIA PARA LA DESOBSTRUCCIÓN DEL COLECTOR GENERAL DE LA EDAR DE ALCOI (ALACANT) Y RESTABLECIMIENTO DEL SERVICIO DE SANEAMIENTO A SU PASO POR LA ZONA DE PAPELERAS EN EL RIO SERPIS.",
-    plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
-    estado: "Finalizada",
-    archivos: (adjuntosObras["51"] || []).map(f => f.name)
-  });
-  
+  // NOTA: Asegúrate de que este bucle de Jinja2 renderiza correctamente los índices
+  // JS no interpreta Jinja, esto debe venir renderizado del servidor.
+  
+    
+      // Capturamos el valor del select
+      const select1 = form.querySelector('[name="estado_1"]');
+      const val1 = select1 ? select1.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLÍGONO DE SANTIAGO PAYA Y SANT BENET 2021",
+        plan: "IVACE: PARQUES EMPRESARIALES 2021",
+        estado: val1,
+        archivos: (adjuntosObras["1"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select2 = form.querySelector('[name="estado_2"]');
+      const val2 = select2 ? select2.value : "";
+      
+      estados.push({
+        obra: "ACTUACIONES REHABILITACIÓN DEL CONJUNTO INDUSTRIAL RODES PARA EL CONJUNTO ADMINISTRATIVO”, CUYO PROYECTO HA SIDO REDACTADO POR RAMÓN ESTEVE ESTUDIO DE ARQUITECTURA SLP | UTE RE-CIVIC.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val2,
+        archivos: (adjuntosObras["2"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select3 = form.querySelector('[name="estado_3"]');
+      const val3 = select3 ? select3.value : "";
+      
+      estados.push({
+        obra: "IES PARE VITÒRIA (03000394). DEMOLICIÓ DE LA SALA D'ACTES I CONSTRUCCIÓ DE GIMNÀS EN EIXE ESPAI I AULES EN SEGONA PLANTA. REFORÇ I REPARACIÓ ESTRUCTURAL. APARELLS AIRE CONDICIONAT.",
+        plan: "GVA (PROGRAMA EDIFICANT)",
+        estado: val3,
+        archivos: (adjuntosObras["3"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select4 = form.querySelector('[name="estado_4"]');
+      const val4 = select4 ? select4.value : "";
+      
+      estados.push({
+        obra: "REFORMA DEL EDIFICIO DE APARCAMIENTOS SUBTERRÁNEOS Y REPOSICIÓN DE ZONA VERDE EN SU CUBIERTA EN LA PLAZA DE LA CONSTITUCIÓN (LA ROSALEDA) PARA EL CUMPLIMIENTO DE LA STSJCV Nº 1504/2005",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val4,
+        archivos: (adjuntosObras["4"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select5 = form.querySelector('[name="estado_5"]');
+      const val5 = select5 ? select5.value : "";
+      
+      estados.push({
+        obra: "VARIANTE DE TRAZADO EN LA CV-923 ENTRE LOS PK 1+300 A 1+650, TRAMO BIGASTRO A HURCHILLO EN ORIHUELA (ALICANTE).",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val5,
+        archivos: (adjuntosObras["5"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select6 = form.querySelector('[name="estado_6"]');
+      const val6 = select6 ? select6.value : "";
+      
+      estados.push({
+        obra: "CONSTRUCCIÓN DE EDIFICIO DE 18 VIVIENDAS INTERGENERACIONALES EN EL BARRIO DEL PARTIDOR DE ALCOI, CALLE SANT MATEU 102 Y 104",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val6,
+        archivos: (adjuntosObras["6"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select7 = form.querySelector('[name="estado_7"]');
+      const val7 = select7 ? select7.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLIGONO COTES ALTES2023",
+        plan: "IVACE: PARQUES EMPRESARIALES 2023",
+        estado: val7,
+        archivos: (adjuntosObras["7"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select8 = form.querySelector('[name="estado_8"]');
+      const val8 = select8 ? select8.value : "";
+      
+      estados.push({
+        obra: "DEPURADORA DE ELS ALGARS (AMPLIACIÓN)",
+        plan: "None",
+        estado: val8,
+        archivos: (adjuntosObras["8"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select9 = form.querySelector('[name="estado_9"]');
+      const val9 = select9 ? select9.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLIGONO INDUSTRIAL DE COTES BAIXES",
+        plan: "IVACE: PARQUES EMPRESARIALES 2024",
+        estado: val9,
+        archivos: (adjuntosObras["9"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select10 = form.querySelector('[name="estado_10"]');
+      const val10 = select10 ? select10.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLÍGONO SANTIAGO PAYÁ - SANT BENET 2022",
+        plan: "IVACE: PARQUES EMPRESARIALES 2022",
+        estado: val10,
+        archivos: (adjuntosObras["10"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select11 = form.querySelector('[name="estado_11"]');
+      const val11 = select11 ? select11.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLIGONO EL CASTELLAR",
+        plan: "IVACE: PARQUES EMPRESARIALES 2024",
+        estado: val11,
+        archivos: (adjuntosObras["11"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select12 = form.querySelector('[name="estado_12"]');
+      const val12 = select12 ? select12.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLIGONO INDUSTRIAL COTES ALTES",
+        plan: "IVACE: PARQUES EMPRESARIALES 2024",
+        estado: val12,
+        archivos: (adjuntosObras["12"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select13 = form.querySelector('[name="estado_13"]');
+      const val13 = select13 ? select13.value : "";
+      
+      estados.push({
+        obra: "REHABILITACIÓN ENERGÉTICA DE LA CASA CONSISTORIAL Y DEL EDIFICIO ADMINISTRATIVO DEL AYUNTAMIENTO DE ALCOY",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val13,
+        archivos: (adjuntosObras["13"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select14 = form.querySelector('[name="estado_14"]');
+      const val14 = select14 ? select14.value : "";
+      
+      estados.push({
+        obra: "EJECUCIÓN DE LAS OBRAS CONTENIDAS EN EL PROYECTO DE REHABILITACIÓN DE EDIFICIO PARA PINACOTECA MUNICIPAL EN LA CALLE EL CAMÍ, 40", CUYO PROYECTO HA SIDO REDACTADO POR LOS ARQUITECTOS IGNACIO COMPANY SELMA Y CRISTINA PICAZO MICÓ",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val14,
+        archivos: (adjuntosObras["14"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select15 = form.querySelector('[name="estado_15"]');
+      const val15 = select15 ? select15.value : "";
+      
+      estados.push({
+        obra: "OBRAS DEL PROYECTO PARA LA ADECUACIÓN DEL TEATRO CALDERÓN A LA NORMATIVA VIGENTE",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val15,
+        archivos: (adjuntosObras["15"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select16 = form.querySelector('[name="estado_16"]');
+      const val16 = select16 ? select16.value : "";
+      
+      estados.push({
+        obra: "EJECUCIÓN DE LAS OBRAS CONTENIDAS EN EL PROYECTO MODIFICADO DE REHABILITACIÓN DE LOS EDIFICIOS DE LA C/TIBI 4 Y 6, , CUYO PROYECTO HA SIDO REDACTADO POR RAMÓN ESTEVE ESTUDIO DE ARQUITECTURA SLP | UTE RE-CIVIC.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val16,
+        archivos: (adjuntosObras["16"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select17 = form.querySelector('[name="estado_17"]');
+      const val17 = select17 ? select17.value : "";
+      
+      estados.push({
+        obra: "OBRES DE REORDENACIÓ I REURBANITZACIÓ DE LA PLAÇA JAUME EL CONQUERIDOR",
+        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
+        estado: val17,
+        archivos: (adjuntosObras["17"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select18 = form.querySelector('[name="estado_18"]');
+      const val18 = select18 ? select18.value : "";
+      
+      estados.push({
+        obra: "ESTABILIZACIÓN GEOTÉCNICA DE LADERA, DESMANTELAMIE NTO DE OBRA DE PASO Y EJECUCIÓN DE NUEVO VIAL DE ACCESO A LOS POLÍGONOS INDUSTRIALES DE SANT BENET Y DE SANTIAGO PAYÁ",
+        plan: "PLAN PLANIFICA 2024-27 BOP: 14/06/2024",
+        estado: val18,
+        archivos: (adjuntosObras["18"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select19 = form.querySelector('[name="estado_19"]');
+      const val19 = select19 ? select19.value : "";
+      
+      estados.push({
+        obra: "REFORMA Y MEJORA DE INSTALACIONES Y DEL TALUD DE PROTECCIÓN DEL CAMPO DE FÚTBOL MUNICIPAL P. FRANCISCO LAPORTA",
+        plan: "PLAN +DEPORTE 2022 BOP: 21/11/2022",
+        estado: val19,
+        archivos: (adjuntosObras["19"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select20 = form.querySelector('[name="estado_20"]');
+      const val20 = select20 ? select20.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLÍGONO DE LA BENIATA 2021",
+        plan: "IVACE: PARQUES EMPRESARIALES 2021",
+        estado: val20,
+        archivos: (adjuntosObras["20"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select21 = form.querySelector('[name="estado_21"]');
+      const val21 = select21 ? select21.value : "";
+      
+      estados.push({
+        obra: "REHABILITACIÓN DE EDIFICIO DE VIVIENDAS A ALOJAMIENTOS",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val21,
+        archivos: (adjuntosObras["21"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select22 = form.querySelector('[name="estado_22"]');
+      const val22 = select22 ? select22.value : "";
+      
+      estados.push({
+        obra: "ACTUACIONES DE REHABILITACIÓN DEL EDIFICIO AGRES 5 PARA CENTRO DE TURISMO INTERIOR",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val22,
+        archivos: (adjuntosObras["22"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select23 = form.querySelector('[name="estado_23"]');
+      const val23 = select23 ? select23.value : "";
+      
+      estados.push({
+        obra: "IES COTES BAIXES (03000400). CONSTRUCCIÓ DE NOU EDIFICI PER A AULES TALLER.",
+        plan: "GVA (PROGRAMA EDIFICANT)",
+        estado: val23,
+        archivos: (adjuntosObras["23"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select24 = form.querySelector('[name="estado_24"]');
+      const val24 = select24 ? select24.value : "";
+      
+      estados.push({
+        obra: "IES ANDREU SEMPERE (03010727). PROJECTE D'ADEQUACIÓ I AMPLIACIÓ.",
+        plan: "GVA (PROGRAMA EDIFICANT)",
+        estado: val24,
+        archivos: (adjuntosObras["24"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select25 = form.querySelector('[name="estado_25"]');
+      const val25 = select25 ? select25.value : "";
+      
+      estados.push({
+        obra: "PROYECTO CONSTRUCTIVO DE PUENTE SOBRE EL BARRANC DEL CINT EN ALCOI",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val25,
+        archivos: (adjuntosObras["25"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select26 = form.querySelector('[name="estado_26"]');
+      const val26 = select26 ? select26.value : "";
+      
+      estados.push({
+        obra: "CONSTRUCCIÓN DEL PABELLÓN DE GIMNASIA ARTÍSTICA DE ALCOY",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val26,
+        archivos: (adjuntosObras["26"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select27 = form.querySelector('[name="estado_27"]');
+      const val27 = select27 ? select27.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN POLIGONO EL CASTELLAR2023",
+        plan: "IVACE: PARQUES EMPRESARIALES 2023",
+        estado: val27,
+        archivos: (adjuntosObras["27"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select28 = form.querySelector('[name="estado_28"]');
+      const val28 = select28 ? select28.value : "";
+      
+      estados.push({
+        obra: "TRATAMIENTO PAISAJÍSTICO Y CONEXIÓN VERDE CICLO PEATONAL DEL BIC DEL MOLINAR EN ACCESO SUR",
+        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
+        estado: val28,
+        archivos: (adjuntosObras["28"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select29 = form.querySelector('[name="estado_29"]');
+      const val29 = select29 ? select29.value : "";
+      
+      estados.push({
+        obra: "RENOVACIÓN DE ALUMBRADOS EFICIENTES Y EMBELLECEDORES EN EQUIPAMIENTOS PÚBLICOS TURÍSTICOS.",
+        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
+        estado: val29,
+        archivos: (adjuntosObras["29"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select30 = form.querySelector('[name="estado_30"]');
+      const val30 = select30 ? select30.value : "";
+      
+      estados.push({
+        obra: "REHABILITACIÓN, MUSEALIZACIÓN Y CREACIÓN DE UN CENTRO DE INTERPRETACIÓN DE LA SOCIEDAD INDUSTRIAL EN CONJUNTO HISTÓRICO EL MOLINAR",
+        plan: "PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)",
+        estado: val30,
+        archivos: (adjuntosObras["30"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select31 = form.querySelector('[name="estado_31"]');
+      const val31 = select31 ? select31.value : "";
+      
+      estados.push({
+        obra: "CONSOLIDACIÓN Y PUESTA EN VALOR DEL MUSEO ARQUEOLÓGICO MUNICIPAL CAMILO VISEDO MOLTÓ",
+        plan: "REHAB. PATRIMONIO ARQUITECTÓNICO HISTÓRICO MUNICIPAL POB <75000 HAB 2022 2ª CONVOCATORIA BOP: 13/04/2023",
+        estado: val31,
+        archivos: (adjuntosObras["31"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select32 = form.querySelector('[name="estado_32"]');
+      const val32 = select32 ? select32.value : "";
+      
+      estados.push({
+        obra: "REPARACIÓN DE LA TUBERÍA DE IMPULSIÓN DE AGUA TRATADA DE LA EDAR DE ALCOY AL DEPÓSITO DE COCENTAINA",
+        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
+        estado: val32,
+        archivos: (adjuntosObras["32"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select33 = form.querySelector('[name="estado_33"]');
+      const val33 = select33 ? select33.value : "";
+      
+      estados.push({
+        obra: "PROPUESTA DE ACTUACIÓN DEL CEDEX SOBRE LAS PATOLOGÍAS DETECTADAS EN LA AUTOVÍA A-7 ENTRE LOS PP.KK. 445+000 Y 448+000, EN LA VARIANTE DE ALCOY.",
+        plan: "Procedente de volcado de contratos menores de contrataciondelestado.es",
+        estado: val33,
+        archivos: (adjuntosObras["33"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select34 = form.querySelector('[name="estado_34"]');
+      const val34 = select34 ? select34.value : "";
+      
+      estados.push({
+        obra: "REPAVIMENTACIÓN DE LA CALLE JOAN CANTÓ Y ENTORNO , FINANCIADO POR FONDOS EUROPEOS NEXT GENERATIONEU. PRTR.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val34,
+        archivos: (adjuntosObras["34"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select35 = form.querySelector('[name="estado_35"]');
+      const val35 = select35 ? select35.value : "";
+      
+      estados.push({
+        obra: "MEJORAR LA ZONA VERDE LA AVD CARMEN VIDAL",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val35,
+        archivos: (adjuntosObras["35"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select36 = form.querySelector('[name="estado_36"]');
+      const val36 = select36 ? select36.value : "";
+      
+      estados.push({
+        obra: "ADECUACIÓN DE LA ZONA DE REHABILITACIÓN EN LA DELEGACIÓN DE UNIÓN DE MUTUAS, MCSS, Nº 267 DE ALCOI.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val36,
+        archivos: (adjuntosObras["36"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select37 = form.querySelector('[name="estado_37"]');
+      const val37 = select37 ? select37.value : "";
+      
+      estados.push({
+        obra: "DEMOLICIÓN DEL BLOQUE Nº 2 DEL CEMENTERIO DE SAN ANTONIO ABAD Y NUEVA CONSTRUCCIÓN DEL BLOQUE.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val37,
+        archivos: (adjuntosObras["37"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select38 = form.querySelector('[name="estado_38"]');
+      const val38 = select38 ? select38.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN EL POL. IND. SANTIAGO PAYÁ -SANT BENET",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val38,
+        archivos: (adjuntosObras["38"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select39 = form.querySelector('[name="estado_39"]');
+      const val39 = select39 ? select39.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN EL POL. IND. COTES BAIXES",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val39,
+        archivos: (adjuntosObras["39"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select40 = form.querySelector('[name="estado_40"]');
+      const val40 = select40 ? select40.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN EL POL. IND. EL CASTELLAR",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val40,
+        archivos: (adjuntosObras["40"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select41 = form.querySelector('[name="estado_41"]');
+      const val41 = select41 ? select41.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN EL POL. IND. COTES ALTES",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val41,
+        archivos: (adjuntosObras["41"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select42 = form.querySelector('[name="estado_42"]');
+      const val42 = select42 ? select42.value : "";
+      
+      estados.push({
+        obra: "MEJORAS EN EL POL. IND. LA BENIATA",
+        plan: "IVACE: PARQUES EMPRESARIALES 2025-2026",
+        estado: val42,
+        archivos: (adjuntosObras["42"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select43 = form.querySelector('[name="estado_43"]');
+      const val43 = select43 ? select43.value : "";
+      
+      estados.push({
+        obra: "OBRAS DE ESTABILIZACIÓN GEOTÉCNICA DE LA LADERA, DESMANTELAMIENTO DE OBRA DE PASO Y REPOSICIÓN DE VIAL DE ACCESO A LOS POLÍGONOS INDUSTRIALES DE SANTIAGO PAYÁ Y SANT BENET.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val43,
+        archivos: (adjuntosObras["43"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select44 = form.querySelector('[name="estado_44"]');
+      const val44 = select44 ? select44.value : "";
+      
+      estados.push({
+        obra: "EJECUCIÓN DE LAS OBRAS DEL PROYECTO  PARA LA MEJORA DE LA ACCESIBILIDAD VERTICAL ENTRE EL PASEO CERVANTES Y EL PASEO JUANA MORENO, FONDOS EUROPEOS NEXT GENERATIONEU",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val44,
+        archivos: (adjuntosObras["44"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select45 = form.querySelector('[name="estado_45"]');
+      const val45 = select45 ? select45.value : "";
+      
+      estados.push({
+        obra: "RENATURALIZACIÓN, AUMENTO DE LA SUPERFICIE VEGETAL Y MEJORA DE LA BIODIVERSIDAD EN PARQUES, JARDINES Y CALLES DE LA CIUDAD DE ALCOY. FONDOS EUROPEOS NEXT GENERATIONEU",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val45,
+        archivos: (adjuntosObras["45"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select46 = form.querySelector('[name="estado_46"]');
+      const val46 = select46 ? select46.value : "";
+      
+      estados.push({
+        obra: "ACTUACIÓN INTEGRAL PARA LA MEJORA DE LA ACCESIBILIDAD Y DE LA CALIDAD URBANA EN EL ESPACIO PÚBLICO DEL PASSEIG JUANA MORENO, FONDOS EUROPEOS NEXT GENERATIONEU",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val46,
+        archivos: (adjuntosObras["46"] || []).map(f => f.name)
+      });
+    
+  
+    
+      // Capturamos el valor del select
+      const select47 = form.querySelector('[name="estado_47"]');
+      const val47 = select47 ? select47.value : "";
+      
+      estados.push({
+        obra: "REURBANIZACIÓN DEL ACCESO OESTE E IMPLANTACIÓN Y CONEXIÓN CON LA RED EXISTENTE DE CARRIL BICI ENTRE EL BARRIO DE SANTA ROS AY BATOI, FINANCIADO POR FONDOS NEXTGENERATIONEU",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: val47,
+        archivos: (adjuntosObras["47"] || []).map(f => f.name)
+      });
+    
+  
+    
+      estados.push({
+        obra: "ACTUACIONES DE CONSOLIDACIÓN Y PUESTA EN VALOR DE LA TORRE-PORTAL DE COCENTAINA",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["48"] || []).map(f => f.name)
+      });
+    
+  
+    
+      estados.push({
+        obra: "CONSTRUCCIÓN-REHABILITACIÓN DE VARIOS TRAMOS DE ALCANTARILLADO EN EL BARRIO DE BATOI",
+        plan: "PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2016",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["49"] || []).map(f => f.name)
+      });
+    
+  
+    
+      estados.push({
+        obra: "PROYECTO DE MEJORA DE EFICIENCIA ENERGÉTICA Y ADECUACIÓN DE LOS EQUIPAMIENTOS DE SEGURIDAD DEL TÚNEL DEL SALT AL RD 635/2006, EN LA CV-795",
+        plan: "PLAN ESPECIAL DE MEJORA DE ACCESOS A MUNICIPIOS 2023-2024. BOP 18/04/2023",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["50"] || []).map(f => f.name)
+      });
+    
+  
+    
+      estados.push({
+        obra: "EMERGENCIA PARA LA DESOBSTRUCCIÓN DEL COLECTOR GENERAL DE LA EDAR DE ALCOI (ALACANT) Y RESTABLECIMIENTO DEL SERVICIO DE SANEAMIENTO A SU PASO POR LA ZONA DE PAPELERAS EN EL RIO SERPIS.",
+        plan: "Procedente de volcado de licitaciones de contrataciondelestado.es",
+        estado: "Finalizada",
+        archivos: (adjuntosObras["51"] || []).map(f => f.name)
+      });
+    
   
 
   // Enviar a Google Forms
   const formData = new FormData();
-  formData.append("entry.XXXXX", "009");  // ← Cambia XXXXX por tu entry ID
-  formData.append("entry.YYYYY", JSON.stringify(estados));  // ← Cambia YYYYY
+  formData.append("entry.1317069794", "009"); 
+  formData.append("entry.1523598469", JSON.stringify(estados)); 
 
   try {
-    await fetch("URL_GOOGLE_FORMS", { 
+    await fetch(URL_GOOGLE_FORMS, { 
       method: "POST", 
       body: formData, 
       mode: "no-cors" 
     });
-    alert("✅ Obras enviadas correctamente");
+    
+    btnSubmit.textContent = "✅ ¡Enviado!";
+    btnSubmit.style.background = "green";
+    
+    // Opcional: Redirigir o limpiar
+    setTimeout(() => {
+       alert("Datos de obras registrados correctamente.");
+       // window.location.reload(); 
+    }, 500);
+
   } catch(error) {
-    alert("❌ Error al enviar: " + error.message);
+    alert("❌ Error al enviar formulario: " + error.message);
+    btnSubmit.disabled = false;
+    btnSubmit.textContent = originalText;
   }
 });
 
