@@ -103,7 +103,7 @@ def obtener_obras(conn, mun):
 
         # Condición 1
         cur.execute("""
-            SELECT mun, orden, nombre, plan_obra, 1 as cond
+            SELECT clave, mun, orden, nombre, plan_obra, 1 as cond
             FROM geonet_obras
             WHERE fase = (SELECT max(fase) FROM geonet_fase) 
             AND (estado IS NULL OR estado NOT IN ('FI','AN'))
@@ -119,7 +119,7 @@ def obtener_obras(conn, mun):
 
         # Condición 2
         cur.execute("""
-            SELECT mun, orden, nombre, plan_obra, 2 as cond
+            SELECT clave, mun, orden, nombre, plan_obra, 2 as cond
             FROM geonet_obras
             WHERE fase = (SELECT max(fase) FROM geonet_fase) 
             AND estado = 'FI'
@@ -137,6 +137,9 @@ def obtener_obras(conn, mun):
         obras = []
         for r in (c1 + c2):
             obras.append({
+                "clave": r["clave"],       
+                "mun": r["mun"],          
+                "orden": r["orden"],       
                 "nombre": r["nombre"],
                 "plan_obra": r["plan_obra"],
                 "cond": r["cond"]
