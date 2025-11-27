@@ -156,6 +156,7 @@ def obtener_municipios(conn):
 
 def obtener_depositos(conn, mun):
     """Consulta datos de depósitos para un municipio específico."""
+    print(f"DEBUG: Consultando depósitos para municipio: {mun}") # <-- AÑADIDO
     try:
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
         cur.execute("""
@@ -174,11 +175,15 @@ def obtener_depositos(conn, mun):
                 "nombre": r["nombre"] if r["nombre"] is not None else "",
                 "limpieza": str(r["limpieza"]) if r["limpieza"] is not None else ""
             })
+        
+        # AÑADIDO: Imprime el resultado de la consulta antes de salir.
+        print(f"DEBUG: Resultado final de depósitos para {mun}: {depositos}") 
+        
         return depositos
         
     except psycopg2.Error as e:
         print(f"❌ Error BD en obtener_depositos para {mun}: {e}")
-        return [] # Devolver lista vacía si falla
+        return []
 
 def obtener_obras(conn, mun):
     """Consulta obras según las condiciones EIEL para un municipio específico."""
