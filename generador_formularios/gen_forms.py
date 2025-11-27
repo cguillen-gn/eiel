@@ -41,6 +41,21 @@ FIREBASE_CONFIG = {
 }
 # ---------------- END CONFIG -----------------------------------
 
+# ---------------- MAPEO EMAIL -> CÓDIGO MUNICIPAL (AUTORIZACIÓN) ----------------
+MAPPING_FILE = "auth_mapping.json"
+EMAIL_TO_CODE_MAP = {} # Inicializar vacío
+
+try:
+    if os.path.exists(MAPPING_FILE):
+        with open(MAPPING_FILE, "r", encoding="utf-8") as f:
+            EMAIL_TO_CODE_MAP = json.load(f)
+        print(f"✅ Mapeo de autorización cargado desde {MAPPING_FILE}.")
+    else:
+        print(f"❌ ADVERTENCIA: No se encontró el archivo de mapeo {MAPPING_FILE}.")
+except Exception as e:
+    print(f"❌ ERROR al cargar el mapeo de autorización: {e}")
+
+# ---------------- END CONFIG -----------------------------------
 
 
 env = Environment(
@@ -293,13 +308,18 @@ def main():
         
         print(f"DEBUG: Renderizando index.html (Genérico) con el listado de {len(municipios_con_nombres)} municipios.")
 
-        # *NUEVO: Pasamos la configuración de Firebase como JSON para el JS*
+        # Pasamos la lista completa de municipios como JSON
+        municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
+        
+        # NUEVO: Preparamos los JSON para el JavaScript
         firebase_config_json = json.dumps(FIREBASE_CONFIG)
+        mapeo_email_codigo_json = json.dumps(EMAIL_TO_CODE_MAP) # <-- ¡Nuevo!
         
         rendered_index = template_index.render(
             fase_actual = fase_actual,
             municipios_json_data = municipios_json,
-            **firebase_config_data = firebase_config_json**
+            firebase_config_data = firebase_config_json,
+            **mapeo_email_codigo_data = mapeo_email_codigo_json** # <-- ¡Nuevo!
         )
 
         # Generación del archivo index.html en el directorio superior

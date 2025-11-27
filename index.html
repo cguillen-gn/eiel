@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿¡Entendido! Aquí tienes el código completo para tu nuevo index.html (generado por Jinja), incorporando la lógica de Firebase para la autenticación y tu código para la autorización (Email $\rightarrow$ Código Municipal) y la redirección.Este código asume que tu script Python (gen_forms.py) le está pasando las variables firebase_config_data, municipios_json_data y mapeo_email_codigo_data a Jinja.📄 index-template.html.j2 CompletoFragmento de código<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -6,216 +6,232 @@
 <title id="pageTitle">EIEL 2025 - Redireccionando...</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { 
-    font-family: 'Inter', Arial, sans-serif; 
-    display: flex; 
-    justify-content: center; 
-    align-items: center; 
-    min-height: 100vh; 
-    margin: 0; 
-    background: #f0f8ff; 
+/* Mantengo tus estilos originales.
+    Solo añado un estilo para el contenedor de carga.
+*/
+body { 
+    font-family: 'Inter', Arial, sans-serif; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    min-height: 100vh; 
+    margin: 0; 
+    background: #f0f8ff; 
 }
 .panel {
-    background: white; 
-    padding: 40px; 
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
-    text-align: center;
-    max-width: 500px; 
-    width: 90%;
+    background: white; 
+    padding: 40px; 
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1); 
+    text-align: center;
+    max-width: 500px; 
+    width: 90%;
 }
-h1 { 
-    color: #3F51B5; 
-    margin-bottom: 5px; 
+h1 { 
+    color: #3F51B5; 
+    margin-bottom: 5px; 
 }
-#statusMessage { 
-    color: #666; 
-    margin-bottom: 25px; 
+#statusMessage { 
+    color: #666; 
+    margin-bottom: 25px; 
 }
-.muni-info { 
-    font-size: 1.4em; 
-    font-weight: 700; 
-    color: #008080; 
-    margin-bottom: 20px; 
+.muni-info { 
+    font-size: 1.4em; 
+    font-weight: 700; 
+    color: #008080; 
+    margin-bottom: 20px; 
 }
-.loader { 
-    border: 4px solid #f3f3f3; 
-    border-top: 4px solid #3F51B5; 
-    border-radius: 50%; 
-    width: 30px; 
-    height: 30px; 
-    animation: spin 1s linear infinite; 
-    margin: 20px auto; 
+.loader { 
+    border: 4px solid #f3f3f3; 
+    border-top: 4px solid #3F51B5; 
+    border-radius: 50%; 
+    width: 30px; 
+    height: 30px; 
+    animation: spin 1s linear infinite; 
+    margin: 20px auto; 
 }
-@keyframes spin { 
-    0% { transform: rotate(0deg); } 
-    100% { transform: rotate(360deg); } 
+@keyframes spin { 
+    0% { transform: rotate(0deg); } 
+    100% { transform: rotate(360deg); } 
 }
-/* Estilos personalizados para los botones (fallback si Tailwind falla) */
+/* Estilos para botones */
 .btn-base {
-    display: block;
-    width: 100%;
-    padding: 0.75rem;
-    font-weight: bold;
-    border-radius: 0.5rem;
-    text-decoration: none;
-    transition: all 0.2s;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    color: white;
+    display: block;
+    width: 100%;
+    padding: 0.75rem;
+    font-weight: bold;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: all 0.2s;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    color: white;
 }
-.btn-agua {
-    background-color: #2563eb;
-}
-.btn-agua:hover {
-    background-color: #1d4ed8;
-}
-.btn-obras {
-    background-color: #4f46e5;
-}
-.btn-obras:hover {
-    background-color: #4338ca;
-}
-.btn-residuos {
-    background-color: #14b8a6;
-}
-.btn-residuos:hover {
-    background-color: #0d9488;
-}
-.btn-cementerios {
-    background-color: #7c3aed;
-}
-.btn-cementerios:hover {
-    background-color: #6d28d9;
-}
+.btn-agua { background-color: #2563eb; }
+.btn-agua:hover { background-color: #1d4ed8; }
+.btn-obras { background-color: #4f46e5; }
+.btn-obras:hover { background-color: #4338ca; }
+.btn-residuos { background-color: #14b8a6; }
+.btn-residuos:hover { background-color: #0d9488; }
+.btn-cementerios { background-color: #7c3aed; }
+.btn-cementerios:hover { background-color: #6d28d9; }
+.btn-logout { background-color: #ef4444; margin-top: 20px; } /* Nuevo estilo para Logout */
+
 .hidden {
-    display: none;
+    display: none;
 }
+#contenido-protegido { display: none; } /* Oculto inicialmente por JS */
 </style>
 </head>
 <body>
 
 <div class="panel">
-<h1 class="text-3xl">EIEL 2025</h1>
-<p id="statusMessage">Identificando municipio y cargando menú...</p>
+<h1 class="text-3xl">EIEL {{ fase_actual }}</h1>
+<p id="statusMessage">Cargando estado de la sesión...</p>
 
-<div class="muni-info">
-    Municipio: <span id="muniNamePlaceholder">Cargando identidad...</span>
-</div>
-
-<!-- Sección de carga y error -->
 <div id="loadingSection">
-    <div class="loader" id="loader"></div>
-    <p id="errorMsg" style="color: #ef4444; font-weight: 600;" class="hidden">
-        Error: No se encontró la identidad del municipio. Redirigiendo a Login.
-    </p>
+    <div class="loader" id="loader"></div>
+    <p id="errorMsg" style="color: #ef4444; font-weight: 600;" class="hidden">
+        Error: Sesión no válida o municipio no autorizado. Redirigiendo a Login.
+    </p>
 </div>
 
-<!-- Sección de navegación -->
-<div id="muniLinks" class="hidden" style="margin-top: 1.5rem;">
-    <p style="font-size: 1.125rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
-        Seleccione el formulario a rellenar:
-    </p>
-    <div style="display: flex; flex-direction: column; gap: 1rem;">
-        <a id="linkAgua" href="#" class="btn-base btn-agua">
-            Formulario: Abastecimiento de Agua
-        </a>
-        <a id="linkObras" href="#" class="btn-base btn-obras">
-            Formulario: Obras y Actuaciones
-        </a>
-        <a id="linkResiduos" href="#" class="btn-base btn-residuos">
-            Formulario: Residuos y Limpieza Viaria
-        </a>
-        <a id="linkCementerios" href="#" class="btn-base btn-cementerios">
-            Formulario: Cementerios
-        </a>
+<div id="contenido-protegido">
+    <div class="muni-info">
+        Municipio: <span id="muniNamePlaceholder">Cargando identidad...</span>
+        <p style="font-size: 0.75em; font-weight: 400; color: #666; margin-top: 5px;">
+            <span id="userEmailPlaceholder"></span>
+        </p>
+    </div>
+
+    <div id="muniLinks" style="margin-top: 1.5rem;">
+        <p style="font-size: 1.125rem; font-weight: 600; color: #374151; margin-bottom: 1rem;">
+            Seleccione el formulario a rellenar:
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <a id="linkAgua" href="#" class="btn-base btn-agua">
+                Formulario: Abastecimiento de Agua
+            </a>
+            <a id="linkObras" href="#" class="btn-base btn-obras">
+                Formulario: Obras y Actuaciones
+            </a>
+            <a id="linkResiduos" href="#" class="btn-base btn-residuos">
+                Formulario: Residuos y Limpieza Viaria
+            </a>
+            <a id="linkCementerios" href="#" class="btn-base btn-cementerios">
+                Formulario: Cementerios
+            </a>
+        </div>
+        
+        <button id="btnLogout" class="btn-base btn-logout">
+            Cerrar Sesión
+        </button>
     </div>
 </div>
 
-</div>
+</div> <script type="module">
+    // Importación de Firebase 
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getAuth, signOut, onAuthStateChanged } 
+      from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-<script>
-// La lista completa de municipios se inyecta aquí desde Python
-const MUNICIPIOS_DATA = [{"code": "001", "name": "Adsubia"}, {"code": "002", "name": "Agost"}, {"code": "003", "name": "Agres"}, {"code": "004", "name": "Aigües"}, {"code": "005", "name": "Albatera"}, {"code": "006", "name": "Alcalalí"}, {"code": "007", "name": "Alcosser"}, {"code": "008", "name": "Alcoleja"}, {"code": "009", "name": "Alcoy/Alcoi"}, {"code": "010", "name": "Alfafara"}, {"code": "011", "name": "Alfàs del Pi (l')"}, {"code": "012", "name": "Algorfa"}, {"code": "013", "name": "Algueña"}, {"code": "014", "name": "Alicante/Alacant"}, {"code": "015", "name": "Almoradí"}, {"code": "016", "name": "Almudaina"}, {"code": "017", "name": "Alqueria d'Asnar (l')"}, {"code": "018", "name": "Altea"}, {"code": "019", "name": "Aspe"}, {"code": "020", "name": "Balones"}, {"code": "021", "name": "Banyeres de Mariola"}, {"code": "022", "name": "Benasau"}, {"code": "023", "name": "Beneixama"}, {"code": "024", "name": "Benejúzar"}, {"code": "025", "name": "Benferri"}, {"code": "026", "name": "Beniarbeig"}, {"code": "027", "name": "Beniardà"}, {"code": "028", "name": "Beniarrés"}, {"code": "029", "name": "Benigembla"}, {"code": "030", "name": "Benidoleig"}, {"code": "031", "name": "Benidorm"}, {"code": "032", "name": "Benifallim"}, {"code": "033", "name": "Benifato"}, {"code": "034", "name": "Benijófar"}, {"code": "035", "name": "Benilloba"}, {"code": "036", "name": "Benillup"}, {"code": "037", "name": "Benimantell"}, {"code": "038", "name": "Benimarfull"}, {"code": "039", "name": "Benimassot"}, {"code": "040", "name": "Benimeli"}, {"code": "041", "name": "Benissa"}, {"code": "042", "name": "Benitachell/Poble Nou de Benitatxell (el)"}, {"code": "043", "name": "Biar"}, {"code": "044", "name": "Bigastro"}, {"code": "045", "name": "Bolulla"}, {"code": "046", "name": "Busot"}, {"code": "047", "name": "Calp"}, {"code": "048", "name": "Callosa d'En Sarrià"}, {"code": "049", "name": "Callosa de Segura"}, {"code": "050", "name": "Campello (el)"}, {"code": "051", "name": "Campo de Mirra/Camp de Mirra (el)"}, {"code": "052", "name": "Cañada"}, {"code": "053", "name": "Castalla"}, {"code": "054", "name": "Castell de Castells"}, {"code": "055", "name": "Catral"}, {"code": "056", "name": "Cocentaina"}, {"code": "057", "name": "Confrides"}, {"code": "058", "name": "Cox"}, {"code": "059", "name": "Crevillent"}, {"code": "060", "name": "Quatretondeta"}, {"code": "061", "name": "Daya Nueva"}, {"code": "062", "name": "Daya Vieja"}, {"code": "063", "name": "Dénia"}, {"code": "064", "name": "Dolores"}, {"code": "065", "name": "Elche/Elx"}, {"code": "066", "name": "Elda"}, {"code": "067", "name": "Facheca"}, {"code": "068", "name": "Famorca"}, {"code": "069", "name": "Finestrat"}, {"code": "070", "name": "Formentera del Segura"}, {"code": "071", "name": "Gata de Gorgos"}, {"code": "072", "name": "Gaianes"}, {"code": "073", "name": "Gorga"}, {"code": "074", "name": "Granja de Rocamora"}, {"code": "075", "name": "Castell de Guadalest (el)"}, {"code": "076", "name": "Guardamar del Segura"}, {"code": "077", "name": "Fondo de les Neus (El)/Hondon de las Nieves"}, {"code": "078", "name": "Hondón de los Frailes"}, {"code": "079", "name": "Ibi"}, {"code": "080", "name": "Jacarilla"}, {"code": "081", "name": "Xaló"}, {"code": "082", "name": "Jávea/Xàbia"}, {"code": "083", "name": "Jijona/Xixona"}, {"code": "084", "name": "Lorcha/L'Orxa"}, {"code": "085", "name": "Llíber"}, {"code": "086", "name": "Millena"}, {"code": "088", "name": "Monforte del Cid"}, {"code": "089", "name": "Monóvar/Monòver"}, {"code": "090", "name": "Mutxamel"}, {"code": "091", "name": "Murla"}, {"code": "092", "name": "Muro de Alcoy"}, {"code": "093", "name": "Novelda"}, {"code": "094", "name": "Nucia (la)"}, {"code": "095", "name": "Ondara"}, {"code": "096", "name": "Onil"}, {"code": "097", "name": "Orba"}, {"code": "098", "name": "Orxeta"}, {"code": "099", "name": "Orihuela"}, {"code": "100", "name": "Parcent"}, {"code": "101", "name": "Pedreguer"}, {"code": "102", "name": "Pego"}, {"code": "103", "name": "Penàguila"}, {"code": "104", "name": "Petrer"}, {"code": "105", "name": "Pinos (El)/Pinoso"}, {"code": "106", "name": "Planes"}, {"code": "107", "name": "Polop"}, {"code": "109", "name": "Rafal"}, {"code": "110", "name": "Ràfol d'Almúnia (El)"}, {"code": "111", "name": "Redován"}, {"code": "112", "name": "Relleu"}, {"code": "113", "name": "Rojales"}, {"code": "114", "name": "Romana (la)"}, {"code": "115", "name": "Sagra"}, {"code": "116", "name": "Salinas"}, {"code": "117", "name": "Sanet y Negrals"}, {"code": "118", "name": "San Fulgencio"}, {"code": "119", "name": "Sant Joan d'Alacant"}, {"code": "120", "name": "San Miguel de Salinas"}, {"code": "121", "name": "Santa Pola"}, {"code": "122", "name": "San Vicente del Raspeig/Sant Vicent del Raspeig"}, {"code": "123", "name": "Sax"}, {"code": "124", "name": "Sella"}, {"code": "125", "name": "Senija"}, {"code": "127", "name": "Tàrbena"}, {"code": "128", "name": "Teulada"}, {"code": "129", "name": "Tibi"}, {"code": "130", "name": "Tollos"}, {"code": "131", "name": "Tormos"}, {"code": "132", "name": "Torremanzanas/Torre de les Maçanes (la)"}, {"code": "133", "name": "Torrevieja"}, {"code": "134", "name": "Vall d'Alcalà (la)"}, {"code": "135", "name": "Vall d'Ebo (la)"}, {"code": "136", "name": "Vall de Gallinera (la)"}, {"code": "137", "name": "Vall de Laguar (la)"}, {"code": "138", "name": "Verger (el)"}, {"code": "139", "name": "Villajoyosa/Vila Joiosa (la)"}, {"code": "140", "name": "Villena"}, {"code": "901", "name": "Poblets (els)"}, {"code": "902", "name": "Pilar de la Horadada"}, {"code": "903", "name": "Montesinos (Los)"}, {"code": "904", "name": "San Isidro"}];
-
-console.log("MUNICIPIOS_DATA cargados:", MUNICIPIOS_DATA);
-
-document.addEventListener("DOMContentLoaded", () => {
-    const muniCode = localStorage.getItem("usuarioActual");
+    // 1. CONFIGURACIÓN Y DATOS (Inyectados por Jinja)
+    // ESTAS VARIABLES VIENEN DE TU SCRIPT PYTHON
+    const FIREBASE_CONFIG = {{ firebase_config_data | safe }}; 
+    const MUNICIPIOS_DATA = {{ municipios_json_data | safe }}; 
+    const EMAIL_TO_CODE_MAP = {{ mapeo_email_codigo_data | safe }}; 
+    
+    // 2. INICIALIZACIÓN Y REFERENCIAS
+    const app = initializeApp(FIREBASE_CONFIG);
+    const auth = getAuth(app);
+    
     const muniNamePlaceholder = document.getElementById("muniNamePlaceholder");
+    const userEmailPlaceholder = document.getElementById("userEmailPlaceholder");
     const pageTitle = document.getElementById("pageTitle");
     const errorMsg = document.getElementById("errorMsg");
-    const loader = document.getElementById("loader");
     const loadingSection = document.getElementById("loadingSection");
-    const muniLinks = document.getElementById("muniLinks");
+    const protectedContent = document.getElementById('contenido-protegido');
     const statusMessage = document.getElementById("statusMessage");
+    const btnLogout = document.getElementById("btnLogout");
 
     const linkAgua = document.getElementById("linkAgua");
     const linkObras = document.getElementById("linkObras");
     const linkResiduos = document.getElementById("linkResiduos");
     const linkCementerios = document.getElementById("linkCementerios");
 
-    console.log("Código de municipio desde localStorage:", muniCode);
 
-    // Crear mapa de códigos a nombres
-    const muniMap = {};
-    MUNICIPIOS_DATA.forEach(muni => {
-        // Normalizar el código a 3 dígitos con ceros a la izquierda
-        const normalizedCode = String(muni.code).padStart(3, '0');
-        muniMap[normalizedCode] = muni.name;
-        console.log(`Mapeado: ${normalizedCode} -> ${muni.name}`);
+    // 3. FUNCIÓN DE REDIRECCIÓN A FALLO
+    const redirectToLogin = (message) => {
+        muniNamePlaceholder.textContent = "Acceso Denegado";
+        statusMessage.textContent = message;
+        errorMsg.classList.remove("hidden");
+        document.getElementById("loader").classList.add("hidden"); 
+
+        setTimeout(() => {
+            window.location.replace("login.html");
+        }, 3000);
+    };
+
+    // 4. FUNCIÓN PRINCIPAL DE AUTORIZACIÓN (Se activa con Firebase)
+    const handleAuthUser = (user) => {
+        if (!user) {
+            // No hay usuario logueado -> Fallo de autenticación
+            redirectToLogin("¡Necesita iniciar sesión para acceder al portal!");
+            return;
+        }
+
+        const userEmail = user.email.toLowerCase();
+        
+        // 4.1. Mapear Email a Código de Municipio
+        const muniCodeRaw = EMAIL_TO_CODE_MAP[userEmail];
+        
+        if (!muniCodeRaw) {
+            // El usuario está logueado, pero su email no está autorizado en el mapa
+            redirectToLogin(`Usuario ${userEmail} no autorizado.`);
+            return;
+        }
+
+        // 4.2. ÉXITO: Autorización y Redirección de Enlaces
+        const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
+        
+        // Crear mapa de códigos a nombres
+        const muniMap = {};
+        MUNICIPIOS_DATA.forEach(muni => {
+            muniMap[String(muni.code).padStart(3, '0')] = muni.name;
+        });
+
+        const actualMuniName = muniMap[normalizedMuniCode] || `Código ${normalizedMuniCode} Desconocido`;
+        
+        // Actualización de la UI
+        userEmailPlaceholder.textContent = user.email; // Muestra el email del usuario logueado
+        muniNamePlaceholder.textContent = actualMuniName;
+        pageTitle.textContent = `EIEL {{ fase_actual }} - ${actualMuniName} (${normalizedMuniCode})`;
+        statusMessage.textContent = "Identificación completada. Seleccione una opción:";
+
+        // Configurar los enlaces con el código normalizado
+        linkAgua.href = `formularios/agua_${normalizedMuniCode}.html`;
+        linkObras.href = `formularios/obras_${normalizedMuniCode}.html`;
+        linkResiduos.href = `formularios/residuos_${normalizedMuniCode}.html`;
+        linkCementerios.href = `formularios/cementerios_${normalizedMuniCode}.html`;
+
+        // Ocultar la carga y mostrar el menú
+        loadingSection.classList.add("hidden");
+        protectedContent.style.display = 'block'; // Mostrar el contenido protegido
+    };
+
+    // 5. ESCUCHA DE FIREBASE AL CARGAR LA PÁGINA
+    // onAuthStateChanged se activa inmediatamente si hay sesión o no.
+    onAuthStateChanged(auth, handleAuthUser);
+    
+    // 6. CERRAR SESIÓN
+    btnLogout.addEventListener('click', () => {
+        signOut(auth).then(() => {
+            window.location.replace('login.html');
+        }).catch((error) => {
+            alert("Error al cerrar sesión.");
+            console.error(error);
+        });
     });
 
-    console.log("Mapa de municipios:", muniMap);
-
-    if (!muniCode) {
-        muniNamePlaceholder.textContent = "Acceso Denegado";
-        statusMessage.textContent = "¡Necesita iniciar sesión para acceder al portal!";
-        errorMsg.textContent = "Error: Sesión no encontrada. Redirigiendo a 'login.html'.";
-        errorMsg.classList.remove("hidden");
-        loader.classList.add("hidden");
-        setTimeout(() => {
-            window.location.replace("login.html");
-        }, 3000);
-        return;
-    }
-
-    // Normalizar el código del usuario a 3 dígitos
-    const normalizedMuniCode = String(muniCode).padStart(3, '0');
-    console.log("Código normalizado:", normalizedMuniCode);
-
-    // Buscar el nombre usando el código normalizado
-    const actualMuniName = muniMap[normalizedMuniCode];
-    console.log("Nombre encontrado:", actualMuniName);
-
-    if (!actualMuniName) {
-        muniNamePlaceholder.textContent = `Código ${normalizedMuniCode} no válido`;
-        statusMessage.textContent = "Error crítico de identidad. El código no se encuentra en el listado.";
-        errorMsg.textContent = "Error: Código de municipio desconocido. Redirigiendo a 'login.html'.";
-        errorMsg.classList.remove("hidden");
-        loader.classList.add("hidden");
-        setTimeout(() => {
-            window.location.replace("login.html");
-        }, 3000);
-        return;
-    }
-
-    // ÉXITO: Actualización Dinámica
-    muniNamePlaceholder.textContent = actualMuniName;
-    pageTitle.textContent = `EIEL 2025 - ${actualMuniName} (${normalizedMuniCode})`;
-    statusMessage.textContent = "Identificación completada. Seleccione una opción:";
-
-    // Configurar los enlaces con el código normalizado
-    linkAgua.href = `formularios/agua_${normalizedMuniCode}.html`;
-    linkObras.href = `formularios/obras_${normalizedMuniCode}.html`;
-    linkResiduos.href = `formularios/residuos_${normalizedMuniCode}.html`;
-    linkCementerios.href = `formularios/cementerios_${normalizedMuniCode}.html`;
-
-
-    // Ocultar la carga y mostrar el menú
-    loadingSection.classList.add("hidden");
-    muniLinks.classList.remove("hidden");
-});
 </script>
-
 </body>
 </html>
