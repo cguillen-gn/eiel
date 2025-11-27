@@ -1,92 +1,66 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <title>Selección de Municipio</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso al Portal EIEL 2025</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f8ff; }
+        #login-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        input { display: block; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
+        button { padding: 10px 20px; background-color: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #304ffe; }
+        #error-msg { color: #ef4444; margin-top: 15px; }
+    </style>
 </head>
 <body>
 
-    <div id="loading-container">
-        Cargando estado de la sesión...
-    </div>
-
-    <div id="contenido-protegido" style="display: none;">
-        
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <p>Bienvenido, <span id="user-email"></span></p>
-            <button id="btnLogout">Cerrar Sesión</button>
-        </div>
-        <hr>
-        
-        <h2>Selección de Municipio</h2>
-        <select id="municipio-selector"></select>
-        <button id="btnAccederFormularios" disabled>Acceder a formularios</button>
-
+    <div id="login-container">
+        <h2>Acceso Ayuntamientos EIEL</h2>
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button id="btnLogin">Iniciar Sesión</button>
+        <p id="error-msg"></p>
     </div>
 
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-      import { getAuth, signOut, onAuthStateChanged } 
+      import { getAuth, signInWithEmailAndPassword } 
         from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-      // Insertamos la configuración y los datos desde Python (Jinja2)
-      const firebaseConfig = {{ firebase_config_data | safe }};
-      const municipiosData = {{ municipios_json_data | safe }};
-      
+      // --- CONFIGURACIÓN FIREBASE ESTATICA ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ",
+        authDomain: "eiel-autenticacion-formularios.firebaseapp.com",
+        projectId: "eiel-autenticacion-formularios",
+        storageBucket: "eiel-autenticacion-formularios.firebasestorage.app",
+        messagingSenderId: "293834414398",
+        appId: "1:293834414398:web:8102c11d2ff6e9a1d3346f",
+        measurementId: "G-S9C7Z70HHV"
+      };
+
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
-
-      // Referencias
-      const protectedContent = document.getElementById('contenido-protegido');
-      const loadingContainer = document.getElementById('loading-container');
-      const selector = document.getElementById('municipio-selector');
-      const btnAcceder = document.getElementById('btnAccederFormularios');
-
-      // Función para popular el selector (igual que antes)
-      function populateSelector() {
-          // ... (código para rellenar el selector y añadir listeners) ...
-          selector.innerHTML = '<option value="" disabled selected>Seleccione su municipio...</option>'; 
-          
-          municipiosData.forEach(muni => {
-              const option = document.createElement('option');
-              option.value = muni.code; 
-              option.textContent = muni.name;
-              selector.appendChild(option);
-          });
-          selector.addEventListener('change', () => {
-              btnAcceder.disabled = false;
-          });
-      }
-
-      // **FUNCIÓN CLAVE: COMPROBAR SESIÓN**
-      onAuthStateChanged(auth, (user) => {
-        loadingContainer.style.display = 'none'; // Ocultar el mensaje de carga
-
-        if (user) {
-          // El usuario tiene sesión activa
-          document.getElementById('user-email').textContent = user.email;
-          protectedContent.style.display = 'block'; // Mostrar selector
-
-          populateSelector();
-          
-          btnAcceder.addEventListener('click', () => {
-            const munCode = selector.value;
-            // Redirigir al índice de formularios de ese municipio
-            window.location.href = `formularios/forms_redirect_${munCode}.html`; 
-          });
-
-        } else {
-          // El usuario NO tiene sesión. REDIRIGIR AL LOGIN
-          alert("Su sesión ha expirado o no ha iniciado sesión. Será redirigido.");
-          window.location.href = 'login.html'; 
-        }
-      });
       
-      // Botón de Logout
-      document.getElementById('btnLogout').addEventListener('click', () => {
-        signOut(auth).then(() => {
-            // Después de cerrar sesión, redirigir inmediatamente al login
-            window.location.href = 'login.html';
-        });
+      const btnLogin = document.getElementById('btnLogin');
+      const txtEmail = document.getElementById('email');
+      const txtPassword = document.getElementById('password');
+      const errorMsg = document.getElementById('error-msg');
+
+      btnLogin.addEventListener('click', () => {
+        const email = txtEmail.value;
+        const password = txtPassword.value;
+        
+        signInWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            // Éxito: Redirige a la página protegida
+            errorMsg.textContent = "Acceso concedido...";
+            window.location.href = 'index.html';
+          })
+          .catch((error) => {
+            console.error(error);
+            errorMsg.textContent = "Error de acceso: Usuario o contraseña incorrectos.";
+          });
       });
     </script>
 </body>

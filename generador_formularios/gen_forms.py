@@ -307,20 +307,20 @@ def main():
         municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
         
         print(f"DEBUG: Renderizando index.html (Genérico) con el listado de {len(municipios_con_nombres)} municipios.")
-
-        # Pasamos la lista completa de municipios como JSON
-        municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
-        
+        
+        # Pasamos la lista completa de municipios como JSON
+        municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
+        
         # NUEVO: Preparamos los JSON para el JavaScript
-        firebase_config_json = json.dumps(FIREBASE_CONFIG)
-        mapeo_email_codigo_json = json.dumps(EMAIL_TO_CODE_MAP) # <-- ¡Nuevo!
-        
-        rendered_index = template_index.render(
-            fase_actual = fase_actual,
-            municipios_json_data = municipios_json,
-            firebase_config_data = firebase_config_json,
-            **mapeo_email_codigo_data = mapeo_email_codigo_json** # <-- ¡Nuevo!
-        )
+        firebase_config_json = json.dumps(FIREBASE_CONFIG)
+        mapeo_email_codigo_json = json.dumps(EMAIL_TO_CODE_MAP) 
+        
+        rendered_index = template_index.render(
+            fase_actual = fase_actual,
+            municipios_json_data = municipios_json,
+            firebase_config_data = firebase_config_json,
+            mapeo_email_codigo_data = mapeo_email_codigo_json 
+        )
 
         # Generación del archivo index.html en el directorio superior
         outpath_index = os.path.join(OUT_DIR_INDEX, "index.html")
