@@ -22,8 +22,8 @@ TEMPLATE_AGUA = "form-agua-template.html.j2"
 TEMPLATE_OBRAS = "form-obras-template.html.j2"
 TEMPLATE_RESIDUOS = "form-residuos-template.html.j2"
 TEMPLATE_CEMENTERIOS = "form-cementerios-template.html.j2"
-OUT_DIR = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo\feature\header\formularios"
-OUT_DIR_INDEX = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo\feature\header"
+OUT_DIR = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo\formularios"
+OUT_DIR_INDEX = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo"
 
 MUNICIPIOS_TSV = "municipios.tsv"
 
@@ -304,11 +304,7 @@ def main():
         # 2. GENERACIÓN DEL PANEL PRINCIPAL (index.html)
         # ---------------------------------------------
         
-        # El index.html ahora debe ser genérico y su dinamismo lo proporciona el JS en el cliente
-        
-        # Pasamos la lista completa de municipios como JSON para que el JS la use
-        municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
-        
+      
         print(f"DEBUG: Renderizando index.html (Genérico) con el listado de {len(municipios_con_nombres)} municipios.")
         
         # Pasamos la lista completa de municipios como JSON
