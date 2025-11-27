@@ -29,6 +29,20 @@ URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZF
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
 # ---------------- END CONFIG -----------------------------------
 
+# ---------------- FIREBASE CONFIG - PEGAR AQUI TUS VALORES REALES ----------------
+# *¡No compartas esta API Key públicamente si gestionas datos sensibles!*
+FIREBASE_CONFIG = {
+    "apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ",
+    "authDomain": "eiel-autenticacion-formularios.firebaseapp.com",
+    "projectId": "eiel-autenticacion-formularios",
+    "storageBucket":  "eiel-autenticacion-formularios.firebasestorage.app",
+    "messagingSenderId": "293834414398",
+    "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f",
+}
+# ---------------- END CONFIG -----------------------------------
+
+
+
 env = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR, encoding="utf-8"),
     autoescape=select_autoescape(['html','xml'])
@@ -278,12 +292,15 @@ def main():
         municipios_json = json.dumps(municipios_con_nombres, ensure_ascii=False)
         
         print(f"DEBUG: Renderizando index.html (Genérico) con el listado de {len(municipios_con_nombres)} municipios.")
-        
-        rendered_index = template_index.render(
-            fase_actual = fase_actual,
-            # Pasamos la lista JSON completa para que el JS la use
-            municipios_json_data = municipios_json 
-        )
+
+        # *NUEVO: Pasamos la configuración de Firebase como JSON para el JS*
+        firebase_config_json = json.dumps(FIREBASE_CONFIG)
+        
+        rendered_index = template_index.render(
+            fase_actual = fase_actual,
+            municipios_json_data = municipios_json,
+            **firebase_config_data = firebase_config_json**
+        )
 
         # Generación del archivo index.html en el directorio superior
         outpath_index = os.path.join(OUT_DIR_INDEX, "index.html")
