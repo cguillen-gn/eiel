@@ -343,8 +343,15 @@ def main():
             depositos = obtener_depositos(conn, mun_code)
             depositos_json = json.dumps(depositos, ensure_ascii=False)
             rendered_agua = template_agua.render(
-                muni_code = mun_code, muni_display = muni_display, depositos_json = depositos_json,
-                url_apps_script = URL_APPS_SCRIPT, url_google_forms = URL_GOOGLE_FORMS, fase_anterior = fase_anterior 
+                muni_code = mun_code, 
+                muni_display = muni_display, 
+                depositos_json = depositos_json,
+                url_apps_script = URL_APPS_SCRIPT, 
+                url_google_forms = URL_GOOGLE_FORMS, 
+                fase_anterior = fase_anterior,
+                
+                # ESTA ES LA LÍNEA QUE FALTABA:
+                url_generar_pdf = URL_GENERAR_PDF 
             )
             
             # ---- OBRAS ----
@@ -372,6 +379,8 @@ def main():
                 url_apps_script = URL_APPS_SCRIPT, 
                 url_google_forms = URL_GOOGLE_FORMS
             )
+            
+            
             
             # Guardado de archivos
             path_agua = os.path.join(OUT_DIR, f'agua_{mun_code}.html')
