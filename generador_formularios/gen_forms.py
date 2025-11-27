@@ -2,16 +2,19 @@
 # gen_forms.py
 import os, json, sys, csv 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from dotenv import load_dotenv
 import psycopg2
 import psycopg2.extras
+
+load_dotenv()
 
 # ---------------- CONFIG - Rellena con tus datos ----------------
 DB = {
     "host": "172.23.0.8",
     "port": 5432,
     "dbname": "EIEL",
-    "user": "cguillen",
-    "password": "passSV8"
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD")
 }
 TEMPLATE_DIR = "templates"
 TEMPLATE_INDEX = "index-template.html.j2" 
@@ -30,14 +33,14 @@ URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L
 # ---------------- END CONFIG -----------------------------------
 
 # ---------------- FIREBASE CONFIG - PEGAR AQUI TUS VALORES REALES ----------------
-# *¡No compartas esta API Key públicamente si gestionas datos sensibles!*
 FIREBASE_CONFIG = {
-    "apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ",
-    "authDomain": "eiel-autenticacion-formularios.firebaseapp.com",
-    "projectId": "eiel-autenticacion-formularios",
-    "storageBucket":  "eiel-autenticacion-formularios.firebasestorage.app",
-    "messagingSenderId": "293834414398",
-    "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f",
+    "apiKey": os.getenv("FIREBASE_API_KEY"), 
+    "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
+    "projectId": os.getenv("FIREBASE_PROJECT_ID"),
+    "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET"),
+    "messagingSenderId": os.getenv("FIREBASE_MESSAGING_SENDER_ID"),
+    "appId": os.getenv("FIREBASE_APP_ID"),
+    "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID")
 }
 # ---------------- END CONFIG -----------------------------------
 
