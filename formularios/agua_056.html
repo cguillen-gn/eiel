@@ -460,6 +460,7 @@ td input[type="number"]:focus {
 // ------------------------
 const URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbyaYoePvbzj5ZntRPB8ZFO8AHOmJtUNtDiwiD9Au7BSniFZE5pFHeyGMd0VaLSy-VFknQ/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
+const URL_GENERAR_PDF = "";
 
 let municipio = "056";
 let municipioNombre = "Cocentaina";
@@ -663,42 +664,76 @@ function mostrarMensaje(texto, tipo) {
 }
 
 btnFirmar.addEventListener("click", async () => {
-  try {
-    btnFirmar.disabled = true;
-    mostrarMensaje("⏳ Subiendo archivos...", "info");
-    
-    const driveOk = await subirArchivos();
-    if (!driveOk && archivos.length > 0) {
-      mostrarMensaje("❌ Error al subir archivos", "error");
-      btnFirmar.disabled = false;
-      return;
+    try {
+        btnFirmar.disabled = true;
+        mostrarMensaje("⏳ Subiendo archivos...", "info");
+        
+        // 1. SUBIR ARCHIVOS (MANTENEMOS ESTE PASO)
+        const driveOk = await subirArchivos();
+        if (!driveOk && archivos.length > 0) {
+            mostrarMensaje("❌ Error al subir archivos", "error");
+            btnFirmar.disabled = false;
+            return;
+        }
+
+        mostrarMensaje("⏳ Generando justificante de registro...", "info");
+
+        // 2. RECOPILAR TODOS LOS DATOS (incluyendo trazabilidad)
+        const consumoValor = document.getElementById("consumoInput").value;
+        const nombreArchivosAdjuntos = archivos.map(a=>a.name).join("\n");
+        const userEmail = localStorage.getItem("usuarioActual"); // Obtenemos el email
+        
+        const payload = {
+            // Datos del formulario
+            consumo: consumoValor,
+            depositos: JSON.stringify(depositos),
+            
+            // Datos de trazabilidad (La "Firma")
+            email_usuario: userEmail,
+            municipio_codigo: municipio,
+            municipio_nombre: municipioNombre,
+            timestamp_envio: new Date().toISOString(),
+            
+            // Adjuntos para la lista en el PDF
+            archivos_adjuntos: nombreArchivosAdjuntos,
+            
+            // Datos de destino
+            email_destino: "administracion@geonet.es", // Cambiar por el email fijo de recepción
+            email_copia: userEmail // Copia al usuario (opcional)
+        };
+        
+        // 3. ENVIAR LOS DATOS AL NUEVO ENDPOINT DE APPS SCRIPT
+        const response = await fetch(URL_GENERAR_PDF, { 
+            method: "POST", 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload) 
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            mostrarMensaje("✅ Formulario enviado y justificante generado.", "success");
+            
+            // 4. OPCIONAL: Ofrecer la descarga del PDF
+            if (result.downloadUrl) {
+                // Abre el PDF en una nueva pestaña (si Apps Script devuelve la URL temporal)
+                window.open(result.downloadUrl, '_blank');
+            }
+        } else {
+             mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
+             btnFirmar.disabled = false;
+             return;
+        }
+
+        // Limpieza y fin
+        archivos = [];
+        renderArchivos();
+        setTimeout(() => { btnFirmar.disabled = false; }, 3000);
+        
+    } catch(error) {
+        mostrarMensaje("❌ Error en el proceso: " + error.message, "error");
+        btnFirmar.disabled = false;
     }
-
-    mostrarMensaje("⏳ Enviando datos al sistema...", "info");
-
-    const consumoValor = document.getElementById("consumoInput").value;
-    
-    const formData = new FormData();
-    formData.append("entry.960913048", municipioNombre);
-    formData.append("entry.312379068", JSON.stringify(depositos));
-    formData.append("entry.1907656835", archivos.map(a=>a.name).join("\n"));
-    formData.append("entry.694300870", consumoValor);
-
-    await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
-
-    mostrarMensaje("✅ Formulario enviado correctamente", "success");
-    
-    archivos = [];
-    renderArchivos();
-    
-    setTimeout(() => {
-      btnFirmar.disabled = false;
-    }, 3000);
-    
-  } catch(error) {
-    mostrarMensaje("❌ Error: " + error.message, "error");
-    btnFirmar.disabled = false;
-  }
 });
 
 // --- Control de acceso ---
