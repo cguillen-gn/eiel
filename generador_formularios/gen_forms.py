@@ -28,7 +28,7 @@ OUT_DIR_INDEX = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo"
 MUNICIPIOS_TSV = "municipios.tsv"
 
 
-URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbxFEc0MnM5VuhpPIznJAXYOc72SpdUHRp-TeyLIsMmuszJCEbYhNX38scRGUl0rSJU/exec"
+URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbykLlcEVOncrH0Olge-nBpMV4AE4QV2munK6HnSEjsak1ctSqjDpHpNLOMgKSMQuTFu/exec"
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
 URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbwL9SvRO8qTK4JRWycmJfIL3sUaRgocSrKSaAhvUo8hYDEPFnYfUl8WulXeuMGNWXI/exec";
 # ---------------- END CONFIG -----------------------------------
