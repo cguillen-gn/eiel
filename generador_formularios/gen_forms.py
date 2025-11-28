@@ -28,9 +28,9 @@ OUT_DIR_INDEX = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo"
 MUNICIPIOS_TSV = "municipios.tsv"
 
 
-URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbzSuM2iZ-LBqgeEfXbSiRWr1dylgZgwTycGkFc-gPkImD9KCn8BasQyKr32Wu3AnDBo/exec"
+URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbyr00aAxTyEe5_avvLyMDgN9Q0-48yvSWHNXdmF2k2kymEwA1JRdx3rtCgZzM5_PW8H/exec"
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
-URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbwGlIdwN_CMyyFpeZPcBmtmTk9ImMNIK-mjRv2B-dZe5URoiEwQuBNO43ZRJMht8URF_w/exec";
+URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbwL9SvRO8qTK4JRWycmJfIL3sUaRgocSrKSaAhvUo8hYDEPFnYfUl8WulXeuMGNWXI/exec";
 # ---------------- END CONFIG -----------------------------------
 
 # ---------------- FIREBASE CONFIG - PEGAR AQUI TUS VALORES REALES ----------------
@@ -351,7 +351,7 @@ def main():
                 muni_code = mun_code, 
                 muni_display = muni_display, 
                 depositos_json = depositos_json,
-                url_apps_script = URL_APPS_SCRIPT, 
+                url_adjuntos = URL_ADJUNTOS, 
                 url_google_forms = URL_GOOGLE_FORMS, 
                 fase_anterior = fase_anterior,
                 
@@ -364,13 +364,13 @@ def main():
             obras_json = json.dumps(obras, ensure_ascii=False)
             rendered_obras = template_obras.render(
                 muni_code = mun_code, muni_display = muni_display, obras = obras, obras_json = obras_json,
-                url_apps_script = URL_APPS_SCRIPT, url_google_forms = URL_GOOGLE_FORMS
+                url_adjuntos = URL_ADJUNTOS, url_google_forms = URL_GOOGLE_FORMS
             )
             
             # ---- RESIDUOS ----
             rendered_residuos = template_residuos.render(
                 muni_code = mun_code, muni_display = muni_display,
-                url_apps_script = URL_APPS_SCRIPT, url_google_forms = URL_GOOGLE_FORMS, fase_anterior = fase_anterior
+                url_adjuntos = URL_ADJUNTOS, url_google_forms = URL_GOOGLE_FORMS, fase_anterior = fase_anterior
             )
             
             # ---- CEMENTERIOS ----
@@ -381,7 +381,7 @@ def main():
                 muni_display = muni_display, 
                 cementerios = cementerios,
                 cementerios_json = cementerios_json,
-                url_apps_script = URL_APPS_SCRIPT, 
+                url_adjuntos = URL_ADJUNTOS, 
                 url_google_forms = URL_GOOGLE_FORMS
             )
             
