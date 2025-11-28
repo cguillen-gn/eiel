@@ -30,7 +30,7 @@ MUNICIPIOS_TSV = "municipios.tsv"
 
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbwDOo2GzUU2P3pM5aZnSUhAirdViU5nrANrTeBAXti2gL71PDIzRbCh9JEljh-PAN5R/exec"
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
-URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbwL9SvRO8qTK4JRWycmJfIL3sUaRgocSrKSaAhvUo8hYDEPFnYfUl8WulXeuMGNWXI/exec";
+URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbxuzqG-MRbQxih2G7FKyjZ2KuLEi_O7zHlaN_pmPJ8nANauRgaG5tTuZabyp2OvAOtz/exec";
 # ---------------- END CONFIG -----------------------------------
 
 # ---------------- FIREBASE CONFIG - PEGAR AQUI TUS VALORES REALES ----------------
