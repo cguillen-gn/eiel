@@ -583,50 +583,115 @@ async function subirArchivos() {
 }
 
 function subirArchivoIndividual(file) {
+  console.log("🚀 Iniciando subida de:", file.name, "Tamaño:", file.size, "bytes");
+  
   return new Promise((resolve) => {
-    const iframeName = "upload_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
-    const iframe = document.createElement("iframe");
-    iframe.name = iframeName;
-    iframe.style.display = "none";
-    document.body.appendChild(iframe);
-
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = URL_APPS_SCRIPT;
-    form.target = iframeName;
-    form.enctype = "multipart/form-data";
-
-    const addHidden = (name, value) => {
-      const inp = document.createElement("input");
-      inp.type = "hidden";
-      inp.name = name;
-      inp.value = value;
-      form.appendChild(inp);
-    };
-
-    addHidden("tipo", "agua");
-    addHidden("mun", MUNI_CODE);
-
-    // 🔧 CONVERTIR ARCHIVO A BASE64
     const reader = new FileReader();
+    
+    reader.onerror = () => {
+      console.error("❌ Error leyendo archivo:", reader.error);
+      resolve(false);
+    };
+    
     reader.onload = function() {
-      const base64 = reader.result.split(',')[1]; // Quitar prefijo data:...
+      console.log("📖 Archivo leído, tamaño datos:", reader.result.length);
       
+      const base64 = reader.result.split(',')[1];
+      console.log("🔐 Base64 generado, longitud:", base64.length);
+      console.log("🔐 Primeros 50 chars:", base64.substring(0, 50));
+      
+      // Crear iframe
+      const iframeName = "upload_" + Date.now();
+      const iframe = document.createElement("iframe");
+      iframe.name = iframeName;
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      console.log("📺 Iframe creado:", iframeName);
+
+      // Crear form
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = URL_APPS_SCRIPT;
+      form.target = iframeName;
+      
+      console.log("📋 Form action:", URL_APPS_SCRIPT);
+
+      const addHidden = (name, value) => {
+        const inp = document.createElement("input");
+        inp.type = "hidden";
+        inp.name = name;
+        inp.value = value;
+        form.appendChild(inp);
+        console.log("  ➕ Campo agregado:", name, "=", value.substring(0, 50) + (value.length > 50 ? "..." : ""));
+      };
+
+      addHidden("tipo", "agua");
+      addHidden("mun", MUNI_CODE);
       addHidden("file0", base64);
       addHidden("filename", file.name);
       addHidden("mimeType", file.type);
-      
+
       document.body.appendChild(form);
 
-      // Manejar respuesta...
+      let procesado = false;
+
       iframe.onload = () => {
+        if (procesado) return;
+        procesado = true;
+        
+        console.log("📥 Iframe cargado, intentando leer respuesta...");
+
         setTimeout(() => {
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const txt = doc.body.textContent || doc.body.innerText;
+            
+            console.log("📄 Respuesta del servidor:", txt);
+            
+            if (txt && txt.trim()) {
+              try {
+                const data = JSON.parse(txt);
+                console.log("✅ JSON parseado:", data);
+                
+                if (data.status === "ok") {
+                  console.log("🎉 Archivo subido exitosamente!");
+                  console.log("   - Nombre:", data.fileName);
+                  console.log("   - ID:", data.fileId);
+                  console.log("   - URL:", data.fileUrl);
+                } else {
+                  console.error("❌ Error del servidor:", data.message);
+                  console.error("   - Debug:", data.debug);
+                }
+              } catch(jsonErr) {
+                console.error("❌ Error parseando JSON:", jsonErr);
+                console.log("   Texto recibido:", txt.substring(0, 200));
+              }
+            } else {
+              console.warn("⚠️ Respuesta vacía del servidor");
+            }
+          } catch(err) {
+            console.error("❌ Error accediendo a iframe:", err.message);
+            console.log("ℹ️ Probablemente CORS - el servidor respondió pero no podemos leer la respuesta");
+          }
+
           try { form.remove(); } catch(e) {}
           try { iframe.remove(); } catch(e) {}
+          
           resolve(true);
-        }, 2000);
+        }, 3000);
       };
 
+      iframe.onerror = () => {
+        console.error("❌ Error en iframe");
+        if (!procesado) {
+          procesado = true;
+          try { form.remove(); } catch(e) {}
+          try { iframe.remove(); } catch(e) {}
+          resolve(false);
+        }
+      };
+
+      console.log("📤 Enviando form...");
       form.submit();
     };
 
