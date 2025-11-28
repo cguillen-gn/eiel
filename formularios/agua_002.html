@@ -474,7 +474,7 @@ const MUNI_NAME = 'Agost';
 
 let depositos = [];
 
-// Definir las funciones ANTES del try-catch
+// Definir funciones
 function pintarTabla(){
   let html = "";
   depositos.forEach((d,i) => {
@@ -502,18 +502,16 @@ function cambiarFecha(i, val){
   depositos[i].limpieza = val;
 }
 
-// Ahora cargar datos y pintar
+// Cargar depósitos cuando el DOM esté listo
 try {
     const rawData = document.getElementById('data-depositos').textContent;
     if (rawData && rawData.trim()) {
         depositos = JSON.parse(rawData);
-        pintarTabla(); // ← MUÉVELO AQUÍ DENTRO
+        pintarTabla();
     }
 } catch (e) {
     console.error("Error leyendo depositos:", e);
 }
-
-
 
 // ------------------------
 // ARCHIVOS
@@ -600,7 +598,7 @@ function subirArchivoIndividual(file) {
     };
 
     addHidden("tipo", "agua");
-    addHidden("mun", municipio);
+    addHidden("mun", MUNI_CODE);
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -687,7 +685,6 @@ btnFirmar.addEventListener("click", async () => {
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Subiendo archivos...", "info");
         
-        // 1. SUBIR ARCHIVOS (Si hay error 403, fallará aquí)
         const driveOk = await subirArchivos();
         if (!driveOk && archivos.length > 0) {
             mostrarMensaje("❌ Error al subir archivos (Código 403/500). Verifique Apps Script.", "error");
@@ -697,53 +694,37 @@ btnFirmar.addEventListener("click", async () => {
 
         mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
 
-        // 2. RECOPILAR TODOS LOS DATOS Y LA FIRMA
         const consumoValor = document.getElementById("consumoInput").value;
         const nombreArchivosAdjuntos = archivos.map(a=>a.name).join("\n");
         const userEmail = localStorage.getItem("usuarioActual"); 
         
         const payload = {
-            // Datos del formulario
             consumo: consumoValor,
             depositos: JSON.stringify(depositos),
-            
-            // Datos de trazabilidad (La "Firma")
             email_usuario: userEmail,
-            municipio_codigo: municipio,
-            municipio_nombre: municipioNombre,
+            municipio_codigo: MUNI_CODE,
+            municipio_nombre: MUNI_NAME,
             timestamp_envio: new Date().toISOString(),
-            
-            // Adjuntos para el PDF
             archivos_adjuntos: nombreArchivosAdjuntos,
         };
         
-        // 3. ENVÍO ÚNICO AL APPS SCRIPT GENERADOR DE PDF/REGISTRO
         const response = await fetch(URL_GENERAR_PDF, { 
             method: "POST", 
-            // headers: { 'Content-Type': 'application/json' }, // Eliminado
             body: JSON.stringify(payload) 
         });
 
-        // NUEVO BLOQUE: Saltamos la lectura de response.json() si falla por CORS
         if (response.ok || response.status === 200) {
-            
-            // ** INTENTO DE LECTURA (Si el navegador lo permite) **
             let result = { success: false, message: "Éxito reportado por servidor (200 OK), pero fallo al leer respuesta JSON." };
             try {
                 result = await response.json(); 
             } catch(e) {
-                // Si falla la lectura JSON (por CORS), asumimos el éxito porque el estado es 200.
-                // **ESTA ES LA LÍNEA CLAVE**
                 result.success = true; 
                 result.message = "Éxito confirmado (200 OK). La respuesta JSON fue bloqueada por el navegador (CORS).";
             }
 
             if (result.success) {
-                // Asumimos que el script GAS hizo su trabajo si el estado es 200
                 mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email (Estado 200 OK).", "success");
                 
-                // El downloadUrl probablemente estará vacío si CORS bloqueó la lectura, 
-                // pero mostramos el mensaje de éxito de todos modos.
                 if (result.downloadUrl) {
                     window.open(result.downloadUrl, '_blank');
                 }
@@ -752,15 +733,14 @@ btnFirmar.addEventListener("click", async () => {
                 btnFirmar.disabled = false;
                 return;
             }
-
-            // Limpieza y fin
-            // ...
-            
         } else {
-            // Si el estado no es 200 (e.g. 404, 500, etc.)
             mostrarMensaje(`❌ Error HTTP ${response.status}: El servidor de Apps Script falló.`, "error");
             btnFirmar.disabled = false;
         }
+    } catch(error) {
+        mostrarMensaje(`❌ Error: ${error.message}`, "error");
+        btnFirmar.disabled = false;
+    }
 });
 
 // --- Control de acceso ---
@@ -776,7 +756,7 @@ document.addEventListener("DOMContentLoaded", () => {
     muniName.textContent = localStorage.getItem("usuarioNombre") || municipioLogin;
   }
 
-  const formMunicipio = "002";
+  const formMunicipio = MUNI_CODE;
   if (municipioLogin !== formMunicipio) {
     alert("No tienes permiso para acceder a este municipio.");
     window.location.href = "../login.html";
