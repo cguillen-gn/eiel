@@ -642,15 +642,25 @@ function subirArchivoIndividual(file) {
         console.log("📥 Iframe cargado, intentando leer respuesta...");
 
         setTimeout(() => {
-          try {
-            const doc = iframe.contentDocument || iframe.contentWindow.document;
-            const txt = doc.body.textContent || doc.body.innerText;
+          try {
+            // MODIFICADO: Buscamos el elemento <textarea>
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const textarea = doc.getElementsByTagName("textarea")[0];
             
-            console.log("📄 Respuesta del servidor:", txt);
-            
-            if (txt && txt.trim()) {
-              try {
-                const data = JSON.parse(txt);
+            let txt = '';
+
+            if (textarea) {
+                txt = textarea.value; // Leemos el contenido del textarea
+                console.log("📄 Respuesta del servidor (desde textarea):", txt);
+            } else {
+                // Fallback si por alguna razón no se usó el textarea
+                txt = doc.body.textContent || doc.body.innerText; 
+                console.warn("⚠️ No se encontró textarea. Usando body. Respuesta:", txt.substring(0, 200));
+            }
+            
+            if (txt && txt.trim()) {
+              try {
+                const data = JSON.parse(txt);
                 console.log("✅ JSON parseado:", data);
                 
                 if (data.status === "ok") {
