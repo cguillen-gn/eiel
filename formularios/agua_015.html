@@ -607,72 +607,30 @@ function subirArchivoIndividual(file) {
     addHidden("tipo", "agua");
     addHidden("mun", MUNI_CODE);
 
-    const fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.name = "file0";
-    
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    fileInput.files = dt.files;
-    
-    form.appendChild(fileInput);
-    document.body.appendChild(form);
+    // 🔧 CONVERTIR ARCHIVO A BASE64
+    const reader = new FileReader();
+    reader.onload = function() {
+      const base64 = reader.result.split(',')[1]; // Quitar prefijo data:...
+      
+      addHidden("file0", base64);
+      addHidden("filename", file.name);
+      addHidden("mimeType", file.type);
+      
+      document.body.appendChild(form);
 
-    let procesado = false;
-    let timeoutId;
+      // Manejar respuesta...
+      iframe.onload = () => {
+        setTimeout(() => {
+          try { form.remove(); } catch(e) {}
+          try { iframe.remove(); } catch(e) {}
+          resolve(true);
+        }, 2000);
+      };
 
-    iframe.onload = () => {
-      if (procesado) return;
-      procesado = true;
-      clearTimeout(timeoutId);
-
-      setTimeout(() => {
-        let subidaExitosa = false;
-
-        try {
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          const txt = doc.body.textContent || doc.body.innerText;
-          
-          if (txt && txt.trim()) {
-            try {
-              const data = JSON.parse(txt);
-              if (data.status === "ok" && data.archivos > 0) {
-                subidaExitosa = true;
-              }
-            } catch(jsonErr) {}
-          }
-        } catch(err) {
-          subidaExitosa = true;
-        }
-
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        
-        resolve(subidaExitosa);
-      }, 2000);
+      form.submit();
     };
 
-    iframe.onerror = () => {
-      if (procesado) return;
-      procesado = true;
-      clearTimeout(timeoutId);
-      
-      try { form.remove(); } catch(e) {}
-      try { iframe.remove(); } catch(e) {}
-      
-      resolve(true);
-    };
-
-    timeoutId = setTimeout(() => {
-      if (!procesado) {
-        procesado = true;
-        try { form.remove(); } catch(e) {}
-        try { iframe.remove(); } catch(e) {}
-        resolve(false);
-      }
-    }, 20000);
-
-    form.submit();
+    reader.readAsDataURL(file);
   });
 }
 
