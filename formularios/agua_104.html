@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>averrbastecimiento de Agua - Petrer</title>
+<title>6u6abastecimiento de Agua - Petrer</title>
 <style>
 :root {
   --primary: #2563eb;
@@ -721,38 +721,45 @@ function mostrarMensaje(texto, tipo) {
 }
 
 function postSinCors(url, data) {
-            return new Promise(resolve => {
+    return new Promise(resolve => {
+        const iframeName = "iframe_pdf_" + Date.now();
+        const iframe = document.createElement("iframe");
+        iframe.name = iframeName;
+        iframe.style.display = "none";
+        document.body.appendChild(iframe);
 
-                const iframeName = "iframe_pdf_" + Date.now();
-                const iframe = document.createElement("iframe");
-                iframe.name = iframeName;
-                iframe.style.display = "none";
-                document.body.appendChild(iframe);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = url;
+        form.target = iframeName;
 
-                const form = document.createElement("form");
-                form.method = "POST";
-                form.action = url;
-                form.target = iframeName;
-
-                for (const k in data) {
-                    const input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = k;
-                    input.value = data[k];
-                    form.appendChild(input);
-                }
-
-                document.body.appendChild(form);
-
-                iframe.onload = () => {
-                    resolve(true); 
-                    form.remove();
-                    iframe.remove();
-                };
-
-                form.submit();
-            });
+        for (const k in data) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = k;
+            input.value = data[k];
+            form.appendChild(input);
         }
+
+        document.body.appendChild(form);
+
+        iframe.onload = () => {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                let txt = doc.body.textContent || doc.body.innerText;
+                const json = JSON.parse(txt);
+                resolve(json);  // <-- ahora devuelve la respuesta real del Apps Script
+            } catch(e) {
+                resolve({ success: false, message: "Error leyendo respuesta del servidor" });
+            } finally {
+                form.remove();
+                iframe.remove();
+            }
+        };
+
+        form.submit();
+    });
+}
 
 btnFirmar.addEventListener("click", async () => {
     try {
@@ -784,8 +791,17 @@ btnFirmar.addEventListener("click", async () => {
         
         
         
-        await postSinCors(URL_GENERAR_PDF, payload);
-        mostrarMensaje("✅ Formulario enviado. Justificante generado.", "success");
+        const response = await postSinCors(URL_GENERAR_PDF, payload);
+
+        if (response.success) {
+            mostrarMensaje("✅ Formulario enviado. Justificante generado.", "success");
+            if (response.downloadUrl) {
+                window.open(response.downloadUrl, "_blank");
+            }
+        } else {
+            mostrarMensaje(`❌ Error: ${response.message}`, "error");
+            btnFirmar.disabled = false;
+        }
         
     } catch(error) {
         mostrarMensaje(`❌ Error: ${error.message}`, "error");
