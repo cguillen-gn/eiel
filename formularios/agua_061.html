@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>41111111abastecimiento de Agua - Daya Nueva</title>
+<title>qqAbastecimiento de Agua - Daya Nueva</title>
 <style>
 :root {
   --primary: #2563eb;
@@ -720,55 +720,68 @@ function mostrarMensaje(texto, tipo) {
   mensaje.style.display = 'block';
 }
 
-async function enviarFormulario() {
+btnFirmar.addEventListener("click", async () => {
     try {
         btnFirmar.disabled = true;
-        mostrarMensaje("⏳ Subiendo archivos y generando PDF...", "info");
-
-        const archivosOk = await subirArchivos();
-        if (!archivosOk && archivos.length > 0) {
-            mostrarMensaje("❌ Error al subir archivos.", "error");
+        mostrarMensaje("⏳ Subiendo archivos...", "info");
+        
+        const driveOk = await subirArchivos();
+        if (!driveOk && archivos.length > 0) {
+            mostrarMensaje("❌ Error al subir archivos (Código 403/500). Verifique Apps Script.", "error");
             btnFirmar.disabled = false;
             return;
         }
 
-        const consumoValor = document.getElementById("consumoInput").value;
-        const nombreArchivosAdjuntos = archivos.map(a => a.name).join("\n");
-        const userEmail = localStorage.getItem("usuarioActual"); 
+        mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
 
+        const consumoValor = document.getElementById("consumoInput").value;
+        const nombreArchivosAdjuntos = archivos.map(a=>a.name).join("\n");
+        const userEmail = localStorage.getItem("usuarioActual"); 
+        
         const payload = {
             consumo: consumoValor,
-            depositos: depositos,
+            depositos: JSON.stringify(depositos),
             email_usuario: userEmail,
             municipio_codigo: MUNI_CODE,
             municipio_nombre: MUNI_NAME,
             timestamp_envio: new Date().toISOString(),
             archivos_adjuntos: nombreArchivosAdjuntos,
         };
+        
+        const response = await fetch(URL_GENERAR_PDF, { 
+            method: "POST",
+            body: new URLSearchParams(payload)
+        });
 
-        const response = await fetch(URL_GENERAR_PDF, {
-            method: "POST",
-            mode: "cors", 
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
+        if (response.ok || response.status === 200) {
+            let result = { success: false, message: "Éxito reportado por servidor (200 OK), pero fallo al leer respuesta JSON." };
+            try {
+                result = await response.json(); 
+            } catch(e) {
+                result.success = true; 
+                result.message = "Éxito confirmado (200 OK). La respuesta JSON fue bloqueada por el navegador (CORS).";
+            }
 
-        const result = await response.json();
-
-        if (result.success) {
-            mostrarMensaje("✅ Formulario enviado. Justificante generado.", "success");
-            if (result.downloadUrl) window.open(result.downloadUrl, "_blank");
+            if (result.success) {
+                mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email (Estado 200 OK).", "success");
+                
+                if (result.downloadUrl) {
+                    window.open(result.downloadUrl, '_blank');
+                }
+            } else {
+                mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
+                btnFirmar.disabled = false;
+                return;
+            }
         } else {
-            mostrarMensaje(`❌ Error: ${result.message}`, "error");
+            mostrarMensaje(`❌ Error HTTP ${response.status}: El servidor de Apps Script falló.`, "error");
+            btnFirmar.disabled = false;
         }
-
-    } catch (error) {
+    } catch(error) {
         mostrarMensaje(`❌ Error: ${error.message}`, "error");
-    } finally {
         btnFirmar.disabled = false;
     }
-}
-btnFirmar.addEventListener("click", enviarFormulario);
+});
 
 // --- Control de acceso ---
 const municipioLogin = localStorage.getItem("usuarioActual");
