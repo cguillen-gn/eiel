@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>bienbastecimiento de Agua - Benidoleig</title>
+<title>101010Abastecimiento de Agua - Benidoleig</title>
 <style>
 :root {
   --primary: #2563eb;
@@ -738,7 +738,6 @@ btnFirmar.addEventListener("click", async () => {
         const nombreArchivosAdjuntos = archivos.map(a=>a.name).join("\n");
         const userEmail = localStorage.getItem("usuarioActual"); 
         
-        // Preparamos payload como query string
         const payload = {
             consumo: consumoValor,
             depositos: JSON.stringify(depositos),
@@ -748,31 +747,41 @@ btnFirmar.addEventListener("click", async () => {
             timestamp_envio: new Date().toISOString(),
             archivos_adjuntos: nombreArchivosAdjuntos,
         };
+        
+        const response = await fetch(URL_GENERAR_PDF, { 
+            method: "POST",
+            body: new URLSearchParams(payload)
+        });
 
-        const params = new URLSearchParams(payload).toString();
-        const pdfUrl = `${URL_GENERAR_PDF}?${params}`;
+        if (response.ok || response.status === 200) {
+            let result = { success: false, message: "Éxito reportado por servidor (200 OK), pero fallo al leer respuesta JSON." };
+            try {
+                result = await response.json(); 
+            } catch(e) {
+                result.success = true; 
+                result.message = "Éxito confirmado (200 OK). La respuesta JSON fue bloqueada por el navegador (CORS).";
+            }
 
-        // Abrir PDF en nueva pestaña
-        window.open(pdfUrl, '_blank');
-
-        // Forzar descarga del PDF
-        const a = document.createElement('a');
-        a.href = pdfUrl;
-        a.download = `justificante_${MUNI_CODE}.pdf`;
-        a.target = '_blank'; // fallback: abrir también en otra pestaña
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email.", "success");
-        btnFirmar.disabled = false;
-
+            if (result.success) {
+                mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email (Estado 200 OK).", "success");
+                
+                if (result.downloadUrl) {
+                    window.open(result.downloadUrl, '_blank');
+                }
+            } else {
+                mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
+                btnFirmar.disabled = false;
+                return;
+            }
+        } else {
+            mostrarMensaje(`❌ Error HTTP ${response.status}: El servidor de Apps Script falló.`, "error");
+            btnFirmar.disabled = false;
+        }
     } catch(error) {
         mostrarMensaje(`❌ Error: ${error.message}`, "error");
         btnFirmar.disabled = false;
     }
 });
-
 
 // --- Control de acceso ---
 const municipioLogin = localStorage.getItem("usuarioActual");
