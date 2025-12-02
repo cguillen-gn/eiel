@@ -822,73 +822,18 @@ document.addEventListener('input', (e) => {
   }
 });
 
-// ARCHIVOS
+// ------------------------
+// GESTIÓN DE ARCHIVOS
+// ------------------------
 let archivos = [];
 const input = document.getElementById("fileInput");
 const fileList = document.getElementById("fileList");
 
-input.onchange = async () => {
-  const files = Array.from(input.files);
-  if (!files.length) return;
-
-  mostrarMensaje("⏳ Subiendo archivos...", "info");
-
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    console.log(`[${i+1}/${files.length}] Subiendo: ${file.name}`);
-
-    try {
-      const base64 = await getBase64(file);
-
-      const payload = {
-        tipo: "cementerios",
-        mun: municipio,
-        filename: file.name,
-        mimeType: file.type,
-        file: base64
-      };
-
-      const resp = await fetch(URL_APPS_SCRIPT, {
-        method: "POST",
-        body: JSON.stringify(payload)
-      });
-
-      const data = await resp.json().catch(() => ({ status: "unknown" }));
-      if (data.status === "error") throw new Error(data.message);
-
-      archivos.push(file);
-      console.log(`✅ ${file.name} subido.`);
-
-    } catch (err) {
-      console.error(err);
-      mostrarMensaje(`⚠️ Error subiendo ${file.name}`, "error");
-      await new Promise(r => setTimeout(r, 1000));
-    }
-  }
-
+input.onchange = () => {
+  archivos.push(...Array.from(input.files));
   renderArchivos();
-  mostrarMensaje("✅ Archivos subidos correctamente", "success");
-  setTimeout(() => {
-    mensaje.style.display = 'none';
-  }, 3000);
-  
   input.value = '';
 };
-
-function getBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      let encoded = reader.result.toString().replace(/^data:(.*,)?/, '');
-      if ((encoded.length % 4) > 0) {
-        encoded += '='.repeat(4 - (encoded.length % 4));
-      }
-      resolve(encoded);
-    };
-    reader.onerror = error => reject(error);
-  });
-}
 
 function eliminarArchivo(i) {
   archivos.splice(i, 1);
@@ -921,7 +866,133 @@ function renderArchivos() {
     .join("");
 }
 
-// ENVÍO
+async function subirArchivos() {
+  if (!archivos.length) return true;
+
+  console.log("📤 Subiendo", archivos.length, "archivo(s)...");
+  let exitosos = 0;
+
+  for (let i = 0; i < archivos.length; i++) {
+    const file = archivos[i];
+    console.log(`[${i+1}/${archivos.length}] Subiendo: ${file.name}`);
+    
+    const success = await subirArchivoIndividual(file);
+    if (success) exitosos++;
+  }
+
+  console.log(`✅ ${exitosos}/${archivos.length} archivo(s) subido(s)`);
+  return exitosos > 0;
+}
+
+function subirArchivoIndividual(file) {
+  console.log("🚀 Iniciando subida de:", file.name, "Tamaño:", file.size, "bytes");
+  
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    
+    reader.onerror = () => {
+      console.error("❌ Error leyendo archivo:", reader.error);
+      resolve(false);
+    };
+    
+    reader.onload = function() {
+      console.log("📖 Archivo leído, tamaño datos:", reader.result.length);
+      
+      const base64 = reader.result.split(',')[1];
+      console.log("🔐 Base64 generado, longitud:", base64.length);
+      
+      // Crear iframe
+      const iframeName = "upload_" + Date.now();
+      const iframe = document.createElement("iframe");
+      iframe.name = iframeName;
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+
+      // Crear form
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = URL_ADJUNTOS;
+      form.target = iframeName;
+
+      const addHidden = (name, value) => {
+        const inp = document.createElement("input");
+        inp.type = "hidden";
+        inp.name = name;
+        inp.value = value;
+        form.appendChild(inp);
+      };
+
+      addHidden("tipo", "residuos");
+      addHidden("mun", MUNI_CODE);
+      addHidden("file0", base64);
+      addHidden("filename", file.name);
+      addHidden("mimeType", file.type);
+
+      document.body.appendChild(form);
+
+      let procesado = false;
+
+      iframe.onload = () => {
+        if (procesado) return;
+        procesado = true;
+        
+        console.log("📥 Iframe cargado");
+
+        setTimeout(() => {
+          try {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            const textarea = doc.getElementsByTagName("textarea")[0];
+            
+            let txt = '';
+            if (textarea) {
+                txt = textarea.value;
+                console.log("📄 Respuesta del servidor:", txt);
+            }
+            
+            if (txt && txt.trim()) {
+              try {
+                const data = JSON.parse(txt);
+                console.log("✅ JSON parseado:", data);
+                
+                if (data.status === "ok" || data.status === "success") {
+                  console.log("🎉 Archivo subido exitosamente!");
+                }
+              } catch(jsonErr) {
+                console.error("❌ Error parseando JSON:", jsonErr);
+              }
+            }
+          } catch(err) {
+            console.error("❌ Error accediendo a iframe:", err.message);
+          }
+
+          try { form.remove(); } catch(e) {}
+          try { iframe.remove(); } catch(e) {}
+          
+          resolve(true);
+        }, 3000);
+      };
+
+      iframe.onerror = () => {
+        console.error("❌ Error en iframe");
+        if (!procesado) {
+          procesado = true;
+          try { form.remove(); } catch(e) {}
+          try { iframe.remove(); } catch(e) {}
+          resolve(false);
+        }
+      };
+
+      console.log("📤 Enviando form...");
+      form.submit();
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
+// ------------------------
+// ENVÍO DEL FORMULARIO
+// ------------------------
 const mensaje = document.getElementById("mensaje");
 const btnFirmar = document.getElementById("firmarBtn");
 
@@ -931,12 +1002,26 @@ function mostrarMensaje(texto, tipo) {
   mensaje.style.display = 'block';
 }
 
+// Nota: Debes asegurar que la función subirArchivos() esté definida en tu código,
+// ya que es llamada en el ejemplo de RESIDUOS.
+// Ejemplo: async function subirArchivos() { ... }
+
 btnFirmar.addEventListener("click", async () => {
   try {
     btnFirmar.disabled = true;
-    mostrarMensaje("⏳ Enviando datos...", "info");
     
-    // Recopilar datos de todos los cementerios
+    // 1. Subir archivos adjuntos (Copiado de la lógica de RESIDUOS)
+    mostrarMensaje("⏳ Subiendo archivos...", "info");
+    const driveOk = await subirArchivos();
+    if (!driveOk && archivos.length > 0) {
+      mostrarMensaje("❌ Error al subir archivos. Verifique Apps Script.", "error");
+      btnFirmar.disabled = false;
+      return;
+    }
+
+    mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
+
+    // 2. Recopilar datos de todos los cementerios
     const datosCementerios = cementerios.map((cem, index) => {
       const cemIndex = index + 1;
       const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
@@ -951,24 +1036,65 @@ btnFirmar.addEventListener("click", async () => {
       return datos;
     });
 
-    const formData = new FormData();
-    formData.append("entry.960913048", municipioNombre);
-    formData.append("entry.CEMENTERIOS_FIELD_ID", JSON.stringify(datosCementerios));
-    formData.append("entry.ARCHIVOS_CEMENTERIOS_FIELD_ID", archivos.map(a=>a.name).join("\n"));
+    const nombreArchivosAdjuntos = archivos.map(a => a.name).join("\n");
+    const userEmail = localStorage.getItem("userEmailActual");
 
-    await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
+    // 3. Crear el payload para el servicio de generación de PDF (URLSearchParams)
+    const payload = {
+      tipo_formulario: "cementerios", // Identificador de formulario
+      cementerios_data: JSON.stringify(datosCementerios),
+      email_usuario: userEmail,
+      municipio_codigo: MUNI_CODE,
+      municipio_nombre: municipioNombre,
+      timestamp_envio: new Date().toISOString(),
+      archivos_adjuntos: nombreArchivosAdjuntos,
+    };
+    
+    // 4. Enviar a URL_GENERAR_PDF (como en RESIDUOS)
+    const response = await fetch(URL_GENERAR_PDF, { 
+      method: "POST",
+      body: new URLSearchParams(payload)
+    });
 
-    mostrarMensaje("✅ Formulario enviado correctamente", "success");
-    
-    archivos = [];
-    renderArchivos();
-    
-    setTimeout(() => {
+    // 5. Manejar la respuesta y el PDF
+    if (response.ok || response.status === 200) {
+      let result = { success: false, message: "Éxito reportado por servidor (200 OK)." };
+      try {
+        result = await response.json(); 
+      } catch(e) {
+        result.success = true; 
+        result.message = "Éxito confirmado (200 OK).";
+      }
+
+      if (result.success) {
+        mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email.", "success");
+        
+        if (result.downloadUrl) {
+          window.open(result.downloadUrl, '_blank'); // Abrir PDF
+        }
+        
+        // Limpiar formulario: entradas y archivos
+        archivos = [];
+        renderArchivos();
+        
+        // Limpiar inputs de la tabla (usando selectores)
+        document.querySelectorAll('input[type="number"][data-cem]').forEach(input => {
+            input.value = '';
+        });
+        
+        // Recalcular totales después de limpiar (asumiendo que calcularTotales() está definida)
+        calcularTotales(); 
+
+      } else {
+        mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
+        btnFirmar.disabled = false;
+      }
+    } else {
+      mostrarMensaje(`❌ Error HTTP ${response.status}`, "error");
       btnFirmar.disabled = false;
-    }, 3000);
-    
+    }
   } catch(error) {
-    mostrarMensaje("❌ Error: " + error.message, "error");
+    mostrarMensaje(`❌ Error: ${error.message}`, "error");
     btnFirmar.disabled = false;
   }
 });

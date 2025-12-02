@@ -806,12 +806,26 @@ function mostrarMensaje(texto, tipo) {
   mensaje.style.display = 'block';
 }
 
+// Nota: Debes asegurar que la función subirArchivos() esté definida en tu código,
+// ya que es llamada en el ejemplo de RESIDUOS.
+// Ejemplo: async function subirArchivos() { ... }
+
 btnFirmar.addEventListener("click", async () => {
   try {
     btnFirmar.disabled = true;
-    mostrarMensaje("⏳ Enviando datos...", "info");
     
-    // Recopilar datos de todos los cementerios
+    // 1. Subir archivos adjuntos (Copiado de la lógica de RESIDUOS)
+    mostrarMensaje("⏳ Subiendo archivos...", "info");
+    const driveOk = await subirArchivos();
+    if (!driveOk && archivos.length > 0) {
+      mostrarMensaje("❌ Error al subir archivos. Verifique Apps Script.", "error");
+      btnFirmar.disabled = false;
+      return;
+    }
+
+    mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
+
+    // 2. Recopilar datos de todos los cementerios
     const datosCementerios = cementerios.map((cem, index) => {
       const cemIndex = index + 1;
       const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
@@ -826,24 +840,65 @@ btnFirmar.addEventListener("click", async () => {
       return datos;
     });
 
-    const formData = new FormData();
-    formData.append("entry.960913048", municipioNombre);
-    formData.append("entry.CEMENTERIOS_FIELD_ID", JSON.stringify(datosCementerios));
-    formData.append("entry.ARCHIVOS_CEMENTERIOS_FIELD_ID", archivos.map(a=>a.name).join("\n"));
+    const nombreArchivosAdjuntos = archivos.map(a => a.name).join("\n");
+    const userEmail = localStorage.getItem("userEmailActual");
 
-    await fetch(URL_GOOGLE_FORMS, { method:"POST", body: formData, mode:"no-cors" });
+    // 3. Crear el payload para el servicio de generación de PDF (URLSearchParams)
+    const payload = {
+      tipo_formulario: "cementerios", // Identificador de formulario
+      cementerios_data: JSON.stringify(datosCementerios),
+      email_usuario: userEmail,
+      municipio_codigo: MUNI_CODE,
+      municipio_nombre: municipioNombre,
+      timestamp_envio: new Date().toISOString(),
+      archivos_adjuntos: nombreArchivosAdjuntos,
+    };
+    
+    // 4. Enviar a URL_GENERAR_PDF (como en RESIDUOS)
+    const response = await fetch(URL_GENERAR_PDF, { 
+      method: "POST",
+      body: new URLSearchParams(payload)
+    });
 
-    mostrarMensaje("✅ Formulario enviado correctamente", "success");
-    
-    archivos = [];
-    renderArchivos();
-    
-    setTimeout(() => {
+    // 5. Manejar la respuesta y el PDF
+    if (response.ok || response.status === 200) {
+      let result = { success: false, message: "Éxito reportado por servidor (200 OK)." };
+      try {
+        result = await response.json(); 
+      } catch(e) {
+        result.success = true; 
+        result.message = "Éxito confirmado (200 OK).";
+      }
+
+      if (result.success) {
+        mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email.", "success");
+        
+        if (result.downloadUrl) {
+          window.open(result.downloadUrl, '_blank'); // Abrir PDF
+        }
+        
+        // Limpiar formulario: entradas y archivos
+        archivos = [];
+        renderArchivos();
+        
+        // Limpiar inputs de la tabla (usando selectores)
+        document.querySelectorAll('input[type="number"][data-cem]').forEach(input => {
+            input.value = '';
+        });
+        
+        // Recalcular totales después de limpiar (asumiendo que calcularTotales() está definida)
+        calcularTotales(); 
+
+      } else {
+        mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
+        btnFirmar.disabled = false;
+      }
+    } else {
+      mostrarMensaje(`❌ Error HTTP ${response.status}`, "error");
       btnFirmar.disabled = false;
-    }, 3000);
-    
+    }
   } catch(error) {
-    mostrarMensaje("❌ Error: " + error.message, "error");
+    mostrarMensaje(`❌ Error: ${error.message}`, "error");
     btnFirmar.disabled = false;
   }
 });
