@@ -28,13 +28,13 @@ OUT_DIR_INDEX = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo"
 MUNICIPIOS_TSV = "municipios.tsv"
 
 
-URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbwDOo2GzUU2P3pM5aZnSUhAirdViU5nrANrTeBAXti2gL71PDIzRbCh9JEljh-PAN5R/exec"
+URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbwZxp2M3YiHqZXVIRb_JAbpt-cEUbtOurHn_SBFoKpLFFc6lQ3KvpCXLXhNPFmETnSLAA/exec"
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
-URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbxd84xbrAtaamSTW_zWt898VARkMaEBEPtYACPM8Pbx6O_EfzZeXqBdFJycZ3nRi9N7/exec";
+URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbzww2fMoyRiW4jvHOJ5UKPX7Ows1ZuANMX878cP6Q61e0u-VzI96L00YKvIE2WGuXu6/exec";
 
 # ---------------- END CONFIG -----------------------------------
 
-# ---------------- FIREBASE CONFIG - PEGAR AQUI TUS VALORES REALES ----------------
+# ---------------- FIREBASE CONFIG ----------------
 FIREBASE_CONFIG = {
     "apiKey": os.getenv("FIREBASE_API_KEY"), 
     "authDomain": os.getenv("FIREBASE_AUTH_DOMAIN"),
@@ -343,8 +343,6 @@ def main():
             mun_code = mun_data["code"]
             muni_display = mun_data["name"] 
             
-            # Se han omitido los detalles de la generación de los forms por ser repetitivos
-
             # ---- AGUA ----
             depositos = obtener_depositos(conn, mun_code)
             depositos_json = json.dumps(depositos, ensure_ascii=False)
@@ -355,8 +353,6 @@ def main():
                 url_adjuntos = URL_ADJUNTOS, 
                 url_google_forms = URL_GOOGLE_FORMS, 
                 fase_anterior = fase_anterior,
-                
-                # ESTA ES LA LÍNEA QUE FALTABA:
                 url_generar_pdf = URL_GENERAR_PDF 
             )
             
@@ -386,16 +382,12 @@ def main():
                 url_google_forms = URL_GOOGLE_FORMS
             )
             
-            
-            
             # Guardado de archivos
             path_agua = os.path.join(OUT_DIR, f'agua_{mun_code}.html')
             path_obras = os.path.join(OUT_DIR, f'obras_{mun_code}.html')
             path_residuos = os.path.join(OUT_DIR, f'residuos_{mun_code}.html')
             path_cementerios = os.path.join(OUT_DIR, f'cementerios_{mun_code}.html')
             
-            
-
             with open(path_agua, "w", encoding="utf-8") as f:
                 f.write(rendered_agua)
             
