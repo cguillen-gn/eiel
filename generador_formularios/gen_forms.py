@@ -366,8 +366,12 @@ def main():
             
             # ---- RESIDUOS ----
             rendered_residuos = template_residuos.render(
-                muni_code = mun_code, muni_display = muni_display,
-                url_adjuntos = URL_ADJUNTOS, url_google_forms = URL_GOOGLE_FORMS, fase_anterior = fase_anterior
+                muni_code = mun_code, 
+                muni_display = muni_display,
+                url_adjuntos = URL_ADJUNTOS, 
+                url_google_forms = URL_GOOGLE_FORMS, 
+                fase_anterior = fase_anterior,
+                url_generar_pdf = URL_GENERAR_PDF 
             )
             
             # ---- CEMENTERIOS ----
