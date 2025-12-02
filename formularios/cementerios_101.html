@@ -760,27 +760,36 @@ btnFirmar.addEventListener("click", async () => {
   }
 });
 
-// Control de acceso
-const municipioLogin = localStorage.getItem("usuarioActual");
+// --- Control de acceso ---
 
-if (!municipioLogin) {
-  window.location.href = "../login.html";
+// 1. Obtener las variables de sesión usando los nuevos nombres (que hemos guardado en index.html)
+const userEmail = localStorage.getItem("userEmailActual");
+const codigoMuniLogueado = localStorage.getItem("municipioCodigoActual");
+
+// 2. Comprobación básica de sesión
+// Si no tenemos el email O el código de municipio, redirigimos al login.
+if (!userEmail || !codigoMuniLogueado) {
+  window.location.href = "../login.html";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const muniName = document.getElementById("muniName");
-  if (muniName) {
-    muniName.textContent = localStorage.getItem("usuarioNombre") || municipioLogin;
-  }
+    // La variable MUNI_CODE ya viene del servidor (template Jinja) con el código del formulario actual.
+    const formMunicipioCodigo = MUNI_CODE;
 
-  const formMunicipio = "101";
-  if (municipioLogin !== formMunicipio) {
-    console.error("No tienes permiso para acceder a este municipio.");
-    window.location.href = "../login.html";
-  }
-  
-  // Calcular totales iniciales
-  calcularTotales();
+    // 3. Actualizar la UI (opcional)
+    const muniName = document.getElementById("muniName");
+    if (muniName) {
+        // Usamos la clave guardada en el index.html
+        muniName.textContent = localStorage.getItem("municipioNombreActual") || formMunicipioCodigo;
+    }
+
+    // 4. Comprobación de Autorización (el usuario logueado puede acceder a este formulario)
+    if (codigoMuniLogueado !== formMunicipioCodigo) {
+        alert("No tienes permiso para acceder a este municipio. Estás logueado como municipio " + codigoMuniLogueado);
+        // Además, eliminamos el estado de sesión para forzar un nuevo login limpio.
+        localStorage.clear(); 
+        window.location.href = "../login.html";
+    }
 });
 </script>
 </body>
