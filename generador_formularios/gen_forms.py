@@ -383,7 +383,8 @@ def main():
                 cementerios = cementerios,
                 cementerios_json = cementerios_json,
                 url_adjuntos = URL_ADJUNTOS, 
-                url_google_forms = URL_GOOGLE_FORMS
+                url_google_forms = URL_GOOGLE_FORMS,
+                url_generar_pdf = URL_GENERAR_PDF 
             )
             
             # Guardado de archivos
