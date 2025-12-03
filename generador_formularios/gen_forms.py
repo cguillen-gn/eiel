@@ -361,7 +361,9 @@ def main():
             obras_json = json.dumps(obras, ensure_ascii=False)
             rendered_obras = template_obras.render(
                 muni_code = mun_code, muni_display = muni_display, obras = obras, obras_json = obras_json,
-                url_adjuntos = URL_ADJUNTOS, url_google_forms = URL_GOOGLE_FORMS
+                url_adjuntos = URL_ADJUNTOS, 
+                url_google_forms = URL_GOOGLE_FORMS,
+                url_generar_pdf = URL_GENERAR_PDF 
             )
             
             # ---- RESIDUOS ----
