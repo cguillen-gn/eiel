@@ -30,7 +30,7 @@ MUNICIPIOS_TSV = "municipios.tsv"
 
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec"
 URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
-URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbxp5uPL7xnp4DEbbQ5-g5rLCLBR0XaqG6PIfjetqi4ZzrLidqtLnB2c0pp2lx5erC9M/exec";
+URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbxiTbUbAJkFOgi5SeCGzA3si3cjchwa0AW36SxCWPFsxs46wcdGfudwxxJSuQIurt22/exec";
 
 # ---------------- END CONFIG -----------------------------------
 
