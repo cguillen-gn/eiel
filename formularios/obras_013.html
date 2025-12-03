@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>pppFormulario Obras - Algueña</title>
+<title>sssssFormulario Obras - Algueña</title>
 <style>
 :root {
   --primary: #FF9800;
@@ -1086,98 +1086,76 @@ function eliminarAdjunto(obraId, index) {
 
 const btnFirmar = document.getElementById("firmarBtn");
 
-btnFirmar.addEventListener("click", async () => {
+btnFirmar.addEventListener("click", () => {
     btnFirmar.disabled = true;
     mostrarMensaje("⏳ Recopilando datos y preparando envío...", "info");
 
-    try {
-        const estados = [];
-        const filas = document.querySelectorAll("tbody tr");
+    const estados = [];
+    const filas = document.querySelectorAll("tbody tr");
 
-        filas.forEach((tr, index) => {
-            const loopIndex = index + 1;
-            const tds = tr.querySelectorAll("td");
-            if (tds.length < 3) return;
+    filas.forEach((tr, index) => {
+        const loopIndex = index + 1;
+        const tds = tr.querySelectorAll("td");
+        if (tds.length < 3) return;
 
-            const codigoObra = tds[0].textContent.trim();
-            const nombreObra = tds[1].textContent.trim();
-            const planObra = tds[2].textContent.trim();
+        const codigoObra = tds[0].textContent.trim();
+        const nombreObra = tds[1].textContent.trim();
+        const planObra = tds[2].textContent.trim();
 
-            const select = tr.querySelector(".select-estado");
-            let estadoValor = select ? select.value : "";
+        const select = tr.querySelector(".select-estado");
+        let estadoValor = select ? select.value : "";
 
-            if (estadoValor && estadoValor !== "-- Seleccione --") {
-                estados.push({
-                    obra: codigoObra,
-                    nombre: nombreObra,
-                    plan: planObra,
-                    estado: estadoValor,
-                    archivos: (adjuntosObras[loopIndex] || []).map(f => f.name).join("; ")
-                });
-            }
-        });
-
-        if (estados.length === 0) {
-            mostrarMensaje("⚠️ No se seleccionó ningún estado de obra para enviar.", "warning");
-            btnFirmar.disabled = false;
-            return;
+        if (estadoValor && estadoValor !== "-- Seleccione --") {
+            estados.push({
+                obra: codigoObra,
+                nombre: nombreObra,
+                plan: planObra,
+                estado: estadoValor,
+                archivos: (adjuntosObras[loopIndex] || []).map(f => f.name).join("; ")
+            });
         }
+    });
 
-        const userEmail = localStorage.getItem("userEmailActual") || prompt("Introduce tu email:");
-        if (!userEmail) {
-            mostrarMensaje("❌ Envío cancelado. Se requiere un email.", "error");
-            btnFirmar.disabled = false;
-            return;
-        }
-
-        // Payload
-        const payload = {
-            tipo_formulario: "obras",
-            datos_obras_json: JSON.stringify(estados),
-            email_usuario: userEmail,
-            municipio_codigo: MUNI_CODE,
-            municipio_nombre: MUNI_NAME,
-            timestamp_envio: new Date().toISOString(),
-        };
-
-        mostrarMensaje("⏳ Enviando datos a Apps Script y generando PDF...", "info");
-
-        // Envío con FormData (IMPORTANTE: NO headers)
-        const formData = new FormData();
-        for (const key in payload) {
-            formData.append(key, payload[key]);
-        }
-
-        const response = await fetch(URL_GENERAR_PDF, {
-            method: "POST",
-            body: formData
-        });
-
-        // Respuesta JSON real
-        const raw = await response.text();
-        console.log("RAW:", raw);
-
-        let result;
-        try {
-            result = JSON.parse(raw);
-        } catch (e) {
-            throw new Error("Apps Script NO devolvió JSON. Respuesta: " + raw);
-        }
-
-        if (result.success) {
-            mostrarMensaje("✅ Formulario enviado. Justificante enviado a " + userEmail, "success");
-        } else {
-            throw new Error(result.message || "Fallo en el servidor al generar el justificante.");
-        }
-
-    } catch (error) {
-        console.error(error);
-        mostrarMensaje(`❌ Error al enviar el formulario: ${error.message}`, "error");
-    } finally {
-        if (mensaje.className !== "message success") {
-            btnFirmar.disabled = false;
-        }
+    if (estados.length === 0) {
+        mostrarMensaje("⚠️ No se seleccionó ningún estado de obra para enviar.", "warning");
+        btnFirmar.disabled = false;
+        return;
     }
+
+    const userEmail = localStorage.getItem("userEmailActual") || prompt("Introduce tu email:");
+    if (!userEmail) {
+        mostrarMensaje("❌ Envío cancelado. Se requiere un email.", "error");
+        btnFirmar.disabled = false;
+        return;
+    }
+
+    const payload = {
+        tipo_formulario: "obras",
+        datos_obras_json: JSON.stringify(estados),
+        email_usuario: userEmail,
+        municipio_codigo: MUNI_CODE,
+        municipio_nombre: MUNI_NAME,
+        timestamp_envio: new Date().toISOString(),
+    };
+
+    mostrarMensaje("⏳ Enviando datos a Apps Script y generando PDF...", "info");
+
+    // === ENVÍO CON google.script.run ===
+    google.script.run
+        .withSuccessHandler((result) => {
+            if (result.success) {
+                mostrarMensaje("✅ Formulario enviado. Justificante enviado a " + userEmail, "success");
+            } else {
+                mostrarMensaje(`❌ Error al enviar el formulario: ${result.message}`, "error");
+            }
+            btnFirmar.disabled = false;
+        })
+        .withFailureHandler((err) => {
+            console.error(err);
+            mostrarMensaje(`❌ Error al enviar el formulario: ${err.message || err}`, "error");
+            btnFirmar.disabled = false;
+        })
+        .enviarFormularioObras(payload); // <- función que defines en Apps Script
 });
 
 // --- Control de acceso ---
