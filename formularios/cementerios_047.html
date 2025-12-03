@@ -570,7 +570,7 @@ body {
 <script>
 const URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec"; 
 const URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse";
-const URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbzzNjHpmyn8l3aHMfcA4ApH3m5aFWP4dZAn_CcjYtmkFeM9dGUnzl3qnyd3k0OuHWLU/exec";
+const URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbz9sM2jQj_sjwA3QyGQGZVdxSDPM38gvsFAAiSPuK4nonUrq1HsboUlh3DvRCQZyjif/exec";
 
 const MUNI_CODE = '047'; 
 const MUNI_NAME = 'Calp';
@@ -806,7 +806,7 @@ btnFirmar.addEventListener("click", async () => {
   try {
     btnFirmar.disabled = true;
     
-    // 1. Subir archivos adjuntos (Copiado de la lógica de RESIDUOS)
+    // 1. Subir archivos adjuntos
     mostrarMensaje("⏳ Subiendo archivos...", "info");
     const driveOk = await subirArchivos();
     if (!driveOk && archivos.length > 0) {
@@ -817,47 +817,100 @@ btnFirmar.addEventListener("click", async () => {
 
     mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
 
-    // 2. Recopilar datos de todos los cementerios
+    // 2. Recopilar datos de todos los cementerios - VERSIÓN MEJORADA
     const datosCementerios = cementerios.map((cem, index) => {
       const cemIndex = index + 1;
       const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
       
-      let datos = { nombre: cem.nombre };
+      let datos = { 
+        nombre: cem.nombre || `Cementerio ${cemIndex}`
+      };
       
       inputs.forEach(input => {
         const tipo = input.dataset.tipo;
-        datos[tipo] = parseInt(input.value) || 0;
+        if (!tipo) {
+          console.warn("Input sin data-tipo encontrado:", input);
+          return;
+        }
+        
+        // Obtener valor de forma más robusta
+        let valor = input.value;
+        
+        // Convertir a número de forma segura
+        if (valor === '' || valor === null || valor === undefined) {
+          datos[tipo] = 0;
+        } else {
+          const numValor = parseInt(valor, 10);
+          datos[tipo] = isNaN(numValor) ? 0 : numValor;
+        }
       });
       
       return datos;
     });
 
+    // DEBUGGING - Eliminar después de confirmar que funciona
+    console.log("=== DEBUG CEMENTERIOS ===");
+    console.log("Número de cementerios:", cementerios.length);
+    console.log("Datos construidos:", JSON.stringify(datosCementerios, null, 2));
+    
+    // Verificar que todos los campos esperados estén presentes
+    datosCementerios.forEach((cem, idx) => {
+      console.log(`Cementerio ${idx + 1} (${cem.nombre}):`);
+      const camposEsperados = [
+        'ocupadas_fosas', 'ocupadas_nichos', 'ocupadas_columbarios', 'ocupadas_osarios',
+        'libres_concesion_fosas', 'libres_concesion_nichos', 'libres_concesion_columbarios', 'libres_concesion_osarios',
+        'libres_propiedad_fosas', 'libres_propiedad_nichos', 'libres_propiedad_columbarios', 'libres_propiedad_osarios',
+        'libres_municipal_fosas', 'libres_municipal_nichos', 'libres_municipal_columbarios', 'libres_municipal_osarios'
+      ];
+      
+      camposEsperados.forEach(campo => {
+        if (!(campo in cem)) {
+          console.error(`  ❌ FALTA CAMPO: ${campo}`);
+        }
+      });
+    });
+    console.log("========================");
+
     const nombreArchivosAdjuntos = archivos.map(a => a.name).join("\n");
     const userEmail = localStorage.getItem("userEmailActual");
 
-    // 3. Crear el payload para el servicio de generación de PDF (URLSearchParams)
+    // 3. Crear el payload para el servicio de generación de PDF
+    const cementeriosDataString = JSON.stringify(datosCementerios);
+    
+    console.log("JSON final a enviar:");
+    console.log(cementeriosDataString);
+    
     const payload = {
-      tipo_formulario: "cementerios", // Identificador de formulario
-      cementerios_data: JSON.stringify(datosCementerios),
-      email_usuario: userEmail,
+      tipo_formulario: "cementerios",
+      cementerios_data: cementeriosDataString,
+      email_usuario: userEmail || "sin_email@ejemplo.com",
       municipio_codigo: MUNI_CODE,
       municipio_nombre: municipioNombre,
       timestamp_envio: new Date().toISOString(),
       archivos_adjuntos: nombreArchivosAdjuntos,
     };
     
-    // 4. Enviar a URL_GENERAR_PDF (como en RESIDUOS)
+    console.log("Payload completo:", payload);
+    
+    // 4. Enviar a URL_GENERAR_PDF
     const response = await fetch(URL_GENERAR_PDF, { 
       method: "POST",
       body: new URLSearchParams(payload)
     });
 
-    // 5. Manejar la respuesta y el PDF (Copiado de la lógica de RESIDUOS)
+    console.log("Response status:", response.status);
+    console.log("Response headers:", response.headers);
+
+    // 5. Manejar la respuesta
     if (response.ok || response.status === 200) {
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+      
       let result = { success: false, message: "Éxito reportado por servidor (200 OK)." };
       try {
-        result = await response.json(); 
+        result = JSON.parse(responseText); 
       } catch(e) {
+        console.warn("No se pudo parsear JSON, asumiendo éxito:", e);
         result.success = true; 
         result.message = "Éxito confirmado (200 OK).";
       }
@@ -866,19 +919,17 @@ btnFirmar.addEventListener("click", async () => {
         mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email.", "success");
         
         if (result.downloadUrl) {
-          window.open(result.downloadUrl, '_blank'); // Abrir PDF
+          window.open(result.downloadUrl, '_blank');
         }
         
-        // Limpiar formulario: entradas y archivos
+        // Limpiar formulario
         archivos = [];
         renderArchivos();
         
-        // Limpiar inputs de la tabla (usando selectores)
         document.querySelectorAll('input[type="number"][data-cem]').forEach(input => {
             input.value = '';
         });
         
-        // Recalcular totales después de limpiar (asumiendo que calcularTotales() está definida)
         calcularTotales(); 
 
       } else {
@@ -886,10 +937,13 @@ btnFirmar.addEventListener("click", async () => {
         btnFirmar.disabled = false;
       }
     } else {
-      mostrarMensaje(`❌ Error HTTP ${response.status}`, "error");
+      const errorText = await response.text();
+      console.error("Error response:", errorText);
+      mostrarMensaje(`❌ Error HTTP ${response.status}: ${errorText}`, "error");
       btnFirmar.disabled = false;
     }
   } catch(error) {
+    console.error("Error completo:", error);
     mostrarMensaje(`❌ Error: ${error.message}`, "error");
     btnFirmar.disabled = false;
   }
