@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>vvvvvvFormulario Obras - Vall d'Alcalà (la)</title>
+<title>xxxxFormulario Obras - Vall d'Alcalà (la)</title>
 <style>
 :root {
   --primary: #FF9800;
@@ -1231,15 +1231,13 @@ function eliminarAdjunto(obraId, index) {
 const btnFirmar = document.getElementById("firmarBtn");
 
 btnFirmar.addEventListener("click", async () => {
-    // 1. Deshabilitar y mensaje inicial
     btnFirmar.disabled = true;
     mostrarMensaje("⏳ Recopilando datos y preparando envío...", "info");
-    
+
     try {
         const estados = [];
         const filas = document.querySelectorAll("tbody tr");
 
-        // Recolección de datos
         filas.forEach((tr, index) => {
             const loopIndex = index + 1;
             const tds = tr.querySelectorAll("td");
@@ -1248,18 +1246,16 @@ btnFirmar.addEventListener("click", async () => {
             const codigoObra = tds[0].textContent.trim();
             const nombreObra = tds[1].textContent.trim();
             const planObra = tds[2].textContent.trim();
-            
-            // Buscar el valor de estado
+
             const select = tr.querySelector(".select-estado");
-            let estadoValor = select ? select.value : (tds.length > 3 ? tds[3].textContent.trim() : "");
-            
-            if (estadoValor && estadoValor !== "-- Seleccione --" && estadoValor !== "-") {
+            let estadoValor = select ? select.value : "";
+
+            if (estadoValor && estadoValor !== "-- Seleccione --") {
                 estados.push({
                     obra: codigoObra,
                     nombre: nombreObra,
                     plan: planObra,
                     estado: estadoValor,
-                    // Lista de nombres de archivos adjuntos (solo para el PDF)
                     archivos: (adjuntosObras[loopIndex] || []).map(f => f.name).join("; ")
                 });
             }
@@ -1271,47 +1267,45 @@ btnFirmar.addEventListener("click", async () => {
             return;
         }
 
-        const userEmail = localStorage.getItem("userEmailActual") || prompt("Introduce tu email para recibir el justificante:");
-        
+        const userEmail = localStorage.getItem("userEmailActual") || prompt("Introduce tu email:");
         if (!userEmail) {
             mostrarMensaje("❌ Envío cancelado. Se requiere un email.", "error");
             btnFirmar.disabled = false;
             return;
         }
 
-        // 2. Construcción del Payload para URL_GENERAR_PDF
+        // Payload
         const payload = {
-            tipo_formulario: "obras", 
-            datos_obras_json: JSON.stringify(estados), 
+            tipo_formulario: "obras",
+            datos_obras_json: JSON.stringify(estados),
             email_usuario: userEmail,
             municipio_codigo: MUNI_CODE,
             municipio_nombre: MUNI_NAME,
             timestamp_envio: new Date().toISOString(),
-            // No necesitamos el campo archivos_adjuntos aquí, ya que los adjuntos son por obra
         };
 
         mostrarMensaje("⏳ Enviando datos a Apps Script y generando PDF...", "info");
-        
-        // 3. Envío al Script de Generación de PDF/Email
-        const formData = new FormData();
-        formData.append("tipo_formulario", "obras");
-        formData.append("datos_obras_json", JSON.stringify(estados));
-        formData.append("email_usuario", userEmail);
-        formData.append("municipio_codigo", MUNI_CODE);
-        formData.append("municipio_nombre", MUNI_NAME);
-        formData.append("timestamp_envio", new Date().toISOString());
 
+        // => FormData CORRECTO
+        const formData = new FormData();
+        for (const key in payload) {
+            formData.append(key, payload[key]);
+        }
+
+        // Envío
         const response = await fetch(URL_GENERAR_PDF, {
             method: "POST",
-            body: new URLSearchParams(payload)
+            body: formData
         });
 
-        // 4. Procesar respuesta del PDF
-        const result = await response.json().catch(() => ({ success: false, message: "Error al leer respuesta JSON." }));
+        // Respuesta JSON real
+        const result = await response.json().catch(() => ({
+            success: false,
+            message: "Error al leer respuesta JSON."
+        }));
 
         if (result.success) {
-            mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado a " + userEmail, "success");
-            // Aquí puedes añadir: setTimeout(() => window.location.reload(), 3000);
+            mostrarMensaje("✅ Formulario enviado. Justificante enviado a " + userEmail, "success");
         } else {
             throw new Error(result.message || "Fallo en el servidor al generar el justificante.");
         }
@@ -1320,7 +1314,6 @@ btnFirmar.addEventListener("click", async () => {
         console.error(error);
         mostrarMensaje(`❌ Error al enviar el formulario: ${error.message}`, "error");
     } finally {
-        // Habilitar si la recarga no es inmediata
         if (mensaje.className !== "message success") {
             btnFirmar.disabled = false;
         }
