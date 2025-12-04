@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>sennFormulario Obras - Aigües</title>
+<title>qqqqqFormulario Obras - Aigües</title>
 <style>
 :root {
   --primary: #FF9800;
@@ -1237,83 +1237,100 @@ function eliminarAdjunto(obraId, index) {
 }
 
 // ==========================================
-// 4. LÓGICA DE ENVÍO PRINCIPAL (ADAPTADA)
+// 4. ENVÍO FINAL DEL FORMULARIO (PDF/EMAIL)
 // ==========================================
 
-btnFirmar.addEventListener("click", async () => {
-    try {
-        btnFirmar.disabled = true;
-        
-        // ** NOTA IMPORTANTE: LA SUBIDA DE ADJUNTOS YA SE HIZO EN EL PASO 3 **
-        // Por lo tanto, NO necesitamos la línea: const driveOk = await subirArchivos();
-        
-        mostrarMensaje("⏳ Registrando datos y generando justificante...", "info");
+const btnFirmar = document.getElementById("firmarBtn");
 
-        // 1. Recopilar datos (JSON de Obras)
-        // ASUME QUE LA FUNCIÓN getDatosObras() o similar existe y devuelve el JSON
-        const datosObras = obtenerDatosDelFormularioObras(); 
-        
-        const nombreArchivosAdjuntos = [];
-        // Recopilar todos los nombres de archivo de la variable global adjuntosObras
-        for (const obraId in adjuntosObras) {
-            adjuntosObras[obraId].forEach(file => nombreArchivosAdjuntos.push(file.name));
+btnFirmar.addEventListener("click", async () => {
+    btnFirmar.disabled = true;
+    mostrarMensaje("⏳ Recopilando datos y preparando envío...", "info");
+
+    try {
+        // Recopilar estados de obras
+        const estados = [];
+        const filas = document.querySelectorAll("tbody tr");
+
+        filas.forEach((tr, index) => {
+            const loopIndex = index + 1;
+            const tds = tr.querySelectorAll("td");
+            if (tds.length < 3) return;
+
+            const codigoObra = tds[0].textContent.trim();
+            const nombreObra = tds[1].textContent.trim();
+            const planObra = tds[2].textContent.trim();
+
+            const select = tr.querySelector(".select-estado");
+            let estadoValor = select ? select.value : "";
+
+            if (estadoValor && estadoValor !== "-- Seleccione --") {
+                estados.push({
+                    obra: codigoObra,
+                    nombre: nombreObra,
+                    plan: planObra,
+                    estado: estadoValor,
+                    archivos: (adjuntosObras[loopIndex] || []).map(f => f.name).join("; ")
+                });
+            }
+        });
+
+        if (estados.length === 0) {
+            mostrarMensaje("⚠️ No se seleccionó ningún estado de obra para enviar.", "warning");
+            btnFirmar.disabled = false;
+            return;
         }
 
-        const userEmail = localStorage.getItem("userEmailActual");
+        // Solicitar email si no hay guardado
+        const userEmail = localStorage.getItem("userEmailActual") || prompt("Introduce tu email:");
+        if (!userEmail) {
+            mostrarMensaje("❌ Envío cancelado. Se requiere un email.", "error");
+            btnFirmar.disabled = false;
+            return;
+        }
 
-        // 2. Crear el payload para el servicio de generación de PDF
+        // Preparar payload
         const payload = {
             tipo_formulario: "obras",
-            datos_obras_json: JSON.stringify(datosObras),
-            email_usuario: userEmail || "sin_email@ejemplo.com",
+            datos_obras_json: JSON.stringify(estados),
+            email_usuario: userEmail,
             municipio_codigo: MUNI_CODE,
             municipio_nombre: MUNI_NAME,
             timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: nombreArchivosAdjuntos.join("\n"),
         };
-        
-        // 3. Enviar a URL_GENERAR_PDF
-        const response = await fetch(URL_GENERAR_PDF, { 
+
+        mostrarMensaje("⏳ Enviando datos a Apps Script y generando PDF...", "info");
+
+        // Enviar mediante fetch
+        const response = await fetch(URL_GENERAR_PDF, {
             method: "POST",
-            body: new URLSearchParams(payload)
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(payload)  // Convierte el objeto a formato URL-encoded
         });
 
-        // 4. Manejar la respuesta (Igual que en Cementerios)
-        if (response.ok || response.status === 200) {
-            const responseText = await response.text();
-            let result = { success: false, message: "Éxito reportado por servidor (200 OK)." };
-            
-            try {
-                result = JSON.parse(responseText); 
-            } catch(e) {
-                result.success = true; 
-                result.message = "Éxito confirmado (200 OK).";
-            }
+        // Leer respuesta
+        const raw = await response.text();
+        console.log("RAW:", raw);
 
-            if (result.success) {
-                mostrarMensaje("✅ Formulario enviado. Justificante generado y enviado por email.", "success");
-                if (result.downloadUrl) {
-                    window.open(result.downloadUrl, '_blank');
-                }
-                
-                // Limpiar (solo las variables de archivos, los inputs se limpian aparte)
-                adjuntosObras = {};
-                
-                // ASUME QUE LA FUNCIÓN limpiarFormularioObras() existe
-                // limpiarFormularioObras(); 
-            } else {
-                mostrarMensaje(`❌ Error al generar justificante: ${result.message}`, "error");
-                btnFirmar.disabled = false;
-            }
+        let result;
+        try {
+            result = JSON.parse(raw);
+        } catch (e) {
+            throw new Error("Apps Script NO devolvió JSON. Respuesta: " + raw);
+        }
+
+        if (result.success) {
+            mostrarMensaje("✅ Formulario enviado. Justificante enviado a " + userEmail, "success");
         } else {
-            const errorText = await response.text();
-            mostrarMensaje(`❌ Error HTTP ${response.status}: ${errorText}`, "error");
+            throw new Error(result.message || "Fallo en el servidor al generar el justificante.");
+        }
+
+    } catch (error) {
+        console.error(error);
+        mostrarMensaje(`❌ Error al enviar el formulario: ${error.message}`, "error");
+    } finally {
+        if (mensaje.className !== "message success") {
             btnFirmar.disabled = false;
         }
-    } catch(error) {
-        console.error("Error completo:", error);
-        mostrarMensaje(`❌ Error: ${error.message}`, "error");
-        btnFirmar.disabled = false;
     }
 });
 
