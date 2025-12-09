@@ -224,7 +224,8 @@ def main():
                 "muni_display": name,
                 "url_adjuntos": URL_ADJUNTOS,
                 "url_generar_pdf": URL_GENERAR_PDF,
-                "fase_anterior": fase_anterior
+                "fase_anterior": fase_anterior,
+                "firebase_config": json.dumps(FIREBASE_CONFIG)
             }
 
             # --- AGUA ---
