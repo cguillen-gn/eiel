@@ -36,7 +36,7 @@ DB = {
     "password": os.getenv("DB_PASSWORD")
 }
 
-MUNICIPIOS_TSV = "municipios.tsv"
+MUNICIPIOS_TSV = os.path.join(BASE_DIR, "data", "municipios.tsv")
 
 # URLs de Apps Script (Centralizadas)
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec"
