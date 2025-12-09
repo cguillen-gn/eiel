@@ -13,7 +13,7 @@ load_dotenv()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # 2. OUTPUT_DIR: La ÚNICA carpeta donde se generará todo (HTML, CSS, JS)
-OUTPUT_DIR = os.path.join(BASE_DIR, 'dist')
+OUTPUT_DIR = os.path.join(BASE_DIR, 'docs')
 
 # 3. Carpetas de ORIGEN (Donde tú editas, relativas a BASE_DIR)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
@@ -172,7 +172,7 @@ def copiar_assets():
 def main():
     print("--- INICIO GENERACIÓN DE FORMULARIOS ---")
     
-    # 1. Asegurar el directorio de salida (dist)
+    # 1. Asegurar el directorio de salida
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         print(f"📂 Carpeta creada: {OUTPUT_DIR}")
