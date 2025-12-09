@@ -8,10 +8,24 @@ import psycopg2.extras
 
 load_dotenv()
 
-# --- CONSTANTES GLOBALES ---
+# --- CONSTANTES GLOBALES Y RUTAS ---
+# 1. BASE_DIR: Dónde está este archivo script.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_DIR = os.path.join(BASE_DIR, 'output')
-# ---------------------------
+
+# 2. OUTPUT_DIR: La ÚNICA carpeta donde se generará todo (HTML, CSS, JS)
+OUTPUT_DIR = os.path.join(BASE_DIR, 'dist')
+
+# 3. Carpetas de ORIGEN (Donde tú editas, relativas a BASE_DIR)
+TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+ASSETS_CSS_DIR = os.path.join(BASE_DIR, "css")
+ASSETS_JS_DIR = os.path.join(BASE_DIR, "js") # Si tienes JS
+
+# --- CONFIGURACIÓN DE NOMBRES DE PLANTILLAS ---
+TEMPLATE_INDEX = "index-template.html.j2" 
+TEMPLATE_AGUA = "form-agua.html.j2"
+TEMPLATE_OBRAS = "form-obras.html.j2"
+TEMPLATE_RESIDUOS = "form-residuos.html.j2"
+TEMPLATE_CEMENTERIOS = "form-cementerios.html.j2"
 
 # ---------------- CONFIGURACIÓN ----------------
 DB = {
@@ -21,27 +35,6 @@ DB = {
     "user": os.getenv("DB_USER"),
     "password": os.getenv("DB_PASSWORD")
 }
-
-# Carpetas de origen (donde editas)
-TEMPLATE_DIR = "templates"
-ASSETS_CSS_DIR = "css"
-ASSETS_JS_DIR = "js"
-
-# Nombres de las nuevas plantillas refactorizadas
-TEMPLATE_INDEX = "index-template.html.j2" 
-# Nota: Index suele ser distinto a los formularios, pero si quieres usar base,
-# tendrías que refactorizar index también. Por ahora mantenemos el index original
-# o el que tengas adaptado, asumiendo que apunta a los formularios nuevos.
-
-TEMPLATE_AGUA = "form-agua.html.j2"
-TEMPLATE_OBRAS = "form-obras.html.j2"
-TEMPLATE_RESIDUOS = "form-residuos.html.j2"
-TEMPLATE_CEMENTERIOS = "form-cementerios.html.j2"
-
-# Carpetas de destino (donde se publica la web)
-# AJUSTA ESTA RUTA A TU ENTORNO REAL
-OUT_DIR_ROOT = r"C:\Users\cguillen.GEONET\Documents\GitHub\eiel-prototipo"
-OUT_DIR_FORMS = os.path.join(OUT_DIR_ROOT, "formularios")
 
 MUNICIPIOS_TSV = "municipios.tsv"
 
@@ -169,24 +162,31 @@ def obtener_cementerios(conn, mun):
         return [{"nombre": r["nombre"] or "Sin nombre"} for r in cur.fetchall()]
 
 def copiar_assets():
-    src = os.path.join(BASE_DIR, 'css')  # Tu carpeta original
-    dest = os.path.join(OUTPUT_DIR, 'css') # Tu carpeta destino
-   
-    shutil.copytree(src, dest, dirs_exist_ok=True) 
-    print("✅ Assets copiados correctamente.")
+    src_css = ASSETS_CSS_DIR
+    dest_css = os.path.join(OUTPUT_DIR, 'css')
+
+    if os.path.exists(src_css):
+        shutil.copytree(src_css, dest_css, dirs_exist_ok=True)
+        print(f"✅ CSS copiado a {dest_css}")
 
 def main():
     print("--- INICIO GENERACIÓN DE FORMULARIOS ---")
     
-    # 1. Asegurar directorios
-    os.makedirs(OUT_DIR_FORMS, exist_ok=True)
+    # 1. Asegurar el directorio de salida (dist)
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+        print(f"📂 Carpeta creada: {OUTPUT_DIR}")
     
     # 2. Copiar CSS y JS
     copiar_assets()
     
     # 3. Cargar datos base
-    mmap = cargar_mapado_municipios(MUNICIPIOS_TSV)
-    
+    try:
+        mmap = cargar_mapado_municipios(MUNICIPIOS_TSV) 
+    except Exception as e:
+        print(f"⚠️ No se pudo cargar el mapa de municipios: {e}")
+        mmap = {} # Evitamos que falle si falta el archivo
+
     try:
         conn = conectar()
         fase_actual = obtener_fase_actual(conn)
@@ -196,17 +196,22 @@ def main():
         municipios_data = []
         for m in raw_munis:
             code = str(m).zfill(3)
-            municipios_data.append({"code": code, "name": mmap.get(code, f"Muni {code}")})
+            # Usamos .get por si el código no está en el TSV
+            municipios_data.append({"code": code, "name": mmap.get(code, f"Municipio {code}")})
 
         # 4. Generar Index
         print(f"Generando Index para {len(municipios_data)} municipios...")
+        
+        # CUIDADO: Asegúrate de que FIREBASE_CONFIG y EMAIL_TO_CODE_MAP están definidos arriba
         rendered_index = template_index.render(
             fase_actual=fase_actual,
             municipios_json_data=json.dumps(municipios_data, ensure_ascii=False),
-            firebase_config_data=json.dumps(FIREBASE_CONFIG),
+            firebase_config_data=json.dumps(FIREBASE_CONFIG), 
             mapeo_email_codigo_data=json.dumps(EMAIL_TO_CODE_MAP)
         )
-        with open(os.path.join(OUT_DIR_ROOT, "index.html"), "w", encoding="utf-8") as f:
+        
+        # Guardamos en OUTPUT_DIR
+        with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
             f.write(rendered_index)
 
         # 5. Generar Formularios por Municipio
@@ -215,7 +220,6 @@ def main():
             code = m["code"]
             name = m["name"]
             
-            # Contexto común para todos los forms (Base template usa esto)
             common_ctx = {
                 "muni_code": code,
                 "muni_display": name,
@@ -227,7 +231,7 @@ def main():
 
             # --- AGUA ---
             depositos = obtener_depositos(conn, code)
-            with open(os.path.join(OUT_DIR_FORMS, f'agua_{code}.html'), "w", encoding="utf-8") as f:
+            with open(os.path.join(OUTPUT_DIR, f'agua_{code}.html'), "w", encoding="utf-8") as f:
                 f.write(template_agua.render(
                     **common_ctx,
                     depositos_json=json.dumps(depositos, ensure_ascii=False)
@@ -235,34 +239,36 @@ def main():
 
             # --- OBRAS ---
             obras = obtener_obras(conn, code)
-            with open(os.path.join(OUT_DIR_FORMS, f'obras_{code}.html'), "w", encoding="utf-8") as f:
+            with open(os.path.join(OUTPUT_DIR, f'obras_{code}.html'), "w", encoding="utf-8") as f:
                 f.write(template_obras.render(
                     **common_ctx,
                     obras=obras,
-                    obras_json=json.dumps(obras, ensure_ascii=False) # Por si acaso se usa en JS
+                    obras_json=json.dumps(obras, ensure_ascii=False)
                 ))
 
             # --- RESIDUOS ---
-            with open(os.path.join(OUT_DIR_FORMS, f'residuos_{code}.html'), "w", encoding="utf-8") as f:
+            with open(os.path.join(OUTPUT_DIR, f'residuos_{code}.html'), "w", encoding="utf-8") as f:
                 f.write(template_residuos.render(**common_ctx))
 
             # --- CEMENTERIOS ---
             cementerios = obtener_cementerios(conn, code)
-            with open(os.path.join(OUT_DIR_FORMS, f'cementerios_{code}.html'), "w", encoding="utf-8") as f:
+            with open(os.path.join(OUTPUT_DIR, f'cementerios_{code}.html'), "w", encoding="utf-8") as f:
                 f.write(template_cementerios.render(
                     **common_ctx,
                     cementerios=cementerios,
                     cementerios_json=json.dumps(cementerios, ensure_ascii=False)
                 ))
             
-            # print(f"   . {code}", end="", flush=True) # Progreso simple
-
         print("\n✅ Proceso finalizado con éxito.")
 
     except Exception as e:
-        print(f"\n❌ ERROR FATAL: {e}")
+        print(f"\n❌ ERROR FATAL en el proceso principal: {e}")
+        import traceback
+        traceback.print_exc() # Esto te ayudará mucho a ver la línea exacta del error
     finally:
-        if 'conn' in locals() and conn: conn.close()
+        if 'conn' in locals() and conn: 
+            conn.close()
+            print("🔌 Conexión cerrada.")
 
 if __name__ == '__main__':
     main()
