@@ -1868,16 +1868,28 @@
         // 3. Control de Sesión
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
-                // Usuario logueado
-                document.getElementById("userContainer").style.display = "flex";
-                document.getElementById("userEmail").textContent = user.email;
+                // --- USUARIO LOGUEADO ---
+                const userArea = document.getElementById("userContainer");
+                const userEmailSpan = document.getElementById("userEmail");
                 
-                // Guardamos el email en localStorage por si otros scripts lo necesitan
+                if(userArea) userArea.style.display = "flex";
+                if(userEmailSpan) userEmailSpan.textContent = user.email;
+                
+                // Guardamos email para los scripts de envío
                 localStorage.setItem("userEmailActual", user.email);
             } else {
-                // Usuario NO logueado -> Redirigir al Index (Login)
-                console.warn("Usuario no identificado. Redirigiendo...");
-                window.location.href = "index.html";
+                // --- USUARIO NO LOGUEADO ---
+                
+                // IMPORTANTE: Evitar bucle infinito. 
+                // Solo redirigimos si NO estamos ya en el index.html
+                const path = window.location.pathname;
+                
+                // Si la URL no termina en 'index.html' ni es la raíz '/', entonces echamos al usuario
+                if (!path.endsWith("index.html") && !path.endsWith("/")) {
+                    console.warn("Usuario no identificado. Redirigiendo al login...");
+                    // Asegúrate de que esto apunta a index.html, NO a login.html
+                    window.location.href = "index.html"; 
+                }
             }
         });
 
