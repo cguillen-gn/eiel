@@ -21,13 +21,14 @@ ASSETS_CSS_DIR = os.path.join(BASE_DIR, "css")
 ASSETS_JS_DIR = os.path.join(BASE_DIR, "js") # Si tienes JS
 
 # --- CONFIGURACIÓN DE NOMBRES DE PLANTILLAS ---
+TEMPLATE_LOGIN = "login-template.html.j2"
 TEMPLATE_INDEX = "index-template.html.j2" 
 TEMPLATE_AGUA = "form-agua.html.j2"
 TEMPLATE_OBRAS = "form-obras.html.j2"
 TEMPLATE_RESIDUOS = "form-residuos.html.j2"
 TEMPLATE_CEMENTERIOS = "form-cementerios.html.j2"
 
-# ---------------- CONFIGURACIÓN ----------------
+# ---------------- CONFIGURACIÓN BD ----------------
 DB = {
     "host": "172.23.0.8",
     "port": 5432,
@@ -82,6 +83,8 @@ def from_json_filter(value):
 env.filters['fromjson'] = from_json_filter
     
 # Cargamos las plantillas
+# ⚠️ IMPORTANTE: Añadida la carga del template login aquí
+template_login = env.get_template(TEMPLATE_LOGIN)
 template_index = env.get_template(TEMPLATE_INDEX)
 template_agua = env.get_template(TEMPLATE_AGUA)
 template_obras = env.get_template(TEMPLATE_OBRAS)
@@ -131,7 +134,6 @@ def obtener_depositos(conn, mun):
 
 def obtener_obras(conn, mun):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        # Tu consulta original de obras (simplificada aquí para brevedad, mantén la tuya completa)
         sql = """
             SELECT clave, mun, orden, nombre, plan_obra, 
             CASE WHEN estado = 'FI' THEN 2 ELSE 1 END as cond
@@ -184,7 +186,7 @@ def main():
         mmap = cargar_mapado_municipios(MUNICIPIOS_TSV) 
     except Exception as e:
         print(f"⚠️ No se pudo cargar el mapa de municipios: {e}")
-        mmap = {} # Evitamos que falle si falta el archivo
+        mmap = {} 
 
     try:
         conn = conectar()
@@ -195,25 +197,28 @@ def main():
         municipios_data = []
         for m in raw_munis:
             code = str(m).zfill(3)
-            # Usamos .get por si el código no está en el TSV
             municipios_data.append({"code": code, "name": mmap.get(code, f"Municipio {code}")})
 
-        # 4. Generar Index
+        # --- 4. Generar Index ---
         print(f"Generando Index para {len(municipios_data)} municipios...")
-        
-        # CUIDADO: Asegúrate de que FIREBASE_CONFIG y EMAIL_TO_CODE_MAP están definidos arriba
         rendered_index = template_index.render(
             fase_actual=fase_actual,
             municipios_json_data=json.dumps(municipios_data, ensure_ascii=False),
             firebase_config_data=json.dumps(FIREBASE_CONFIG), 
             mapeo_email_codigo_data=json.dumps(EMAIL_TO_CODE_MAP)
         )
-        
-        # Guardamos en OUTPUT_DIR
         with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
             f.write(rendered_index)
 
-        # 5. Generar Formularios por Municipio
+        # --- 5. Generar Login ---
+        print("Generando Login...")
+        rendered_login = template_login.render(
+            firebase_config=json.dumps(FIREBASE_CONFIG)
+        )
+        with open(os.path.join(OUTPUT_DIR, "login.html"), "w", encoding="utf-8") as f:
+            f.write(rendered_login)
+
+        # --- 6. Generar Formularios por Municipio ---
         print("Generando formularios específicos...")
         for m in municipios_data:
             code = m["code"]
@@ -225,7 +230,7 @@ def main():
                 "url_adjuntos": URL_ADJUNTOS,
                 "url_generar_pdf": URL_GENERAR_PDF,
                 "fase_anterior": fase_anterior,
-                "firebase_config": json.dumps(FIREBASE_CONFIG)
+                "firebase_config": json.dumps(FIREBASE_CONFIG) # Esencial para que base.html.j2 no falle
             }
 
             # --- AGUA ---
@@ -263,7 +268,7 @@ def main():
     except Exception as e:
         print(f"\n❌ ERROR FATAL en el proceso principal: {e}")
         import traceback
-        traceback.print_exc() # Esto te ayudará mucho a ver la línea exacta del error
+        traceback.print_exc() 
     finally:
         if 'conn' in locals() and conn: 
             conn.close()
