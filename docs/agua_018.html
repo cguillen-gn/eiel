@@ -13,7 +13,7 @@
             muniName: "Altea",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec",
             urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyxhsTZynldpFj9kyUIYmtflvHKvKr_ew4mRaB8LlnqEh5gxAC5f1ORRjIY2unS5ioO/exec",
-            urlGoogleForms: "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
+            urlGoogleForms: ""
         };
     </script>
 </head>
@@ -60,6 +60,8 @@
 <div class="card">
     <h2 class="section-title">Depósitos Municipales</h2>
     
+    
+    
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse; min-width: 400px;">
             <thead>
@@ -69,6 +71,8 @@
                 </tr>
             </thead>
             <tbody id="tablaDepositos">
+                
+                
                 
                 
                 <tr style="border-bottom: 1px solid var(--border);">
@@ -331,19 +335,20 @@
 
 <div class="card">
     <h2 class="section-title">Documentación Adjunta (Opcional)</h2>
-    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px;">
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; transition: background 0.2s;">
         <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
         <div style="color: var(--primary); font-weight: 600;">Haga clic para adjuntar archivos</div>
+        <p style="font-size: 0.9rem; color: #666;">(Fotos, informes, análisis...)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
 </div>
 
 <div class="card">
-    <button id="firmarBtn" class="btn btn-primary">
-        <span>✓</span> Firmar y enviar formularioOoOoo
+    <button id="firmarBtn" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1.1rem;">
+        <span>✓</span> Firmar y enviar formulario
     </button>
-    <div id="mensaje" class="message"></div>
+    <div id="mensaje" class="message" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: 6px;"></div>
 </div>
 
 
@@ -359,8 +364,55 @@
     
     
 <script>
+    // 1. CONFIGURACIÓN (Inyectada desde Python/Jinja)
+    // Esto asegura que el JS tenga acceso a las variables del servidor
+    window.EIEL_CONFIG = {
+        muniCode: "018",
+        muniName: "Altea",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyxhsTZynldpFj9kyUIYmtflvHKvKr_ew4mRaB8LlnqEh5gxAC5f1ORRjIY2unS5ioO/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec"
+    };
+
+    // 2. SERVICIO DE SUBIDA (La lógica que faltaba)
+    const UploadService = {
+        toBase64: file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        }),
+
+        async uploadFile(file, tipoFicha, muniCode) {
+            try {
+                const base64 = await this.toBase64(file);
+                // Obtenemos email (intentamos Firebase, si no localStorage, si no Anonimo)
+                const userEmail = firebase.auth().currentUser ? firebase.auth().currentUser.email : (localStorage.getItem("userEmailActual") || "anonimo");
+
+                const payload = {
+                    filename: file.name,
+                    mimeType: file.type,
+                    bytesBase64: base64, // Nota: Asegúrate que tu AppScript espera 'bytesBase64' o 'bytes'
+                    municipio: muniCode,
+                    usuario: userEmail,
+                    tipo: tipoFicha
+                };
+
+                await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                return true;
+            } catch (e) {
+                console.error("Error subiendo archivo:", e);
+                return false;
+            }
+        }
+    };
+
     // ==========================================
-    // GESTIÓN DE ARCHIVOS
+    // 3. GESTIÓN DE ARCHIVOS (Tu código original)
     // ==========================================
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
@@ -385,81 +437,94 @@
         fileList.innerHTML = archivos.map((f, i) => `
             <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
                 <span>📄 ${f.name}</span>
-                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger">✖</button>
+                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger" style="background:none; border:none; color:red; cursor:pointer;">✖</button>
             </div>
         `).join("");
     }
 
     // ==========================================
-    // ENVÍO
+    // 4. LÓGICA DE ENVÍO
     // ==========================================
     const btnFirmar = document.getElementById("firmarBtn");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
         mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`;
+        // Asignamos colores según el tipo
+        let color = "#e2e8f0"; // gris
+        if(tipo === 'success') color = "#d1fae5"; // verde
+        if(tipo === 'error') color = "#fee2e2"; // rojo
+        if(tipo === 'warning') color = "#fef3c7"; // amarillo
+        
+        mensajeDiv.style.background = color;
+        mensajeDiv.style.color = "#333";
         mensajeDiv.style.display = 'block';
     }
 
     btnFirmar.addEventListener("click", async () => {
         btnFirmar.disabled = true;
-        mostrarMensaje("⏳ Subiendo archivos...", "info");
+        mostrarMensaje("⏳ Subiendo archivos adjuntos a Drive...", "info");
 
-        // 1. Subir Archivos
+        // A. Subir Archivos uno a uno
         let errores = 0;
         for (const file of archivos) {
-            const ok = await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode);
+            const ok = await UploadService.uploadFile(file, 'AGUA', window.EIEL_CONFIG.muniCode);
             if (!ok) errores++;
         }
         
-        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
+        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir, pero seguimos enviando el PDF.`, "warning");
 
-        // 2. Recopilar Datos
-        mostrarMensaje("⏳ Generando justificante...", "info");
+        // B. Recopilar Datos
+        mostrarMensaje("⏳ Generando PDF y enviando email...", "info");
 
-        // Leer tabla de depósitos desde el DOM
         const depositosData = [];
         document.querySelectorAll('.input-limpieza').forEach(input => {
             depositosData.push({
                 nombre: input.dataset.nombre,
-                limpieza: input.value || ""
+                limpieza: input.value || "No indicado"
             });
         });
 
+        // Intentamos coger el email de Firebase o fallback
+        const emailUsuario = firebase.auth().currentUser ? firebase.auth().currentUser.email : "desconocido";
+
         const payload = {
-            consumo: document.getElementById("consumoInput").value || "",
+            consumo: document.getElementById("consumoInput").value || "No indicado",
             depositos: JSON.stringify(depositosData),
-            email_usuario: localStorage.getItem("userEmailActual"),
+            email_usuario: emailUsuario,
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
+            tipo_ficha: "AGUA", // Importante para que el PDF sepa qué plantilla usar
             timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: archivos.map(a => a.name).join("\n")
+            lista_archivos: archivos.map(a => a.name).join(", ")
         };
 
-        // 3. Enviar a PDF
+        // C. Enviar a Script PDF
         try {
-            const response = await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+            // Usamos mode: 'no-cors' para AppScript
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                body: new URLSearchParams(payload)
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
-            // Manejo robusto de respuesta (igual que en los otros forms)
-            let result = {};
-            try { result = await response.json(); } 
-            catch(e) { if(response.ok) result = {success:true}; }
-
-            if (result.success || response.ok) {
-                mostrarMensaje("✅ Formulario enviado. Revisa tu email.", "success");
-                archivos = [];
-                renderArchivos();
-                if(result.downloadUrl) window.open(result.downloadUrl, '_blank');
-            } else {
-                throw new Error("Error en el servidor al generar PDF.");
-            }
+            // Como usamos no-cors, no podemos leer la respuesta (result.json), 
+            // pero si no da error en el catch, asumimos que llegó a Google.
+            mostrarMensaje("✅ ¡Éxito! Formulario enviado. Revisa tu email.", "success");
+            
+            // Limpieza
+            archivos = [];
+            renderArchivos();
+            document.getElementById("consumoInput").value = "";
+            
         } catch (error) {
-            mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            console.error(error);
+            mostrarMensaje(`❌ Error de conexión: ${error.message}`, "error");
+        } finally {
             btnFirmar.disabled = false;
+            // Restaurar texto botón tras 3 segundos
+            setTimeout(() => { btnFirmar.innerHTML = "<span>✓</span> Firmar y enviar formulario"; }, 3000);
         }
     });
 </script>

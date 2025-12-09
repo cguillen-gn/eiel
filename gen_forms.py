@@ -40,7 +40,6 @@ MUNICIPIOS_TSV = os.path.join(BASE_DIR, "data", "municipios.tsv")
 
 # URLs de Apps Script (Centralizadas)
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbySvcn7wgRbbNhnoKYPND7Ij7CaPgLzFKbNq-AfX80CkyV1J7aIKUQ8tQGYmmKBNQjb8A/exec"
-URL_GOOGLE_FORMS = "https://docs.google.com/forms/d/e/1FAIpQLSc84PLY4O2wM9ek3v6L14DzZ8jcqDtFeKOK01i38s7ttPt0Ng/formResponse"
 URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbyxhsTZynldpFj9kyUIYmtflvHKvKr_ew4mRaB8LlnqEh5gxAC5f1ORRjIY2unS5ioO/exec"
 
 # ---------------- FIREBASE CONFIG ----------------
@@ -225,7 +224,6 @@ def main():
                 "muni_display": name,
                 "url_adjuntos": URL_ADJUNTOS,
                 "url_generar_pdf": URL_GENERAR_PDF,
-                "url_google_forms": URL_GOOGLE_FORMS,
                 "fase_anterior": fase_anterior
             }
 
