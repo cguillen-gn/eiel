@@ -1,4 +1,97 @@
-﻿<script type="module">
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">EIEL {{ fase_actual }}</title>
+<link rel="stylesheet" href="css/style.css"> 
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+/* Reset específico para el Index */
+html, body { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; }
+body { display: flex; align-items: center; justify-content: center; }
+
+/* CARD */
+.panel { 
+    background: white; 
+    border-radius: 16px; 
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    text-align: center; 
+    max-width: 420px; 
+    width: 90%; 
+    overflow: hidden; 
+    padding-bottom: 2rem;
+}
+
+.panel-header {
+    background-color: var(--primary); 
+    padding: 2rem 1rem;
+    color: white;
+}
+.panel-header h1 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+.panel-header p { color: rgba(255, 255, 255, 0.9); font-size: 0.9rem; margin-top: 0.5rem; }
+
+/* INFO */
+.muni-info { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; }
+.muni-name { font-size: 1.4rem; font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.25rem; }
+.user-email-display { font-size: 0.9rem; color: #64748b; display: block; }
+
+/* BOTONES */
+.btn-grid { display: flex; flex-direction: column; gap: 0.8rem; padding: 1.5rem 2rem; }
+.btn-base { 
+    display: flex; align-items: center; padding: 1rem; font-weight: 600; border-radius: 8px; 
+    text-decoration: none; color: #334155; background-color: white; border: 1px solid #e2e8f0; 
+    border-left-width: 6px; transition: all 0.2s; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.btn-base:hover { transform: translateX(4px); background-color: #f8fafc; }
+.btn-icon { font-size: 1.2rem; margin-right: 12px; }
+
+/* Temas */
+.btn-agua { border-left-color: var(--theme-agua); }
+.btn-obras { border-left-color: var(--theme-obras); }
+.btn-residuos { border-left-color: var(--theme-residuos); }
+.btn-cementerios { border-left-color: var(--theme-cementerios); }
+
+/* Loader */
+.loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.btn-logout-text { background: none; border: none; color: #94a3b8; text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="panel">
+    <div class="panel-header">
+        <h1>EIEL {{ fase_actual }}</h1>
+        <p id="statusMessage">Verificando acceso...</p>
+    </div>
+
+    <div id="loadingSection" style="padding: 2rem;">
+        <div class="loader" id="loader"></div>
+        <p id="errorMsg" class="hidden" style="color: #ef4444; font-weight: 600; margin-top: 1rem; font-size: 0.9rem;"></p>
+    </div>
+
+    <div id="contenido-protegido" class="hidden">
+        <div class="muni-info">
+            <span class="muni-name" id="muniNamePlaceholder">...</span>
+            <span class="user-email-display" id="userEmailPlaceholder">...</span>
+        </div>
+
+        <div class="btn-grid">
+            <a id="linkAgua" href="#" class="btn-base btn-agua"><span class="btn-icon">💧</span> Agua</a>
+            <a id="linkObras" href="#" class="btn-base btn-obras"><span class="btn-icon">🏗️</span> Obras</a>
+            <a id="linkResiduos" href="#" class="btn-base btn-residuos"><span class="btn-icon">♻️</span> Residuos</a>
+            <a id="linkCementerios" href="#" class="btn-base btn-cementerios"><span class="btn-icon">🪦</span> Cementerios</a>
+        </div>
+        
+        <button id="btnLogout" class="btn-logout-text">Cerrar Sesión</button>
+    </div>
+</div>
+
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } 
       from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
@@ -6,49 +99,53 @@
     // 1. VARIABLES PYTHON
     const FIREBASE_CONFIG = {{ firebase_config_data | safe }}; 
     const MUNICIPIOS_DATA = {{ municipios_json_data | safe }}; 
-    const AUTH_MAP = {{ mapeo_email_codigo_data | safe }}; // Ahora contiene Base64
+    // Esta variable ahora contiene las claves en BASE64 gracias a gen_forms.py
+    const AUTH_MAP = {{ mapeo_email_codigo_data | safe }}; 
     
+    // DEBUG: Exponer al navegador para que puedas verlas en consola
     window.AUTH_MAP = AUTH_MAP;
-    window.MUNICIPIOS_DATA = MUNICIPIOS_DATA;
-    
+
     // 2. INIT
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
     
     // 3. REFERENCIAS UI
+    const getEl = (id) => document.getElementById(id);
     const refs = {
-        muniName: document.getElementById("muniNamePlaceholder"),
-        userEmail: document.getElementById("userEmailPlaceholder"),
-        errorMsg: document.getElementById("errorMsg"),
-        loader: document.getElementById("loader"),
-        loadingSection: document.getElementById("loadingSection"),
-        protectedContent: document.getElementById('contenido-protegido'),
-        statusMessage: document.getElementById("statusMessage"),
+        muniName: getEl("muniNamePlaceholder"),
+        userEmail: getEl("userEmailPlaceholder"),
+        errorMsg: getEl("errorMsg"),
+        loader: getEl("loader"),
+        loadingSection: getEl("loadingSection"),
+        protectedContent: getEl('contenido-protegido'),
+        statusMessage: getEl("statusMessage"),
+        btnLogout: getEl("btnLogout"),
         links: {
-            agua: document.getElementById("linkAgua"),
-            obras: document.getElementById("linkObras"),
-            residuos: document.getElementById("linkResiduos"),
-            cementerios: document.getElementById("linkCementerios")
+            agua: getEl("linkAgua"),
+            obras: getEl("linkObras"),
+            residuos: getEl("linkResiduos"),
+            cementerios: getEl("linkCementerios")
         }
     };
 
     const redirectToLogin = (message) => {
-        refs.statusMessage.textContent = "Acceso Denegado";
-        refs.errorMsg.textContent = message;
-        refs.errorMsg.classList.remove("hidden");
-        refs.loader.classList.add("hidden"); 
-        // Esperamos 2s y mandamos al login
-        setTimeout(() => { window.location.href = "login.html"; }, 2000);
+        console.warn("Redirigiendo:", message);
+        if(refs.statusMessage) refs.statusMessage.textContent = "Acceso Denegado";
+        if(refs.errorMsg) {
+            refs.errorMsg.innerHTML = message;
+            refs.errorMsg.classList.remove("hidden");
+        }
+        if(refs.loader) refs.loader.classList.add("hidden"); 
+        
+        // Espera de seguridad
+        setTimeout(() => { window.location.href = "login.html"; }, 2500);
     };
 
-    // 4. LÓGICA DE AUTORIZACIÓN (SOLUCIÓN BASE64)
     const handleAuthUser = (user) => {
         if (!user) {
             redirectToLogin("Sesión no iniciada.");
             return;
         }
-
-        console.log("🔍 Verificando usuario:", user.email);
 
         // A. Normalizar email (igual que en Python)
         const cleanEmail = user.email.trim().toLowerCase();
@@ -56,18 +153,20 @@
         // B. Convertir a Base64 (btoa es nativo del navegador)
         const userB64 = btoa(cleanEmail);
         
-        console.log("🔑 Código generado:", userB64);
+        console.log("🔍 Email:", cleanEmail);
+        console.log("🔑 Tu Código:", userB64);
+        console.log("🗺️ Buscando en:", AUTH_MAP);
 
         // C. Buscar en la lista
         const muniCodeRaw = AUTH_MAP[userB64];
         
         if (!muniCodeRaw) {
-            console.warn("⛔ No encontrado en la lista de permisos.");
-            redirectToLogin("Usuario no autorizado.");
+            console.error("⛔ NO ENCONTRADO");
+            redirectToLogin(`Usuario no autorizado.<br><small style='color:black'>Código: ${userB64}</small>`);
             return;
         }
 
-        console.log("✅ Autorizado para municipio:", muniCodeRaw);
+        console.log("✅ Autorizado para:", muniCodeRaw);
 
         // D. Éxito: Configurar UI
         const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
@@ -77,23 +176,27 @@
         localStorage.setItem("userEmailActual", user.email); 
         localStorage.setItem("municipioCodigoActual", normalizedMuniCode);
         
-        refs.userEmail.textContent = user.email;
-        refs.muniName.textContent = actualMuniName;
-        refs.statusMessage.textContent = "Seleccione un formulario:";
+        if(refs.userEmail) refs.userEmail.textContent = user.email;
+        if(refs.muniName) refs.muniName.textContent = actualMuniName;
+        if(refs.statusMessage) refs.statusMessage.textContent = "Seleccione un formulario:";
 
         // Actualizar enlaces
-        refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
-        refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
-        refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
-        refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
+        if(refs.links.agua) refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
+        if(refs.links.obras) refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
+        if(refs.links.residuos) refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
+        if(refs.links.cementerios) refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
 
-        refs.loadingSection.classList.add("hidden");
-        refs.protectedContent.classList.remove("hidden");
+        if(refs.loadingSection) refs.loadingSection.classList.add("hidden");
+        if(refs.protectedContent) refs.protectedContent.classList.remove("hidden");
     };
 
     onAuthStateChanged(auth, handleAuthUser);
     
-    document.getElementById("btnLogout").addEventListener('click', () => {
-        signOut(auth).then(() => { window.location.href = 'login.html'; });
-    });
+    if (refs.btnLogout) {
+        refs.btnLogout.addEventListener('click', () => {
+            signOut(auth).then(() => { window.location.href = 'login.html'; });
+        });
+    }
 </script>
+</body>
+</html>

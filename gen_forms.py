@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gen_forms.py
-import os, json, sys, csv, shutil, hashlib, base64
+import os, json, sys, csv, shutil, hashlib, base64 # <--- IMPORTANTE: base64
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from dotenv import load_dotenv
 import psycopg2
@@ -71,6 +71,7 @@ try:
             # 1. Normalizar: minúsculas y sin espacios
             clean_email = email.strip().lower()
             # 2. Codificar en Base64 (Estándar Web)
+            # Encode a bytes -> Base64 bytes -> Decode a string para JSON
             email_b64 = base64.b64encode(clean_email.encode('utf-8')).decode('utf-8')
             # 3. Guardar
             HASHED_AUTH_MAP[email_b64] = code
@@ -217,7 +218,7 @@ def main():
             fase_actual=fase_actual,
             municipios_json_data=json.dumps(municipios_data, ensure_ascii=False),
             firebase_config_data=json.dumps(FIREBASE_CONFIG), 
-            # ⚠️ CAMBIO DE SEGURIDAD: Pasamos los Hashes, no los emails
+            # ⚠️ CAMBIO DE SEGURIDAD: Pasamos los Hashes BASE64
             mapeo_email_codigo_data=json.dumps(HASHED_AUTH_MAP)
         )
         with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:

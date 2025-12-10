@@ -1,4 +1,97 @@
-﻿<script type="module">
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="pageTitle">EIEL 2025</title>
+<link rel="stylesheet" href="css/style.css"> 
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+/* Reset específico para el Index */
+html, body { height: 100%; margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Inter', system-ui, sans-serif; }
+body { display: flex; align-items: center; justify-content: center; }
+
+/* CARD */
+.panel { 
+    background: white; 
+    border-radius: 16px; 
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    text-align: center; 
+    max-width: 420px; 
+    width: 90%; 
+    overflow: hidden; 
+    padding-bottom: 2rem;
+}
+
+.panel-header {
+    background-color: var(--primary); 
+    padding: 2rem 1rem;
+    color: white;
+}
+.panel-header h1 { margin: 0; font-size: 1.8rem; font-weight: 700; }
+.panel-header p { color: rgba(255, 255, 255, 0.9); font-size: 0.9rem; margin-top: 0.5rem; }
+
+/* INFO */
+.muni-info { padding: 1.5rem; border-bottom: 1px solid #e2e8f0; }
+.muni-name { font-size: 1.4rem; font-weight: 700; color: #1e293b; display: block; margin-bottom: 0.25rem; }
+.user-email-display { font-size: 0.9rem; color: #64748b; display: block; }
+
+/* BOTONES */
+.btn-grid { display: flex; flex-direction: column; gap: 0.8rem; padding: 1.5rem 2rem; }
+.btn-base { 
+    display: flex; align-items: center; padding: 1rem; font-weight: 600; border-radius: 8px; 
+    text-decoration: none; color: #334155; background-color: white; border: 1px solid #e2e8f0; 
+    border-left-width: 6px; transition: all 0.2s; text-align: left; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.btn-base:hover { transform: translateX(4px); background-color: #f8fafc; }
+.btn-icon { font-size: 1.2rem; margin-right: 12px; }
+
+/* Temas */
+.btn-agua { border-left-color: var(--theme-agua); }
+.btn-obras { border-left-color: var(--theme-obras); }
+.btn-residuos { border-left-color: var(--theme-residuos); }
+.btn-cementerios { border-left-color: var(--theme-cementerios); }
+
+/* Loader */
+.loader { border: 3px solid #f3f3f3; border-top: 3px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+.btn-logout-text { background: none; border: none; color: #94a3b8; text-decoration: underline; cursor: pointer; font-size: 0.85rem; }
+.hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="panel">
+    <div class="panel-header">
+        <h1>EIEL 2025</h1>
+        <p id="statusMessage">Verificando acceso...</p>
+    </div>
+
+    <div id="loadingSection" style="padding: 2rem;">
+        <div class="loader" id="loader"></div>
+        <p id="errorMsg" class="hidden" style="color: #ef4444; font-weight: 600; margin-top: 1rem; font-size: 0.9rem;"></p>
+    </div>
+
+    <div id="contenido-protegido" class="hidden">
+        <div class="muni-info">
+            <span class="muni-name" id="muniNamePlaceholder">...</span>
+            <span class="user-email-display" id="userEmailPlaceholder">...</span>
+        </div>
+
+        <div class="btn-grid">
+            <a id="linkAgua" href="#" class="btn-base btn-agua"><span class="btn-icon">💧</span> Agua</a>
+            <a id="linkObras" href="#" class="btn-base btn-obras"><span class="btn-icon">🏗️</span> Obras</a>
+            <a id="linkResiduos" href="#" class="btn-base btn-residuos"><span class="btn-icon">♻️</span> Residuos</a>
+            <a id="linkCementerios" href="#" class="btn-base btn-cementerios"><span class="btn-icon">🪦</span> Cementerios</a>
+        </div>
+        
+        <button id="btnLogout" class="btn-logout-text">Cerrar Sesión</button>
+    </div>
+</div>
+
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getAuth, signOut, onAuthStateChanged } 
       from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
@@ -6,49 +99,53 @@
     // 1. VARIABLES PYTHON
     const FIREBASE_CONFIG = {"apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ", "authDomain": "eiel-autenticacion-formularios.firebaseapp.com", "projectId": "eiel-autenticacion-formularios", "storageBucket": "eiel-autenticacion-formularios.firebasestorage.app", "messagingSenderId": "293834414398", "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f", "measurementId": "G-S9C7Z70HHV"}; 
     const MUNICIPIOS_DATA = [{"code": "001", "name": "Adsubia"}, {"code": "002", "name": "Agost"}, {"code": "003", "name": "Agres"}, {"code": "004", "name": "Aigües"}, {"code": "005", "name": "Albatera"}, {"code": "006", "name": "Alcalalí"}, {"code": "007", "name": "Alcosser"}, {"code": "008", "name": "Alcoleja"}, {"code": "009", "name": "Alcoy/Alcoi"}, {"code": "010", "name": "Alfafara"}, {"code": "011", "name": "Alfàs del Pi (l')"}, {"code": "012", "name": "Algorfa"}, {"code": "013", "name": "Algueña"}, {"code": "014", "name": "Alicante/Alacant"}, {"code": "015", "name": "Almoradí"}, {"code": "016", "name": "Almudaina"}, {"code": "017", "name": "Alqueria d'Asnar (l')"}, {"code": "018", "name": "Altea"}, {"code": "019", "name": "Aspe"}, {"code": "020", "name": "Balones"}, {"code": "021", "name": "Banyeres de Mariola"}, {"code": "022", "name": "Benasau"}, {"code": "023", "name": "Beneixama"}, {"code": "024", "name": "Benejúzar"}, {"code": "025", "name": "Benferri"}, {"code": "026", "name": "Beniarbeig"}, {"code": "027", "name": "Beniardà"}, {"code": "028", "name": "Beniarrés"}, {"code": "029", "name": "Benigembla"}, {"code": "030", "name": "Benidoleig"}, {"code": "031", "name": "Benidorm"}, {"code": "032", "name": "Benifallim"}, {"code": "033", "name": "Benifato"}, {"code": "034", "name": "Benijófar"}, {"code": "035", "name": "Benilloba"}, {"code": "036", "name": "Benillup"}, {"code": "037", "name": "Benimantell"}, {"code": "038", "name": "Benimarfull"}, {"code": "039", "name": "Benimassot"}, {"code": "040", "name": "Benimeli"}, {"code": "041", "name": "Benissa"}, {"code": "042", "name": "Benitachell/Poble Nou de Benitatxell (el)"}, {"code": "043", "name": "Biar"}, {"code": "044", "name": "Bigastro"}, {"code": "045", "name": "Bolulla"}, {"code": "046", "name": "Busot"}, {"code": "047", "name": "Calp"}, {"code": "048", "name": "Callosa d'En Sarrià"}, {"code": "049", "name": "Callosa de Segura"}, {"code": "050", "name": "Campello (el)"}, {"code": "051", "name": "Campo de Mirra/Camp de Mirra (el)"}, {"code": "052", "name": "Cañada"}, {"code": "053", "name": "Castalla"}, {"code": "054", "name": "Castell de Castells"}, {"code": "055", "name": "Catral"}, {"code": "056", "name": "Cocentaina"}, {"code": "057", "name": "Confrides"}, {"code": "058", "name": "Cox"}, {"code": "059", "name": "Crevillent"}, {"code": "060", "name": "Quatretondeta"}, {"code": "061", "name": "Daya Nueva"}, {"code": "062", "name": "Daya Vieja"}, {"code": "063", "name": "Dénia"}, {"code": "064", "name": "Dolores"}, {"code": "065", "name": "Elche/Elx"}, {"code": "066", "name": "Elda"}, {"code": "067", "name": "Facheca"}, {"code": "068", "name": "Famorca"}, {"code": "069", "name": "Finestrat"}, {"code": "070", "name": "Formentera del Segura"}, {"code": "071", "name": "Gata de Gorgos"}, {"code": "072", "name": "Gaianes"}, {"code": "073", "name": "Gorga"}, {"code": "074", "name": "Granja de Rocamora"}, {"code": "075", "name": "Castell de Guadalest (el)"}, {"code": "076", "name": "Guardamar del Segura"}, {"code": "077", "name": "Fondo de les Neus (El)/Hondon de las Nieves"}, {"code": "078", "name": "Hondón de los Frailes"}, {"code": "079", "name": "Ibi"}, {"code": "080", "name": "Jacarilla"}, {"code": "081", "name": "Xaló"}, {"code": "082", "name": "Jávea/Xàbia"}, {"code": "083", "name": "Jijona/Xixona"}, {"code": "084", "name": "Lorcha/L'Orxa"}, {"code": "085", "name": "Llíber"}, {"code": "086", "name": "Millena"}, {"code": "088", "name": "Monforte del Cid"}, {"code": "089", "name": "Monóvar/Monòver"}, {"code": "090", "name": "Mutxamel"}, {"code": "091", "name": "Murla"}, {"code": "092", "name": "Muro de Alcoy"}, {"code": "093", "name": "Novelda"}, {"code": "094", "name": "Nucia (la)"}, {"code": "095", "name": "Ondara"}, {"code": "096", "name": "Onil"}, {"code": "097", "name": "Orba"}, {"code": "098", "name": "Orxeta"}, {"code": "099", "name": "Orihuela"}, {"code": "100", "name": "Parcent"}, {"code": "101", "name": "Pedreguer"}, {"code": "102", "name": "Pego"}, {"code": "103", "name": "Penàguila"}, {"code": "104", "name": "Petrer"}, {"code": "105", "name": "Pinos (El)/Pinoso"}, {"code": "106", "name": "Planes"}, {"code": "107", "name": "Polop"}, {"code": "109", "name": "Rafal"}, {"code": "110", "name": "Ràfol d'Almúnia (El)"}, {"code": "111", "name": "Redován"}, {"code": "112", "name": "Relleu"}, {"code": "113", "name": "Rojales"}, {"code": "114", "name": "Romana (la)"}, {"code": "115", "name": "Sagra"}, {"code": "116", "name": "Salinas"}, {"code": "117", "name": "Sanet y Negrals"}, {"code": "118", "name": "San Fulgencio"}, {"code": "119", "name": "Sant Joan d'Alacant"}, {"code": "120", "name": "San Miguel de Salinas"}, {"code": "121", "name": "Santa Pola"}, {"code": "122", "name": "San Vicente del Raspeig/Sant Vicent del Raspeig"}, {"code": "123", "name": "Sax"}, {"code": "124", "name": "Sella"}, {"code": "125", "name": "Senija"}, {"code": "127", "name": "Tàrbena"}, {"code": "128", "name": "Teulada"}, {"code": "129", "name": "Tibi"}, {"code": "130", "name": "Tollos"}, {"code": "131", "name": "Tormos"}, {"code": "132", "name": "Torremanzanas/Torre de les Maçanes (la)"}, {"code": "133", "name": "Torrevieja"}, {"code": "134", "name": "Vall d'Alcalà (la)"}, {"code": "135", "name": "Vall d'Ebo (la)"}, {"code": "136", "name": "Vall de Gallinera (la)"}, {"code": "137", "name": "Vall de Laguar (la)"}, {"code": "138", "name": "Verger (el)"}, {"code": "139", "name": "Villajoyosa/Vila Joiosa (la)"}, {"code": "140", "name": "Villena"}, {"code": "901", "name": "Poblets (els)"}, {"code": "902", "name": "Pilar de la Horadada"}, {"code": "903", "name": "Montesinos (Los)"}, {"code": "904", "name": "San Isidro"}]; 
-    const AUTH_MAP = {}; // Ahora contiene Base64
+    // Esta variable ahora contiene las claves en BASE64 gracias a gen_forms.py
+    const AUTH_MAP = {"c2Rmc2Rmc2Rm": "001", "YXl0by5hZ29zdEBwb3J0YWwuZXM=": "002", "Y3Jpc3RpYW5iZW5pZG9ybUBnbWFpbC5jb20=": "066", "cGZlcnJpQGdlb25ldC5lcw==": "140"}; 
     
+    // DEBUG: Exponer al navegador para que puedas verlas en consola
     window.AUTH_MAP = AUTH_MAP;
-    window.MUNICIPIOS_DATA = MUNICIPIOS_DATA;
-    
+
     // 2. INIT
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
     
     // 3. REFERENCIAS UI
+    const getEl = (id) => document.getElementById(id);
     const refs = {
-        muniName: document.getElementById("muniNamePlaceholder"),
-        userEmail: document.getElementById("userEmailPlaceholder"),
-        errorMsg: document.getElementById("errorMsg"),
-        loader: document.getElementById("loader"),
-        loadingSection: document.getElementById("loadingSection"),
-        protectedContent: document.getElementById('contenido-protegido'),
-        statusMessage: document.getElementById("statusMessage"),
+        muniName: getEl("muniNamePlaceholder"),
+        userEmail: getEl("userEmailPlaceholder"),
+        errorMsg: getEl("errorMsg"),
+        loader: getEl("loader"),
+        loadingSection: getEl("loadingSection"),
+        protectedContent: getEl('contenido-protegido'),
+        statusMessage: getEl("statusMessage"),
+        btnLogout: getEl("btnLogout"),
         links: {
-            agua: document.getElementById("linkAgua"),
-            obras: document.getElementById("linkObras"),
-            residuos: document.getElementById("linkResiduos"),
-            cementerios: document.getElementById("linkCementerios")
+            agua: getEl("linkAgua"),
+            obras: getEl("linkObras"),
+            residuos: getEl("linkResiduos"),
+            cementerios: getEl("linkCementerios")
         }
     };
 
     const redirectToLogin = (message) => {
-        refs.statusMessage.textContent = "Acceso Denegado";
-        refs.errorMsg.textContent = message;
-        refs.errorMsg.classList.remove("hidden");
-        refs.loader.classList.add("hidden"); 
-        // Esperamos 2s y mandamos al login
-        setTimeout(() => { window.location.href = "login.html"; }, 2000);
+        console.warn("Redirigiendo:", message);
+        if(refs.statusMessage) refs.statusMessage.textContent = "Acceso Denegado";
+        if(refs.errorMsg) {
+            refs.errorMsg.innerHTML = message;
+            refs.errorMsg.classList.remove("hidden");
+        }
+        if(refs.loader) refs.loader.classList.add("hidden"); 
+        
+        // Espera de seguridad
+        setTimeout(() => { window.location.href = "login.html"; }, 2500);
     };
 
-    // 4. LÓGICA DE AUTORIZACIÓN (SOLUCIÓN BASE64)
     const handleAuthUser = (user) => {
         if (!user) {
             redirectToLogin("Sesión no iniciada.");
             return;
         }
-
-        console.log("🔍 Verificando usuario:", user.email);
 
         // A. Normalizar email (igual que en Python)
         const cleanEmail = user.email.trim().toLowerCase();
@@ -56,18 +153,20 @@
         // B. Convertir a Base64 (btoa es nativo del navegador)
         const userB64 = btoa(cleanEmail);
         
-        console.log("🔑 Código generado:", userB64);
+        console.log("🔍 Email:", cleanEmail);
+        console.log("🔑 Tu Código:", userB64);
+        console.log("🗺️ Buscando en:", AUTH_MAP);
 
         // C. Buscar en la lista
         const muniCodeRaw = AUTH_MAP[userB64];
         
         if (!muniCodeRaw) {
-            console.warn("⛔ No encontrado en la lista de permisos.");
-            redirectToLogin("Usuario no autorizado.");
+            console.error("⛔ NO ENCONTRADO");
+            redirectToLogin(`Usuario no autorizado.<br><small style='color:black'>Código: ${userB64}</small>`);
             return;
         }
 
-        console.log("✅ Autorizado para municipio:", muniCodeRaw);
+        console.log("✅ Autorizado para:", muniCodeRaw);
 
         // D. Éxito: Configurar UI
         const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
@@ -77,23 +176,27 @@
         localStorage.setItem("userEmailActual", user.email); 
         localStorage.setItem("municipioCodigoActual", normalizedMuniCode);
         
-        refs.userEmail.textContent = user.email;
-        refs.muniName.textContent = actualMuniName;
-        refs.statusMessage.textContent = "Seleccione un formulario:";
+        if(refs.userEmail) refs.userEmail.textContent = user.email;
+        if(refs.muniName) refs.muniName.textContent = actualMuniName;
+        if(refs.statusMessage) refs.statusMessage.textContent = "Seleccione un formulario:";
 
         // Actualizar enlaces
-        refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
-        refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
-        refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
-        refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
+        if(refs.links.agua) refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
+        if(refs.links.obras) refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
+        if(refs.links.residuos) refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
+        if(refs.links.cementerios) refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
 
-        refs.loadingSection.classList.add("hidden");
-        refs.protectedContent.classList.remove("hidden");
+        if(refs.loadingSection) refs.loadingSection.classList.add("hidden");
+        if(refs.protectedContent) refs.protectedContent.classList.remove("hidden");
     };
 
     onAuthStateChanged(auth, handleAuthUser);
     
-    document.getElementById("btnLogout").addEventListener('click', () => {
-        signOut(auth).then(() => { window.location.href = 'login.html'; });
-    });
+    if (refs.btnLogout) {
+        refs.btnLogout.addEventListener('click', () => {
+            signOut(auth).then(() => { window.location.href = 'login.html'; });
+        });
+    }
 </script>
+</body>
+</html>
