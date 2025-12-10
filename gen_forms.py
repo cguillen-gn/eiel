@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gen_forms.py
-import os, json, sys, csv, shutil, hashlib
+import os, json, sys, csv, shutil, hashlib, base64
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from dotenv import load_dotenv
 import psycopg2
@@ -56,30 +56,30 @@ FIREBASE_CONFIG = {
 # ---------------- END CONFIG ----------------
 
 # -----------------------------------------------------------
-# CARGA Y ENCRIPTADO DE MAPEO DE EMAILS (SEGURIDAD)
+# CARGA Y OFUSCACIÓN DE EMAILS (BASE64)
 # -----------------------------------------------------------
 MAPPING_FILE = "auth_mapping.json"
-HASHED_AUTH_MAP = {} # Aquí guardaremos los códigos encriptados
+HASHED_AUTH_MAP = {} 
 
 try:
     if os.path.exists(MAPPING_FILE):
         with open(MAPPING_FILE, "r", encoding="utf-8") as f:
             raw_map = json.load(f)
             
-        print("🔒 Procesando seguridad: Encriptando emails (SHA-256)...")
+        print("🔒 Ocultando emails (Base64) para despliegue...")
         for email, code in raw_map.items():
-            # 1. Normalizar: minúsculas y sin espacios extra
+            # 1. Normalizar: minúsculas y sin espacios
             clean_email = email.strip().lower()
-            # 2. Hashear: Convertir a huella digital única
-            email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest()
-            # 3. Guardar: Hash -> Código Municipio
-            HASHED_AUTH_MAP[email_hash] = code
+            # 2. Codificar en Base64 (Estándar Web)
+            email_b64 = base64.b64encode(clean_email.encode('utf-8')).decode('utf-8')
+            # 3. Guardar
+            HASHED_AUTH_MAP[email_b64] = code
             
-        print(f"✅ {len(HASHED_AUTH_MAP)} usuarios encriptados correctamente.")
+        print(f"✅ {len(HASHED_AUTH_MAP)} usuarios procesados.")
     else:
-        print(f"⚠️ No se encontró {MAPPING_FILE}. El login no funcionará correctamente.")
+        print(f"⚠️ No se encontró {MAPPING_FILE}.")
 except Exception as e:
-    print(f"❌ ERROR procesando mapeo auth: {e}")
+    print(f"❌ ERROR procesando auth: {e}")
 
 
 # Configurar Jinja2
