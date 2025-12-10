@@ -20,13 +20,13 @@ body { display: flex; align-items: center; justify-content: center; }
     text-align: center; 
     max-width: 420px; 
     width: 90%; 
-    overflow: hidden; /* Para que la cabecera no se salga de las esquinas */
+    overflow: hidden; 
     padding-bottom: 2rem;
 }
 
-/* CABECERA AZUL (NUEVO DISEÑO) */
+/* CABECERA AZUL */
 .panel-header {
-    background-color: var(--primary); /* El nuevo #0080ad */
+    background-color: var(--primary); 
     padding: 2rem 1rem;
     color: white;
 }
@@ -44,7 +44,7 @@ body { display: flex; align-items: center; justify-content: center; }
     margin-top: 0.5rem;
 }
 
-/* INFO MUNICIPIO (LIMPIO) */
+/* INFO MUNICIPIO */
 .muni-info { 
     padding: 1.5rem; 
     border-bottom: 1px solid #e2e8f0;
@@ -60,7 +60,7 @@ body { display: flex; align-items: center; justify-content: center; }
     padding: 1.5rem 2rem;
 }
 
-/* ESTILO DE BOTÓN ELEGANTE (Línea lateral) */
+/* ESTILO DE BOTÓN ELEGANTE */
 .btn-base { 
     display: flex; 
     align-items: center; 
@@ -68,22 +68,21 @@ body { display: flex; align-items: center; justify-content: center; }
     font-weight: 600; 
     border-radius: 8px; 
     text-decoration: none; 
-    color: #334155; /* Gris oscuro texto */
+    color: #334155; 
     background-color: white;
-    border: 1px solid #e2e8f0; /* Borde sutil */
-    border-left-width: 6px; /* LA LÍNEA DE COLOR */
+    border: 1px solid #e2e8f0; 
+    border-left-width: 6px; 
     transition: all 0.2s ease;
     text-align: left;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 .btn-base:hover { 
-    transform: translateX(4px); /* Pequeño movimiento a la derecha */
+    transform: translateX(4px); 
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     background-color: #f8fafc;
 }
 
-/* Icono dentro del botón */
 .btn-icon { font-size: 1.2rem; margin-right: 12px; }
 
 /* COLORES DE LA LÍNEA LATERAL */
@@ -92,7 +91,7 @@ body { display: flex; align-items: center; justify-content: center; }
 .btn-residuos { border-left-color: var(--theme-residuos); }
 .btn-cementerios { border-left-color: var(--theme-cementerios); }
 
-/* LOADER Y ERRORES */
+/* LOADER */
 .loader { 
     border: 3px solid #f3f3f3; 
     border-top: 3px solid var(--primary); 
@@ -103,7 +102,7 @@ body { display: flex; align-items: center; justify-content: center; }
 }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* Logout discreto */
+/* Logout */
 .btn-logout-text {
     background: none;
     border: none;
@@ -207,35 +206,51 @@ body { display: flex; align-items: center; justify-content: center; }
         setTimeout(() => { window.location.href = "login.html"; }, 2000);
     };
 
+    // 5. LÓGICA DE AUTORIZACIÓN (UNIFICADA CON LOGS)
     const handleAuthUser = async (user) => {
         if (!user) {
             redirectToLogin("Sesión no iniciada.");
             return;
         }
 
-        // HASH CHECK
-        const userHash = await hashEmail(user.email);
-        const muniCodeRaw = AUTH_HASH_MAP[userHash];
+        console.log("🔍 --- DEBUG LOGIN ---");
+        console.log("📧 Email:", user.email);
+
+        // 1. Calcular Hash
+        let userHash = "";
+        try {
+            userHash = await hashEmail(user.email);
+            console.log("🔑 Hash calculado:", userHash);
+        } catch (e) {
+            console.error("❌ Error crypto:", e);
+            redirectToLogin("Error: Navegador no soporta encriptación segura.");
+            return;
+        }
         
+        // 2. Buscar en Mapa
+        const muniCodeRaw = AUTH_HASH_MAP[userHash];
+        console.log("🎯 Resultado:", muniCodeRaw ? "ENCONTRADO: " + muniCodeRaw : "NO ENCONTRADO");
+
         if (!muniCodeRaw) {
-            redirectToLogin("Usuario no autorizado.");
+            console.warn("⛔ Hash no encontrado en la lista autorizada.");
+            redirectToLogin(`Usuario no autorizado.`);
             return;
         }
 
+        console.log("✅ ACCESO CONCEDIDO");
+
+        // 3. Éxito: Mostrar Web
         const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
         const muniObj = MUNICIPIOS_DATA.find(m => String(m.code).padStart(3,'0') === normalizedMuniCode);
         const actualMuniName = muniObj ? muniObj.name : `Municipio ${normalizedMuniCode}`;
         
-        // SESSION STORAGE
         localStorage.setItem("userEmailActual", user.email); 
         localStorage.setItem("municipioCodigoActual", normalizedMuniCode);
         
-        // UI UPDATE
         refs.userEmail.textContent = user.email;
         refs.muniName.textContent = actualMuniName;
         refs.statusMessage.textContent = "Seleccione un formulario:";
 
-        // LINKS UPDATE
         refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
         refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
         refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
