@@ -99,76 +99,56 @@ body { display: flex; align-items: center; justify-content: center; }
     // 1. VARIABLES PYTHON
     const FIREBASE_CONFIG = {{ firebase_config_data | safe }}; 
     const MUNICIPIOS_DATA = {{ municipios_json_data | safe }}; 
-    // Esta variable ahora contiene las claves en BASE64 gracias a gen_forms.py
     const AUTH_MAP = {{ mapeo_email_codigo_data | safe }}; 
     
-    // DEBUG: Exponer al navegador para que puedas verlas en consola
-    window.AUTH_MAP = AUTH_MAP;
-
     // 2. INIT
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
     
-    // 3. REFERENCIAS UI
+    // 3. REFERENCIAS UI SEGURAS
     const getEl = (id) => document.getElementById(id);
-    const refs = {
-        muniName: getEl("muniNamePlaceholder"),
-        userEmail: getEl("userEmailPlaceholder"),
-        errorMsg: getEl("errorMsg"),
-        loader: getEl("loader"),
-        loadingSection: getEl("loadingSection"),
-        protectedContent: getEl('contenido-protegido'),
-        statusMessage: getEl("statusMessage"),
-        btnLogout: getEl("btnLogout"),
-        links: {
-            agua: getEl("linkAgua"),
-            obras: getEl("linkObras"),
-            residuos: getEl("linkResiduos"),
-            cementerios: getEl("linkCementerios")
-        }
-    };
+    
+    // Función segura para actualizar texto sin romper si es null
+    const setText = (id, text) => { const el = getEl(id); if(el) el.textContent = text; };
+    const show = (id) => { const el = getEl(id); if(el) el.classList.remove("hidden"); };
+    const hide = (id) => { const el = getEl(id); if(el) el.classList.add("hidden"); };
 
     const redirectToLogin = (message) => {
         console.warn("Redirigiendo:", message);
-        if(refs.statusMessage) refs.statusMessage.textContent = "Acceso Denegado";
-        if(refs.errorMsg) {
-            refs.errorMsg.innerHTML = message;
-            refs.errorMsg.classList.remove("hidden");
-        }
-        if(refs.loader) refs.loader.classList.add("hidden"); 
+        setText("statusMessage", "Acceso Denegado");
         
-        // Espera de seguridad
-        setTimeout(() => { window.location.href = "login.html"; }, 2500);
+        const errEl = getEl("errorMsg");
+        if(errEl) {
+            errEl.innerHTML = message;
+            errEl.classList.remove("hidden");
+        }
+        hide("loader"); 
+        
+        setTimeout(() => { window.location.href = "login.html"; }, 3000);
     };
 
+    // 4. LÓGICA DE AUTORIZACIÓN
     const handleAuthUser = (user) => {
         if (!user) {
             redirectToLogin("Sesión no iniciada.");
             return;
         }
 
-        // A. Normalizar email (igual que en Python)
+        console.log("🔍 Usuario:", user.email);
         const cleanEmail = user.email.trim().toLowerCase();
-        
-        // B. Convertir a Base64 (btoa es nativo del navegador)
         const userB64 = btoa(cleanEmail);
-        
-        console.log("🔍 Email:", cleanEmail);
         console.log("🔑 Tu Código:", userB64);
-        console.log("🗺️ Buscando en:", AUTH_MAP);
+        console.log("📋 Claves disponibles en el sistema:", Object.keys(AUTH_MAP));
 
-        // C. Buscar en la lista
         const muniCodeRaw = AUTH_MAP[userB64];
         
         if (!muniCodeRaw) {
-            console.error("⛔ NO ENCONTRADO");
-            redirectToLogin(`Usuario no autorizado.<br><small style='color:black'>Código: ${userB64}</small>`);
+            redirectToLogin(`Usuario no autorizado.<br><span style='font-size:0.7rem; color:black'>Tu código: ${userB64}</span>`);
             return;
         }
 
-        console.log("✅ Autorizado para:", muniCodeRaw);
+        console.log("✅ Autorizado:", muniCodeRaw);
 
-        // D. Éxito: Configurar UI
         const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
         const muniObj = MUNICIPIOS_DATA.find(m => String(m.code).padStart(3,'0') === normalizedMuniCode);
         const actualMuniName = muniObj ? muniObj.name : `Municipio ${normalizedMuniCode}`;
@@ -176,24 +156,29 @@ body { display: flex; align-items: center; justify-content: center; }
         localStorage.setItem("userEmailActual", user.email); 
         localStorage.setItem("municipioCodigoActual", normalizedMuniCode);
         
-        if(refs.userEmail) refs.userEmail.textContent = user.email;
-        if(refs.muniName) refs.muniName.textContent = actualMuniName;
-        if(refs.statusMessage) refs.statusMessage.textContent = "Seleccione un formulario:";
+        setText("userEmailPlaceholder", user.email);
+        setText("muniNamePlaceholder", actualMuniName);
+        setText("statusMessage", "Seleccione un formulario:");
+        
+        // Actualizar título
+        const pageTitle = getEl("pageTitle");
+        if(pageTitle) pageTitle.textContent = `EIEL - ${actualMuniName}`;
 
-        // Actualizar enlaces
-        if(refs.links.agua) refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
-        if(refs.links.obras) refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
-        if(refs.links.residuos) refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
-        if(refs.links.cementerios) refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
+        // Links
+        const linkAgua = getEl("linkAgua"); if(linkAgua) linkAgua.href = `agua_${normalizedMuniCode}.html`;
+        const linkObras = getEl("linkObras"); if(linkObras) linkObras.href = `obras_${normalizedMuniCode}.html`;
+        const linkResiduos = getEl("linkResiduos"); if(linkResiduos) linkResiduos.href = `residuos_${normalizedMuniCode}.html`;
+        const linkCementerios = getEl("linkCementerios"); if(linkCementerios) linkCementerios.href = `cementerios_${normalizedMuniCode}.html`;
 
-        if(refs.loadingSection) refs.loadingSection.classList.add("hidden");
-        if(refs.protectedContent) refs.protectedContent.classList.remove("hidden");
+        hide("loadingSection");
+        show("contenido-protegido");
     };
 
     onAuthStateChanged(auth, handleAuthUser);
     
-    if (refs.btnLogout) {
-        refs.btnLogout.addEventListener('click', () => {
+    const btnLogout = getEl("btnLogout");
+    if (btnLogout) {
+        btnLogout.addEventListener('click', () => {
             signOut(auth).then(() => { window.location.href = 'login.html'; });
         });
     }
