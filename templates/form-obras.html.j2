@@ -1,8 +1,8 @@
 ﻿{% extends "base.html.j2" %}
 
-{% block title %}Obras{% endblock %}
+{% block title %}Inventario de Obras{% endblock %}
 {% block header_icon %}🏗️{% endblock %}
-{% block header_title %}Obras{% endblock %}
+{% block header_title %}Formulario de Obras{% endblock %}
 
 {% block content %}
 
@@ -18,8 +18,8 @@
         <table class="data-table" style="font-size: 0.85rem;">
             <thead>
                 <tr>
-                    <th style="width: 10%;">Cód.</th>
-                    <th style="width: 55%;">Denominación y Plan</th>
+                    <th style="width: 8%; text-align: center;">Id</th>
+                    <th style="width: 57%;">Denominación</th>
                     <th style="width: 20%; text-align: center;">Estado</th>
                     <th style="width: 15%; text-align: center;">Docs</th>
                 </tr>
@@ -28,23 +28,23 @@
                 {% for o in obras %}
                 {% set codigo_obra = o.clave ~ o.mun ~ o.orden %}
                 <tr>
-                    <td style="font-weight: 700; color: var(--primary); vertical-align: top; padding-top: 12px;">
-                        {{ o.clave }}{{ o.orden }}
+                    <td style="font-weight: 700; color: var(--primary); vertical-align: middle; text-align: center;">
+                        {{ codigo_obra[-3:] }}
                     </td>
 
-                    <td style="vertical-align: top;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px; line-height: 1.4;">
+                    <td style="vertical-align: middle;">
+                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px; line-height: 1.3;">
                             {{ o.nombre }}
                         </div>
-                        <div style="color: #64748b; font-size: 0.75rem; border-top: 1px dashed #e2e8f0; padding-top: 4px; margin-top: 4px;">
-                            <span style="font-weight: 700; text-transform: uppercase; font-size: 0.7rem;">PLAN:</span> {{ o.plan_obra }}
+                        <div style="color: #64748b; font-size: 0.75rem; margin-top: 2px;">
+                            <span style="font-weight: 700; font-size: 0.7rem; opacity: 0.7;">PLAN:</span> {{ o.plan_obra }}
                         </div>
                     </td>
 
-                    <td style="text-align: center; vertical-align: top; padding-top: 10px;">
+                    <td style="text-align: center; vertical-align: middle;">
                         {% if o.cond == 1 %}
                             <select class="form-select select-estado" 
-                                    style="padding: 4px; font-size: 0.85rem;"
+                                    style="padding: 6px; font-size: 0.85rem;"
                                     data-obra-id="{{ codigo_obra }}" 
                                     data-nombre="{{ o.nombre }}" 
                                     data-plan="{{ o.plan_obra }}">
@@ -65,14 +65,14 @@
                         {% endif %}
                     </td>
 
-                    <td style="text-align: center; vertical-align: top; padding-top: 10px;">
+                    <td style="text-align: center; vertical-align: middle;">
                         {% if o.cond in [1,2] %}
                             <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;" 
+                                style="font-size: 0.75rem; padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;" 
                                 onclick="gestionarAdjuntos('{{ codigo_obra }}')">
                                 📎 Adjuntar
                             </button>
-                            <div id="lista_adjuntos_{{ codigo_obra }}" style="margin-top: 5px; text-align: left; font-size: 0.7rem; color: var(--success);"></div>
+                            <div id="lista_adjuntos_{{ codigo_obra }}" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success);"></div>
                         {% else %}
                             <span style="color: #cbd5e1;">-</span>
                         {% endif %}
@@ -197,7 +197,9 @@
                 const item = document.createElement("div");
                 item.style.color = "var(--success)";
                 item.style.fontSize = "0.75rem";
-                item.innerHTML = `✅ ${file.name.substring(0, 15)}${file.name.length>15?'...':''}`;
+                // Mostramos nombre corto
+                const shortName = file.name.length > 15 ? file.name.substring(0, 12) + "..." : file.name;
+                item.innerHTML = `✅ ${shortName}`;
                 contenedor.appendChild(item);
             } else {
                 const errorItem = document.createElement("div");
@@ -224,12 +226,13 @@
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Recopilando datos...", "info");
 
-        // A) Recopilar datos
+        // A) Recopilar datos de la tabla
         const filas = document.querySelectorAll(".select-estado");
         const estados = [];
 
         filas.forEach(select => {
             const estado = select.value || select.getAttribute("value");
+            // Solo enviamos si se ha seleccionado algo o si es una obra finalizada 'hardcoded'
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
