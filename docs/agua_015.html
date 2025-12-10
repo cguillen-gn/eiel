@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>Abastecimiento de agua</title>
+    <title>Abastecimiento de Agua</title>
 
     <link rel="stylesheet" href="css/style.css">
     
@@ -45,7 +45,7 @@
                 💧
             </div>
             <div class="title-header">
-                <h2>Abastecimiento de agua</h2>
+                <h2>Abastecimiento de Agua</h2>
                 <p class="subtitle">Almoradí (Código: 015)</p>
             </div>
         </div>
@@ -53,7 +53,7 @@
         
 
 <div class="card">
-    <h2 class="section-title">Consumo Anual</h2>
+    <h2 class="section-title" style="color: var(--theme-agua);">Consumo Anual</h2>
     <div class="form-group">
         <label for="consumoInput" class="form-label">
             Consumo de agua potable en el año 2024 (m³)
@@ -70,7 +70,7 @@
 </div>
 
 <div class="card">
-    <h2 class="section-title">Depósitos Municipales</h2>
+    <h2 class="section-title" style="color: var(--theme-agua);">Depósitos Municipales</h2>
     
     
     
@@ -184,7 +184,15 @@
 </div>
 
 <div class="card">
-    <h2 class="section-title">Documentación Adjunta (Opcional)</h2>
+    <h2 class="section-title" style="color: var(--theme-agua);">📝 Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+<div class="card">
+    <h2 class="section-title" style="color: var(--theme-agua);">Documentación Adjunta (Opcional)</h2>
     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; transition: background 0.2s;">
         <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
         <div style="color: var(--primary); font-weight: 600;">Haga clic para adjuntar archivos</div>
@@ -195,17 +203,10 @@
 </div>
 
 <div class="card">
-    <h2 class="section-title" style="color: var(--theme-agua);">📝 Observaciones</h2>
-    <div class="form-group">
-        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
-        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
-    </div>
-</div>
-
-<div class="card">
-    <button id="firmarBtn" class="btn btn-primary btn-agua"> <span>✓</span> Firmar y enviar formulario
+    <button id="firmarBtn" class="btn btn-primary btn-agua" style="width: 100%; padding: 1rem; font-size: 1.1rem;">
+        <span>✓</span> Firmar y enviar formulario
     </button>
-    <div id="mensaje" class="message"></div>
+    <div id="mensaje" class="message" style="display: none; margin-top: 1rem; padding: 1rem; border-radius: 6px;"></div>
 </div>
 
 
@@ -262,26 +263,18 @@
 
     
 <script>
-
-    // ==========================================
-    // 1. CAMBIAR COLOR CABECERA
-    // ==========================================
+    // 1. CONFIGURACIÓN Header (Color tema Agua)
     document.querySelector('.site-header').classList.add('header-agua');
-    
-    // ==========================================
-    // 2. CONFIGURACIÓN (Inyectada desde Python/Jinja)
-    // ==========================================
-    // Esto asegura que el JS tenga acceso a las variables del servidor
+
+    // 2. Variables de Python
     window.EIEL_CONFIG = {
         muniCode: "015",
         muniName: "Almoradí",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbxIJ9ZAGvaEWLeRJf-j_JhuA3AFOPfbKqLNkZimeqwUrkLWzI1NQpkZ908t5ttFZLQ2Ow/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
-    
-    // ==========================================
-    // 3. SERVICIO DE SUBIDA (La lógica que faltaba)
-    // ==========================================
+
+    // 3. SERVICIO DE SUBIDA
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -293,13 +286,12 @@
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
-                // Obtenemos email (intentamos Firebase, si no localStorage, si no Anonimo)
-                const userEmail = firebase.auth().currentUser ? firebase.auth().currentUser.email : (localStorage.getItem("userEmailActual") || "anonimo");
+                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
 
                 const payload = {
                     filename: file.name,
                     mimeType: file.type,
-                    bytesBase64: base64, // Nota: Asegúrate que tu AppScript espera 'bytesBase64' o 'bytes'
+                    bytesBase64: base64, 
                     municipio: muniCode,
                     usuario: userEmail,
                     tipo: tipoFicha
@@ -319,9 +311,7 @@
         }
     };
 
-    // ==========================================
-    // 4. GESTIÓN DE ARCHIVOS (Tu código original)
-    // ==========================================
+    // 4. GESTIÓN DE ARCHIVOS UI
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -350,19 +340,16 @@
         `).join("");
     }
 
-    // ==========================================
     // 5. LÓGICA DE ENVÍO
-    // ==========================================
     const btnFirmar = document.getElementById("firmarBtn");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
         mensajeDiv.textContent = texto;
-        // Asignamos colores según el tipo
-        let color = "#e2e8f0"; // gris
-        if(tipo === 'success') color = "#d1fae5"; // verde
-        if(tipo === 'error') color = "#fee2e2"; // rojo
-        if(tipo === 'warning') color = "#fef3c7"; // amarillo
+        let color = "#e2e8f0";
+        if(tipo === 'success') color = "#d1fae5";
+        if(tipo === 'error') color = "#fee2e2";
+        if(tipo === 'warning') color = "#fef3c7";
         
         mensajeDiv.style.background = color;
         mensajeDiv.style.color = "#333";
@@ -371,19 +358,19 @@
 
     btnFirmar.addEventListener("click", async () => {
         btnFirmar.disabled = true;
-        mostrarMensaje("⏳ Subiendo archivos adjuntos a Drive...", "info");
+        mostrarMensaje("⏳ Subiendo archivos...", "info");
 
-        // A. Subir Archivos uno a uno
+        // A. Subir Archivos
         let errores = 0;
         for (const file of archivos) {
-            const ok = await UploadService.uploadFile(file, 'AGUA', window.EIEL_CONFIG.muniCode);
+            const ok = await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode);
             if (!ok) errores++;
         }
         
-        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir, pero seguimos enviando el PDF.`, "warning");
+        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
         // B. Recopilar Datos
-        mostrarMensaje("⏳ Generando PDF y enviando email...", "info");
+        mostrarMensaje("⏳ Generando justificante...", "info");
 
         const depositosData = [];
         document.querySelectorAll('.input-limpieza').forEach(input => {
@@ -393,47 +380,48 @@
             });
         });
 
-        // Intentamos coger el email de Firebase o fallback
-        const emailUsuario = firebase.auth().currentUser ? firebase.auth().currentUser.email : "desconocido";
+        const userEmail = localStorage.getItem("userEmailActual");
 
         const payload = {
+            tipo_formulario: "agua",
             consumo: document.getElementById("consumoInput").value || "No indicado",
             depositos: JSON.stringify(depositosData),
-            email_usuario: emailUsuario,
+            observaciones: document.getElementById("observaciones").value || "", // Observaciones
+            email_usuario: userEmail,
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
-            tipo_ficha: "AGUA", // Importante para que el PDF sepa qué plantilla usar
             timestamp_envio: new Date().toISOString(),
-            lista_archivos: archivos.map(a => a.name).join(", "),
-            observaciones: document.getElementById("observaciones").value || ""
+            archivos_adjuntos: archivos.map(a => a.name).join("\n")
         };
 
         // C. Enviar a Script PDF
         try {
-            // Usamos mode: 'no-cors' para AppScript
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+            const response = await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: new URLSearchParams(payload)
             });
 
-            // Como usamos no-cors, no podemos leer la respuesta (result.json), 
-            // pero si no da error en el catch, asumimos que llegó a Google.
-            mostrarMensaje("✅ ¡Éxito! Formulario enviado. Revisa tu email.", "success");
-            
-            // Limpieza
-            archivos = [];
-            renderArchivos();
-            document.getElementById("consumoInput").value = "";
+            // Intentamos leer respuesta
+            let result = {};
+            try { result = await response.json(); } 
+            catch(e) { if(response.ok) result = {success:true}; }
+
+            if (result.success || response.ok) {
+                mostrarMensaje("✅ ¡Éxito! Formulario enviado. Revisa tu email.", "success");
+                archivos = [];
+                renderArchivos();
+                document.getElementById("consumoInput").value = "";
+                document.getElementById("observaciones").value = "";
+                if(result.downloadUrl) window.open(result.downloadUrl, '_blank');
+            } else {
+                throw new Error("Error en el servidor.");
+            }
             
         } catch (error) {
             console.error(error);
             mostrarMensaje(`❌ Error de conexión: ${error.message}`, "error");
         } finally {
             btnFirmar.disabled = false;
-            // Restaurar texto botón tras 3 segundos
-            setTimeout(() => { btnFirmar.innerHTML = "<span>✓</span> Firmar y enviar formulario"; }, 3000);
         }
     });
 </script>
