@@ -42,7 +42,7 @@
                     </td>
 
                     <td style="text-align: center; vertical-align: middle;">
-                        {% if o.cond == 1 %}
+                        {% if o.cond in [1, 2] %}
                             <select class="form-select select-estado" 
                                     style="padding: 6px; font-size: 0.85rem;"
                                     data-obra-id="{{ codigo_obra }}" 
@@ -52,21 +52,16 @@
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
                                 <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada">Finalizada</option>
+                                <option value="Finalizada" {% if o.cond == 2 %}selected{% endif %}>Finalizada</option>
                                 <option value="Anulada">Anulada</option>
                             </select>
-                        {% elif o.cond == 2 %}
-                            <span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 6px; border-radius: 4px; font-size: 0.75rem; display: inline-block; border: 1px solid #bbf7d0;">
-                                ✅ Finalizada
-                            </span>
-                            <input type="hidden" class="select-estado" data-obra-id="{{ codigo_obra }}" data-nombre="{{ o.nombre }}" data-plan="{{ o.plan_obra }}" value="Finalizada">
                         {% else %}
                             <span style="color: #cbd5e1;">-</span>
                         {% endif %}
                     </td>
 
                     <td style="text-align: center; vertical-align: middle;">
-                        {% if o.cond in [1,2] %}
+                        {% if o.cond in [1, 2] %}
                             <button type="button" class="btn btn-secondary" 
                                 style="font-size: 0.75rem; padding: 0.4rem 0.8rem; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;" 
                                 onclick="gestionarAdjuntos('{{ codigo_obra }}')">
@@ -197,7 +192,6 @@
                 const item = document.createElement("div");
                 item.style.color = "var(--success)";
                 item.style.fontSize = "0.75rem";
-                // Mostramos nombre corto
                 const shortName = file.name.length > 15 ? file.name.substring(0, 12) + "..." : file.name;
                 item.innerHTML = `✅ ${shortName}`;
                 contenedor.appendChild(item);
@@ -232,7 +226,7 @@
 
         filas.forEach(select => {
             const estado = select.value || select.getAttribute("value");
-            // Solo enviamos si se ha seleccionado algo o si es una obra finalizada 'hardcoded'
+            // Enviamos si hay algo seleccionado (incluido "Finalizada" por defecto)
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
@@ -247,8 +241,11 @@
             }
         });
 
+        // Permitir enviar aunque no se toque nada (para confirmar "Finalizada")
         if (estados.length === 0) {
-            mostrarMensaje("⚠️ No ha actualizado el estado de ninguna obra.", "warning");
+            // Opcional: Si quieres obligar a cambiar algo, deja el aviso.
+            // Si quieres permitir confirmar lo que hay, comenta estas líneas.
+            mostrarMensaje("⚠️ No ha seleccionado ningún estado.", "warning");
             btnFirmar.disabled = false;
             return;
         }
