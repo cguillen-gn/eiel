@@ -132,21 +132,18 @@ h1 { color: #3F51B5; margin: 0 0 0.5rem 0; font-weight: 700; }
 </div>
 
 <script type="module">
-    // Importación de Firebase 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getAuth, signOut, onAuthStateChanged } 
-      from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+    import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-    // 1. CONFIGURACIÓN (Inyectada por Jinja)
+    // 1. CONFIGURACIÓN (Ahora MUNICIPIOS_DATA contiene HASHES, no emails)
     const FIREBASE_CONFIG = {{ firebase_config_data | safe }}; 
     const MUNICIPIOS_DATA = {{ municipios_json_data | safe }}; 
-    const EMAIL_TO_CODE_MAP = {{ mapeo_email_codigo_data | safe }}; 
+    const AUTH_HASH_MAP = {{ mapeo_email_codigo_data | safe }}; // Nombre actualizado
     
-    // 2. INICIALIZACIÓN
     const app = initializeApp(FIREBASE_CONFIG);
     const auth = getAuth(app);
     
-    // Elementos DOM
+    // Referencias DOM
     const refs = {
         muniName: document.getElementById("muniNamePlaceholder"),
         userEmail: document.getElementById("userEmailPlaceholder"),
@@ -156,6 +153,7 @@ h1 { color: #3F51B5; margin: 0 0 0.5rem 0; font-weight: 700; }
         loadingSection: document.getElementById("loadingSection"),
         protectedContent: document.getElementById('contenido-protegido'),
         statusMessage: document.getElementById("statusMessage"),
+        btnLogout: document.getElementById("btnLogout"),
         links: {
             agua: document.getElementById("linkAgua"),
             obras: document.getElementById("linkObras"),
@@ -164,74 +162,72 @@ h1 { color: #3F51B5; margin: 0 0 0.5rem 0; font-weight: 700; }
         }
     };
 
-    // 3. REDIRECCIÓN SI FALLA LOGIN
+    // --- FUNCIÓN DE SEGURIDAD: SHA-256 ---
+    // Convierte el email en la misma huella digital que generó Python
+    async function hashEmail(message) {
+        const msgBuffer = new TextEncoder().encode(message.trim().toLowerCase());
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     const redirectToLogin = (message) => {
         refs.statusMessage.textContent = "Acceso Denegado";
         refs.errorMsg.textContent = message;
         refs.errorMsg.classList.remove("hidden");
         refs.loader.classList.add("hidden"); 
-
-        setTimeout(() => {
-            // REDIRIGIR A LOGIN.HTML (Porque index.html no tiene formulario de login)
-            window.location.href = "login.html";
-        }, 2000);
+        setTimeout(() => { window.location.href = "login.html"; }, 2000);
     };
 
-    // 4. LÓGICA DE AUTORIZACIÓN
-    const handleAuthUser = (user) => {
+    const handleAuthUser = async (user) => {
         if (!user) {
-            redirectToLogin("Sesión no iniciada. Redirigiendo...");
+            redirectToLogin("Sesión no iniciada.");
             return;
         }
 
-        const userEmail = user.email.toLowerCase();
-        // Buscar código de municipio
-        const muniCodeRaw = EMAIL_TO_CODE_MAP[userEmail];
+        // 1. Calculamos el Hash del email del usuario logueado
+        const userHash = await hashEmail(user.email);
+        
+        // 2. Buscamos ese Hash en la lista segura
+        const muniCodeRaw = AUTH_HASH_MAP[userHash];
         
         if (!muniCodeRaw) {
-            redirectToLogin(`Usuario ${userEmail} no tiene permisos asignados.`);
+            // El hash no está en la lista -> Email no autorizado
+            redirectToLogin(`Usuario no autorizado.`);
+            // Nota: No mostramos el email en el error por seguridad visual, o sí si prefieres
             return;
         }
 
-        // ÉXITO
+        // ÉXITO: El resto es igual
         const normalizedMuniCode = String(muniCodeRaw).padStart(3, '0');
-        
-        // Buscar nombre del municipio
         const muniObj = MUNICIPIOS_DATA.find(m => String(m.code).padStart(3,'0') === normalizedMuniCode);
         const actualMuniName = muniObj ? muniObj.name : `Municipio ${normalizedMuniCode}`;
         
-        // Guardar sesión local
-        localStorage.setItem("userEmailActual", userEmail); 
+        localStorage.setItem("userEmailActual", user.email); 
         localStorage.setItem("municipioCodigoActual", normalizedMuniCode);
         localStorage.setItem("municipioNombreActual", actualMuniName);
         
-        // Actualizar UI
         refs.userEmail.textContent = user.email;
         refs.muniName.textContent = actualMuniName;
         refs.pageTitle.textContent = `EIEL - ${actualMuniName}`;
         refs.statusMessage.textContent = "Seleccione un formulario:";
 
-        // Configurar enlaces con el código correcto
         refs.links.agua.href = `agua_${normalizedMuniCode}.html`;
         refs.links.obras.href = `obras_${normalizedMuniCode}.html`;
         refs.links.residuos.href = `residuos_${normalizedMuniCode}.html`;
         refs.links.cementerios.href = `cementerios_${normalizedMuniCode}.html`;
 
-        // Mostrar menú
         refs.loadingSection.classList.add("hidden");
         refs.protectedContent.classList.remove("hidden");
     };
 
-    // 5. LISTENER FIREBASE
     onAuthStateChanged(auth, handleAuthUser);
     
-    // 6. LOGOUT
-    document.getElementById("btnLogout").addEventListener('click', () => {
-        signOut(auth).then(() => {
-            window.location.href = 'login.html';
+    if(refs.btnLogout) {
+        refs.btnLogout.addEventListener('click', () => {
+            signOut(auth).then(() => { window.location.href = 'login.html'; });
         });
-    });
-
+    }
 </script>
 </body>
 </html>

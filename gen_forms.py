@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gen_forms.py
-import os, json, sys, csv, shutil
+import os, json, sys, csv, shutil, hashlib
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from dotenv import load_dotenv
 import psycopg2
@@ -55,18 +55,31 @@ FIREBASE_CONFIG = {
 }
 # ---------------- END CONFIG ----------------
 
-# Cargar Mapeo de Emails
+# -----------------------------------------------------------
+# CARGA Y ENCRIPTADO DE MAPEO DE EMAILS (SEGURIDAD)
+# -----------------------------------------------------------
 MAPPING_FILE = "auth_mapping.json"
-EMAIL_TO_CODE_MAP = {}
+HASHED_AUTH_MAP = {} # Aquí guardaremos los códigos encriptados
+
 try:
     if os.path.exists(MAPPING_FILE):
         with open(MAPPING_FILE, "r", encoding="utf-8") as f:
-            EMAIL_TO_CODE_MAP = json.load(f)
-        print(f"✅ Mapeo de autorización cargado.")
+            raw_map = json.load(f)
+            
+        print("🔒 Procesando seguridad: Encriptando emails (SHA-256)...")
+        for email, code in raw_map.items():
+            # 1. Normalizar: minúsculas y sin espacios extra
+            clean_email = email.strip().lower()
+            # 2. Hashear: Convertir a huella digital única
+            email_hash = hashlib.sha256(clean_email.encode('utf-8')).hexdigest()
+            # 3. Guardar: Hash -> Código Municipio
+            HASHED_AUTH_MAP[email_hash] = code
+            
+        print(f"✅ {len(HASHED_AUTH_MAP)} usuarios encriptados correctamente.")
     else:
-        print(f"⚠️ No se encontró {MAPPING_FILE}.")
+        print(f"⚠️ No se encontró {MAPPING_FILE}. El login no funcionará correctamente.")
 except Exception as e:
-    print(f"❌ ERROR mapeo auth: {e}")
+    print(f"❌ ERROR procesando mapeo auth: {e}")
 
 
 # Configurar Jinja2
@@ -83,7 +96,6 @@ def from_json_filter(value):
 env.filters['fromjson'] = from_json_filter
     
 # Cargamos las plantillas
-# ⚠️ IMPORTANTE: Añadida la carga del template login aquí
 template_login = env.get_template(TEMPLATE_LOGIN)
 template_index = env.get_template(TEMPLATE_INDEX)
 template_agua = env.get_template(TEMPLATE_AGUA)
@@ -205,7 +217,8 @@ def main():
             fase_actual=fase_actual,
             municipios_json_data=json.dumps(municipios_data, ensure_ascii=False),
             firebase_config_data=json.dumps(FIREBASE_CONFIG), 
-            mapeo_email_codigo_data=json.dumps(EMAIL_TO_CODE_MAP)
+            # ⚠️ CAMBIO DE SEGURIDAD: Pasamos los Hashes, no los emails
+            mapeo_email_codigo_data=json.dumps(HASHED_AUTH_MAP)
         )
         with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
             f.write(rendered_index)
@@ -230,7 +243,7 @@ def main():
                 "url_adjuntos": URL_ADJUNTOS,
                 "url_generar_pdf": URL_GENERAR_PDF,
                 "fase_anterior": fase_anterior,
-                "firebase_config": json.dumps(FIREBASE_CONFIG) # Esencial para que base.html.j2 no falle
+                "firebase_config": json.dumps(FIREBASE_CONFIG) 
             }
 
             # --- AGUA ---
