@@ -114,7 +114,13 @@
 
     
 <script>
+    // 1. CAMBIAR COLOR CABECERA A GRIS (NUEVO)
+    document.querySelector('.site-header').classList.add('header-cementerios');
+
     // Inyectamos datos del servidor
+    const cementerios = [];
+    
+    // Inyectamos configuración necesaria para UploadService
     window.EIEL_CONFIG = {
         muniCode: "062",
         muniName: "Daya Vieja",
@@ -122,10 +128,8 @@
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
     
-    const cementerios = [];
-    
     // ==========================================
-    // 1. LÓGICA DE CÁLCULO
+    // 1. LÓGICA DE CÁLCULO (TU LÓGICA ORIGINAL INTACTA)
     // ==========================================
     function calcularTotales() {
         cementerios.forEach((cem, index) => {
@@ -144,6 +148,7 @@
                 if (tipo.includes('osarios')) totales.osarios += valor;
             });
             
+            // Actualizar DOM de forma segura
             const setTotal = (id, val) => {
                 const el = document.getElementById(id);
                 if(el) el.textContent = val;
@@ -163,13 +168,9 @@
     });
 
     // ==========================================
-    // 2. GESTIÓN DE ARCHIVOS (UI Local)
+    // 2. GESTIÓN DE ARCHIVOS (NECESITA UPLOADSERVICE PARA FUNCIONAR)
     // ==========================================
-    let archivos = [];
-    const fileInput = document.getElementById("fileInput");
-    const fileList = document.getElementById("fileList");
-    
-    // SERVICIO DE SUBIDA (UploadService) - AÑADIDO PARA QUE FUNCIONE
+    // Definimos UploadService aquí por si no está en base
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -177,34 +178,26 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
                 const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
-
-                const payload = {
-                    filename: file.name,
-                    mimeType: file.type,
-                    bytesBase64: base64, 
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha
-                };
-
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                        municipio: muniCode, usuario: userEmail, tipo: tipoFicha
+                    })
                 });
                 return true;
-            } catch (e) {
-                console.error("Error subiendo archivo:", e);
-                return false;
-            }
+            } catch (e) { return false; }
         }
     };
+
+    let archivos = [];
+    const fileInput = document.getElementById("fileInput");
+    const fileList = document.getElementById("fileList");
 
     if (fileInput) {
         fileInput.onchange = () => {
@@ -264,7 +257,7 @@
                 mostrarMensaje(`⚠️ Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
             }
 
-            // B) Recopilar Datos
+            // B) Recopilar Datos (TU LÓGICA ORIGINAL)
             mostrarMensaje("⏳ Generando justificante...", "info");
             const datosCementerios = cementerios.map((cem, index) => {
                 const cemIndex = index + 1;
@@ -287,7 +280,9 @@
                 municipio_codigo: window.EIEL_CONFIG.muniCode,
                 municipio_nombre: window.EIEL_CONFIG.muniName,
                 timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                // AÑADIDO: OBSERVACIONES AL ENVÍO
+                observaciones: document.getElementById("observaciones").value || ""
             };
 
             // C) Enviar a Generar PDF

@@ -56,8 +56,8 @@
 
 
 
-<div class="card" style="background-color: #fffbeb; border-left: 4px solid var(--warning);">
-    <p style="font-size: 0.9rem; color: #92400e;">
+<div class="card" style="background-color: #f8fafc; border-left: 4px solid var(--theme-cementerios);">
+    <p style="font-size: 0.9rem; color: #475569;">
       <strong>OCUPACIÓN:</strong> Para la correcta valoración del nivel de saturación, indique el número de unidades ocupadas.<br>
         El total se calcula sumando: Ocupadas + Concesión + Propiedad + Libres.
     </p>
@@ -65,9 +65,8 @@
 
 
 
-
 <div class="card">
-    <h2 class="section-title">📍 CEMENTERIO DE LA CANALOSA</h2>
+    <h2 class="section-title" style="color: var(--theme-cementerios);">📍 CEMENTERIO DE LA CANALOSA</h2>
     
     <div class="cementerio-table-wrapper">
         <table class="cementerio-table">
@@ -128,10 +127,10 @@
             </tbody>
         </table>
     </div>
-</div>
+    </div>
 
 <div class="card">
-    <h2 class="section-title">📍 CEMENTERIO MUNICIPAL</h2>
+    <h2 class="section-title" style="color: var(--theme-cementerios);">📍 CEMENTERIO MUNICIPAL</h2>
     
     <div class="cementerio-table-wrapper">
         <table class="cementerio-table">
@@ -192,12 +191,21 @@
             </tbody>
         </table>
     </div>
-</div>
+    </div>
 
 
 
 <div class="card">
-    <h2 class="section-title">Documentación Adjunta (Opcional)</h2>
+    <h2 class="section-title" style="color: var(--theme-cementerios);">📝 Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia sobre el estado del cementerio..."></textarea>
+    </div>
+</div>
+
+
+<div class="card">
+    <h2 class="section-title" style="color: var(--theme-cementerios);">Documentación Adjunta (Opcional)</h2>
     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px;">
         <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
         <div style="color: var(--primary); font-weight: 600;">Haga clic para adjuntar archivos</div>
@@ -208,7 +216,7 @@
 
 
 <div class="card">
-    <button id="firmarBtn" class="btn btn-primary">
+    <button id="firmarBtn" class="btn btn-primary btn-cementerios">
         <span>✓</span> Firmar y enviar formulario
     </button>
     <div id="mensaje" class="message"></div>
@@ -269,7 +277,13 @@
 
     
 <script>
+    // 1. CAMBIAR COLOR CABECERA A GRIS (NUEVO)
+    document.querySelector('.site-header').classList.add('header-cementerios');
+
     // Inyectamos datos del servidor
+    const cementerios = [{"nombre": "CEMENTERIO DE LA CANALOSA"}, {"nombre": "CEMENTERIO MUNICIPAL"}];
+    
+    // Inyectamos configuración necesaria para UploadService
     window.EIEL_CONFIG = {
         muniCode: "077",
         muniName: "Fondo de les Neus (El)/Hondon de las Nieves",
@@ -277,10 +291,8 @@
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
     
-    const cementerios = [{"nombre": "CEMENTERIO DE LA CANALOSA"}, {"nombre": "CEMENTERIO MUNICIPAL"}];
-    
     // ==========================================
-    // 1. LÓGICA DE CÁLCULO
+    // 1. LÓGICA DE CÁLCULO (TU LÓGICA ORIGINAL INTACTA)
     // ==========================================
     function calcularTotales() {
         cementerios.forEach((cem, index) => {
@@ -299,6 +311,7 @@
                 if (tipo.includes('osarios')) totales.osarios += valor;
             });
             
+            // Actualizar DOM de forma segura
             const setTotal = (id, val) => {
                 const el = document.getElementById(id);
                 if(el) el.textContent = val;
@@ -318,13 +331,9 @@
     });
 
     // ==========================================
-    // 2. GESTIÓN DE ARCHIVOS (UI Local)
+    // 2. GESTIÓN DE ARCHIVOS (NECESITA UPLOADSERVICE PARA FUNCIONAR)
     // ==========================================
-    let archivos = [];
-    const fileInput = document.getElementById("fileInput");
-    const fileList = document.getElementById("fileList");
-    
-    // SERVICIO DE SUBIDA (UploadService) - AÑADIDO PARA QUE FUNCIONE
+    // Definimos UploadService aquí por si no está en base
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -332,34 +341,26 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
                 const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
-
-                const payload = {
-                    filename: file.name,
-                    mimeType: file.type,
-                    bytesBase64: base64, 
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha
-                };
-
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                        municipio: muniCode, usuario: userEmail, tipo: tipoFicha
+                    })
                 });
                 return true;
-            } catch (e) {
-                console.error("Error subiendo archivo:", e);
-                return false;
-            }
+            } catch (e) { return false; }
         }
     };
+
+    let archivos = [];
+    const fileInput = document.getElementById("fileInput");
+    const fileList = document.getElementById("fileList");
 
     if (fileInput) {
         fileInput.onchange = () => {
@@ -419,7 +420,7 @@
                 mostrarMensaje(`⚠️ Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
             }
 
-            // B) Recopilar Datos
+            // B) Recopilar Datos (TU LÓGICA ORIGINAL)
             mostrarMensaje("⏳ Generando justificante...", "info");
             const datosCementerios = cementerios.map((cem, index) => {
                 const cemIndex = index + 1;
@@ -442,7 +443,9 @@
                 municipio_codigo: window.EIEL_CONFIG.muniCode,
                 municipio_nombre: window.EIEL_CONFIG.muniName,
                 timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                // AÑADIDO: OBSERVACIONES AL ENVÍO
+                observaciones: document.getElementById("observaciones").value || ""
             };
 
             // C) Enviar a Generar PDF
