@@ -1,42 +1,54 @@
 ﻿{% extends "base.html.j2" %}
 
-{% block title %}Inventario de Obras{% endblock %}
+{% block title %}Obras{% endblock %}
 {% block header_icon %}🏗️{% endblock %}
-{% block header_title %}Formulario de Obras{% endblock %}
+{% block header_title %}Obras{% endblock %}
 
 {% block content %}
 
 <div class="card">
     <div class="info-text" style="background-color: #fff7ed; color: #9a3412; padding: 1rem; border-radius: 8px; margin-bottom: 0; border-left: 4px solid #f97316;">
-        <strong>Instrucciones:</strong> Actualice el estado de las obras listadas.
-        Si la obra está en ejecución o finalizada, puede adjuntar la documentación pertinente (Certificaciones, Actas, Fotos) pulsando el botón "Adjuntar".
+        <strong>Instrucciones:</strong> Actualice el estado de las obras.
+        Si la obra está en ejecución o finalizada, pulse "Adjuntar" para subir certificaciones o fotos.
     </div>
 </div>
 
 <div class="card">
     <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table" style="font-size: 0.85rem;">
             <thead>
                 <tr>
-                    <th style="width: 15%;">Código</th>
-                    <th style="width: 35%;">Denominación</th>
-                    <th style="width: 20%;">Plan</th>
-                    <th style="width: 15%; text-align: center;">Estado</th>
-                    <th style="width: 15%; text-align: center;">Documentación</th>
+                    <th style="width: 10%;">Cód.</th>
+                    <th style="width: 55%;">Denominación y Plan</th>
+                    <th style="width: 20%; text-align: center;">Estado</th>
+                    <th style="width: 15%; text-align: center;">Docs</th>
                 </tr>
             </thead>
             <tbody>
                 {% for o in obras %}
                 {% set codigo_obra = o.clave ~ o.mun ~ o.orden %}
                 <tr>
-                    <td style="font-weight: 600; color: var(--primary);">{{ codigo_obra }}</td>
-                    <td>{{ o.nombre }}</td>
-                    <td style="color: var(--text-secondary); font-size: 0.85rem;">{{ o.plan_obra }}</td>
+                    <td style="font-weight: 700; color: var(--primary); vertical-align: top; padding-top: 12px;">
+                        {{ o.clave }}{{ o.orden }}
+                    </td>
 
-                    <td style="text-align: center;">
+                    <td style="vertical-align: top;">
+                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 4px; line-height: 1.4;">
+                            {{ o.nombre }}
+                        </div>
+                        <div style="color: #64748b; font-size: 0.75rem; border-top: 1px dashed #e2e8f0; padding-top: 4px; margin-top: 4px;">
+                            <span style="font-weight: 700; text-transform: uppercase; font-size: 0.7rem;">PLAN:</span> {{ o.plan_obra }}
+                        </div>
+                    </td>
+
+                    <td style="text-align: center; vertical-align: top; padding-top: 10px;">
                         {% if o.cond == 1 %}
-                            <select class="form-select select-estado" data-obra-id="{{ codigo_obra }}" data-nombre="{{ o.nombre }}" data-plan="{{ o.plan_obra }}">
-                                <option value="">-- Seleccione --</option>
+                            <select class="form-select select-estado" 
+                                    style="padding: 4px; font-size: 0.85rem;"
+                                    data-obra-id="{{ codigo_obra }}" 
+                                    data-nombre="{{ o.nombre }}" 
+                                    data-plan="{{ o.plan_obra }}">
+                                <option value="">-- Estado --</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
                                 <option value="Paralizada">Paralizada</option>
@@ -44,22 +56,23 @@
                                 <option value="Anulada">Anulada</option>
                             </select>
                         {% elif o.cond == 2 %}
-                            <span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; display: inline-block;">
-                                ✅ Finalizada <br><span style="font-size:0.75rem; opacity:0.8;">(Pendiente Proyecto)</span>
+                            <span class="badge" style="background: #dcfce7; color: #166534; padding: 4px 6px; border-radius: 4px; font-size: 0.75rem; display: inline-block; border: 1px solid #bbf7d0;">
+                                ✅ Finalizada
                             </span>
                             <input type="hidden" class="select-estado" data-obra-id="{{ codigo_obra }}" data-nombre="{{ o.nombre }}" data-plan="{{ o.plan_obra }}" value="Finalizada">
                         {% else %}
-                            -
+                            <span style="color: #cbd5e1;">-</span>
                         {% endif %}
                     </td>
 
-                    <td style="text-align: center;">
+                    <td style="text-align: center; vertical-align: top; padding-top: 10px;">
                         {% if o.cond in [1,2] %}
-                            <button type="button" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.8rem; border: 1px solid #e2e8f0; background: white; color: #64748b;" 
+                            <button type="button" class="btn btn-secondary" 
+                                style="font-size: 0.75rem; padding: 0.3rem 0.6rem; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569;" 
                                 onclick="gestionarAdjuntos('{{ codigo_obra }}')">
                                 📎 Adjuntar
                             </button>
-                            <div id="lista_adjuntos_{{ codigo_obra }}" style="margin-top: 8px; text-align: left; font-size: 0.8rem;"></div>
+                            <div id="lista_adjuntos_{{ codigo_obra }}" style="margin-top: 5px; text-align: left; font-size: 0.7rem; color: var(--success);"></div>
                         {% else %}
                             <span style="color: #cbd5e1;">-</span>
                         {% endif %}
@@ -103,7 +116,7 @@
         urlAdjuntos: "{{ url_adjuntos }}"
     };
 
-    // 3. SERVICIO DE SUBIDA (Necesario definirlo aquí también)
+    // 3. SERVICIO DE SUBIDA
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -124,7 +137,7 @@
                     municipio: muniCode,
                     usuario: userEmail,
                     tipo: tipoFicha,
-                    obra: codigoObra // Importante para Obras
+                    obra: codigoObra 
                 };
 
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
@@ -166,8 +179,8 @@
             const tempId = Date.now();
             const loadingItem = document.createElement("div");
             loadingItem.id = `loading_${tempId}`;
-            loadingItem.innerHTML = `⏳ Subiendo...`;
-            loadingItem.style.color = "var(--primary)";
+            loadingItem.innerHTML = `⏳...`;
+            loadingItem.style.fontSize = "0.7rem";
             contenedor.appendChild(loadingItem);
 
             const success = await UploadService.uploadFile(
@@ -183,7 +196,8 @@
                 adjuntosPorObra[obraActualEnSubida].push(file.name);
                 const item = document.createElement("div");
                 item.style.color = "var(--success)";
-                item.innerHTML = `✅ ${file.name}`;
+                item.style.fontSize = "0.75rem";
+                item.innerHTML = `✅ ${file.name.substring(0, 15)}${file.name.length>15?'...':''}`;
                 contenedor.appendChild(item);
             } else {
                 const errorItem = document.createElement("div");
@@ -210,13 +224,12 @@
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Recopilando datos...", "info");
 
-        // A) Recopilar datos de la tabla
+        // A) Recopilar datos
         const filas = document.querySelectorAll(".select-estado");
         const estados = [];
 
         filas.forEach(select => {
             const estado = select.value || select.getAttribute("value");
-            // Solo enviamos si se ha seleccionado algo distinto al default
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
