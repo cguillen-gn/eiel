@@ -37,7 +37,7 @@ MUNICIPIOS_TSV = os.path.join(BASE_DIR, "data", "municipios.tsv")
 
 # URLs de Apps Script
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
-URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbzR23OiVN8N6loUlnT8eHiwHEwK317Uvj2Smo89itZkeiEHzM-dWF1JpzXFqbejHDaiMQ/exec"
+URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec"
 
 # ---------------- FIREBASE CONFIG ----------------
 FIREBASE_CONFIG = {
