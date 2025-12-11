@@ -192,7 +192,7 @@ def main():
             code = str(m).zfill(3)
             municipios_data.append({"code": code, "name": mmap.get(code, f"Municipio {code}")})
 
-        # --- 4. Generar INDEX (APP COMPLETA) ---
+        # --- 4. Generar INDEX ---
         print(f"Generando Index con Login integrado...")
         rendered_index = template_index.render(
             fase_actual=fase_actual,
