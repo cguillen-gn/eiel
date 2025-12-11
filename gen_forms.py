@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # gen_forms.py
-import os, json, sys, csv, shutil, hashlib, base64 # <--- IMPORTANTE: base64
+import os, json, sys, csv, shutil, hashlib, base64
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from dotenv import load_dotenv
 import psycopg2
@@ -9,19 +9,15 @@ import psycopg2.extras
 load_dotenv()
 
 # --- CONSTANTES GLOBALES Y RUTAS ---
-# 1. BASE_DIR: Dónde está este archivo script.py
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# 2. OUTPUT_DIR: La ÚNICA carpeta donde se generará todo (HTML, CSS, JS)
 OUTPUT_DIR = os.path.join(BASE_DIR, 'docs')
 
-# 3. Carpetas de ORIGEN (Donde tú editas, relativas a BASE_DIR)
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 ASSETS_CSS_DIR = os.path.join(BASE_DIR, "css")
-ASSETS_JS_DIR = os.path.join(BASE_DIR, "js") # Si tienes JS
+ASSETS_JS_DIR = os.path.join(BASE_DIR, "js") 
 
-# --- CONFIGURACIÓN DE NOMBRES DE PLANTILLAS ---
-TEMPLATE_LOGIN = "login-template.html.j2"
+# --- NOMBRES DE PLANTILLAS ---
+# Nota: Ya no usamos template_login porque todo va en el index
 TEMPLATE_INDEX = "index-template.html.j2" 
 TEMPLATE_AGUA = "form-agua.html.j2"
 TEMPLATE_OBRAS = "form-obras.html.j2"
@@ -39,7 +35,7 @@ DB = {
 
 MUNICIPIOS_TSV = os.path.join(BASE_DIR, "data", "municipios.tsv")
 
-# URLs de Apps Script (Centralizadas)
+# URLs de Apps Script
 URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
 URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbxIJ9ZAGvaEWLeRJf-j_JhuA3AFOPfbKqLNkZimeqwUrkLWzI1NQpkZ908t5ttFZLQ2Ow/exec"
 
@@ -53,11 +49,8 @@ FIREBASE_CONFIG = {
     "appId": os.getenv("FIREBASE_APP_ID"),
     "measurementId": os.getenv("FIREBASE_MEASUREMENT_ID")
 }
-# ---------------- END CONFIG ----------------
 
-# -----------------------------------------------------------
-# CARGA Y OFUSCACIÓN DE EMAILS (BASE64)
-# -----------------------------------------------------------
+# ---------------- CARGA Y OFUSCACIÓN DE EMAILS (BASE64) ----------------
 MAPPING_FILE = "auth_mapping.json"
 HASHED_AUTH_MAP = {} 
 
@@ -66,14 +59,10 @@ try:
         with open(MAPPING_FILE, "r", encoding="utf-8") as f:
             raw_map = json.load(f)
             
-        print("🔒 Ocultando emails (Base64) para despliegue...")
+        print("🔒 Ocultando emails (Base64)...")
         for email, code in raw_map.items():
-            # 1. Normalizar: minúsculas y sin espacios
             clean_email = email.strip().lower()
-            # 2. Codificar en Base64 (Estándar Web)
-            # Encode a bytes -> Base64 bytes -> Decode a string para JSON
             email_b64 = base64.b64encode(clean_email.encode('utf-8')).decode('utf-8')
-            # 3. Guardar
             HASHED_AUTH_MAP[email_b64] = code
             
         print(f"✅ {len(HASHED_AUTH_MAP)} usuarios procesados.")
@@ -90,14 +79,12 @@ env = Environment(
 )
 
 def from_json_filter(value):
-    if not value:
-        return None
+    if not value: return None
     return json.loads(value)
 
 env.filters['fromjson'] = from_json_filter
     
-# Cargamos las plantillas
-template_login = env.get_template(TEMPLATE_LOGIN)
+# Cargar plantillas
 template_index = env.get_template(TEMPLATE_INDEX)
 template_agua = env.get_template(TEMPLATE_AGUA)
 template_obras = env.get_template(TEMPLATE_OBRAS)
@@ -105,7 +92,6 @@ template_residuos = env.get_template(TEMPLATE_RESIDUOS)
 template_cementerios = env.get_template(TEMPLATE_CEMENTERIOS)
 
 def conectar():
-    """Conexión a BD."""
     return psycopg2.connect(
         host=DB["host"], port=DB["port"], dbname=DB["dbname"],
         user=DB["user"], password=DB["password"], client_encoding='UTF8'
@@ -154,14 +140,13 @@ def obtener_obras(conn, mun):
             WHERE fase = (SELECT max(fase) FROM geonet_fase) 
             AND mun = %s
             AND (
-                (estado IS NULL OR estado NOT IN ('FI','AN')) -- Condición 1: No iniciadas/En curso
+                (estado IS NULL OR estado NOT IN ('FI','AN'))
                 OR 
-                (estado = 'FI' AND (proyecto IS NULL OR proyecto <> 'SI')) -- Condición 2: Finalizadas sin proyecto
+                (estado = 'FI' AND (proyecto IS NULL OR proyecto <> 'SI'))
             )
         """
         cur.execute(sql, (mun,))
         rows = cur.fetchall()
-        
         obras = []
         for r in rows:
             obras.append({
@@ -178,7 +163,6 @@ def obtener_cementerios(conn, mun):
 def copiar_assets():
     src_css = ASSETS_CSS_DIR
     dest_css = os.path.join(OUTPUT_DIR, 'css')
-
     if os.path.exists(src_css):
         shutil.copytree(src_css, dest_css, dirs_exist_ok=True)
         print(f"✅ CSS copiado a {dest_css}")
@@ -186,15 +170,12 @@ def copiar_assets():
 def main():
     print("--- INICIO GENERACIÓN DE FORMULARIOS ---")
     
-    # 1. Asegurar el directorio de salida
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
         print(f"📂 Carpeta creada: {OUTPUT_DIR}")
     
-    # 2. Copiar CSS y JS
     copiar_assets()
     
-    # 3. Cargar datos base
     try:
         mmap = cargar_mapado_municipios(MUNICIPIOS_TSV) 
     except Exception as e:
@@ -212,27 +193,18 @@ def main():
             code = str(m).zfill(3)
             municipios_data.append({"code": code, "name": mmap.get(code, f"Municipio {code}")})
 
-        # --- 4. Generar Index ---
-        print(f"Generando Index para {len(municipios_data)} municipios...")
+        # --- 4. Generar INDEX (APP COMPLETA) ---
+        print(f"Generando Index con Login integrado...")
         rendered_index = template_index.render(
             fase_actual=fase_actual,
             municipios_json_data=json.dumps(municipios_data, ensure_ascii=False),
             firebase_config_data=json.dumps(FIREBASE_CONFIG), 
-            # ⚠️ CAMBIO DE SEGURIDAD: Pasamos los Hashes BASE64
             mapeo_email_codigo_data=json.dumps(HASHED_AUTH_MAP)
         )
         with open(os.path.join(OUTPUT_DIR, "index.html"), "w", encoding="utf-8") as f:
             f.write(rendered_index)
 
-        # --- 5. Generar Login ---
-        print("Generando Login...")
-        rendered_login = template_login.render(
-            firebase_config=json.dumps(FIREBASE_CONFIG)
-        )
-        with open(os.path.join(OUTPUT_DIR, "login.html"), "w", encoding="utf-8") as f:
-            f.write(rendered_login)
-
-        # --- 6. Generar Formularios por Municipio ---
+        # --- 5. Generar Formularios ---
         print("Generando formularios específicos...")
         for m in municipios_data:
             code = m["code"]
@@ -247,40 +219,29 @@ def main():
                 "firebase_config": json.dumps(FIREBASE_CONFIG) 
             }
 
-            # --- AGUA ---
+            # AGUA
             depositos = obtener_depositos(conn, code)
             with open(os.path.join(OUTPUT_DIR, f'agua_{code}.html'), "w", encoding="utf-8") as f:
-                f.write(template_agua.render(
-                    **common_ctx,
-                    depositos_json=json.dumps(depositos, ensure_ascii=False)
-                ))
+                f.write(template_agua.render(**common_ctx, depositos_json=json.dumps(depositos, ensure_ascii=False)))
 
-            # --- OBRAS ---
+            # OBRAS
             obras = obtener_obras(conn, code)
             with open(os.path.join(OUTPUT_DIR, f'obras_{code}.html'), "w", encoding="utf-8") as f:
-                f.write(template_obras.render(
-                    **common_ctx,
-                    obras=obras,
-                    obras_json=json.dumps(obras, ensure_ascii=False)
-                ))
+                f.write(template_obras.render(**common_ctx, obras=obras, obras_json=json.dumps(obras, ensure_ascii=False)))
 
-            # --- RESIDUOS ---
+            # RESIDUOS
             with open(os.path.join(OUTPUT_DIR, f'residuos_{code}.html'), "w", encoding="utf-8") as f:
                 f.write(template_residuos.render(**common_ctx))
 
-            # --- CEMENTERIOS ---
+            # CEMENTERIOS
             cementerios = obtener_cementerios(conn, code)
             with open(os.path.join(OUTPUT_DIR, f'cementerios_{code}.html'), "w", encoding="utf-8") as f:
-                f.write(template_cementerios.render(
-                    **common_ctx,
-                    cementerios=cementerios,
-                    cementerios_json=json.dumps(cementerios, ensure_ascii=False)
-                ))
+                f.write(template_cementerios.render(**common_ctx, cementerios=cementerios, cementerios_json=json.dumps(cementerios, ensure_ascii=False)))
             
         print("\n✅ Proceso finalizado con éxito.")
 
     except Exception as e:
-        print(f"\n❌ ERROR FATAL en el proceso principal: {e}")
+        print(f"\n❌ ERROR FATAL: {e}")
         import traceback
         traceback.print_exc() 
     finally:
