@@ -17,7 +17,6 @@ ASSETS_CSS_DIR = os.path.join(BASE_DIR, "css")
 ASSETS_JS_DIR = os.path.join(BASE_DIR, "js") 
 
 # --- NOMBRES DE PLANTILLAS ---
-# Nota: Ya no usamos template_login porque todo va en el index
 TEMPLATE_INDEX = "index-template.html.j2" 
 TEMPLATE_AGUA = "form-agua.html.j2"
 TEMPLATE_OBRAS = "form-obras.html.j2"
@@ -36,7 +35,7 @@ DB = {
 MUNICIPIOS_TSV = os.path.join(BASE_DIR, "data", "municipios.tsv")
 
 # URLs de Apps Script
-URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
+URL_ADJUNTOS = "https://script.google.com/macros/s/AKfycbwn0g_GPsLcW41oGKYm72cym07enSVUtVSa2QRL6bq6cBmXEDoxEBtiV3blteHI3yQI/exec"
 URL_GENERAR_PDF = "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec"
 
 # ---------------- FIREBASE CONFIG ----------------
