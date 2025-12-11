@@ -1895,27 +1895,22 @@
 
         // C) Enviar
         try {
-            mostrarMensaje("⏳ Generando justificante...", "info");
+            mostrarMensaje("⏳ Enviando datos...", "info");
             
-            const response = await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                body: new URLSearchParams(payload)
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
-            let result = {};
-            try { result = await response.json(); } 
-            catch(e) { if (response.ok) result = { success: true }; }
-
-            if (result.success || response.ok) {
-                mostrarMensaje(`✅ Estados actualizados. Justificante enviado a ${userEmail}`, "success");
-                if(result.downloadUrl) window.open(result.downloadUrl, '_blank');
-            } else {
-                throw new Error(result.message || "Error desconocido");
-            }
+            mostrarMensaje(`✅ Estados actualizados. El justificante llegará a ${userEmail}`, "success");
+            // Nota: En modo no-cors no podemos abrir el PDF automáticamente
 
         } catch (error) {
             console.error(error);
             mostrarMensaje(`❌ Error: ${error.message}`, "error");
+        } finally {
             btnFirmar.disabled = false;
         }
     });

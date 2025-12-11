@@ -594,26 +594,21 @@
 
         // C. Enviar a Script PDF
         try {
-            const response = await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                body: new URLSearchParams(payload)
+                mode: "no-cors", // <--- ESTA ES LA CLAVE
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
-            // Intentamos leer respuesta
-            let result = {};
-            try { result = await response.json(); } 
-            catch(e) { if(response.ok) result = {success:true}; }
-
-            if (result.success || response.ok) {
-                mostrarMensaje("✅ ¡Éxito! Formulario enviado. Revisa tu email.", "success");
-                archivos = [];
-                renderArchivos();
-                document.getElementById("consumoInput").value = "";
-                document.getElementById("observaciones").value = "";
-                if(result.downloadUrl) window.open(result.downloadUrl, '_blank');
-            } else {
-                throw new Error("Error en el servidor.");
-            }
+            // Con no-cors, no podemos leer la respuesta (result), así que asumimos éxito si no salta al catch
+            mostrarMensaje("✅ ¡Éxito! Datos enviados. Recibirás el PDF en tu email.", "success");
+            
+            // Limpieza
+            archivos = [];
+            renderArchivos();
+            document.getElementById("consumoInput").value = "";
+            document.getElementById("observaciones").value = "";
             
         } catch (error) {
             console.error(error);

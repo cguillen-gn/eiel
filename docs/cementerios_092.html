@@ -514,33 +514,22 @@
 
             // C) Enviar a Generar PDF
             try {
-                const response = await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
-                    body: new URLSearchParams(payload)
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
                 });
                 
-                let result = {};
-                try {
-                    result = await response.json();
-                } catch(e) {
-                    if(response.ok) {
-                        result = { success: true, message: "Envío correcto (CORS opaco)." };
-                    } else {
-                        throw new Error("Error de respuesta del servidor.");
-                    }
-                }
+                mostrarMensaje("✅ Formulario enviado correctamente. Revisa tu email.", "success");
+                archivos = [];
+                renderArchivos();
+                // Limpieza opcional de campos...
 
-                if (result.success || response.ok) {
-                    mostrarMensaje("✅ Formulario enviado correctamente. Revisa tu email.", "success");
-                    archivos = [];
-                    renderArchivos();
-                    if(result.downloadUrl) window.open(result.downloadUrl, '_blank');
-                } else {
-                    throw new Error(result.message || "Error desconocido");
-                }
             } catch (error) {
                 console.error(error);
                 mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            } finally {
                 btnFirmar.disabled = false;
             }
         });
