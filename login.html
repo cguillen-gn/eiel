@@ -1,45 +1,73 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Login EIEL</title>
-<style>
-body { font-family: Arial; margin: 20px; }
-input, button { width: 100%; max-width: 300px; padding: 8px; margin: 6px 0; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso al Portal EIEL 2025</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f0f8ff; }
+        #login-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; }
+        input { display: block; margin: 10px auto; padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 250px; }
+        button { padding: 10px 20px; background-color: #3F51B5; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #304ffe; }
+        #error-msg { color: #ef4444; margin-top: 15px; }
+    </style>
 </head>
 <body>
 
-<h2>Acceso Municipios EIEL</h2>
-<p>Introduzca las credenciales asignadas por Diputación</p>
+    <div id="login-container">
+        <h2>Acceso Ayuntamientos EIEL</h2>
+        <input type="email" id="email" placeholder="Correo electrónico">
+        <input type="password" id="password" placeholder="Contraseña">
+        <button id="btnLogin">Iniciar Sesión</button>
+        <p id="error-msg"></p>
+    </div>
 
-<input id="username" placeholder="Código INE (Ej: 019)">
-<input id="password" type="password" placeholder="Contraseña">
-<button id="loginBtn">Entrar</button>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+      import { getAuth, signInWithEmailAndPassword } 
+        from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-<p id="mensaje" style="color:red;"></p>
+      // --- CONFIGURACIÓN FIREBASE ESTATICA ---
+      const firebaseConfig = {
+        apiKey: "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ",
+        authDomain: "eiel-autenticacion-formularios.firebaseapp.com",
+        projectId: "eiel-autenticacion-formularios",
+        storageBucket: "eiel-autenticacion-formularios.firebasestorage.app",
+        messagingSenderId: "293834414398",
+        appId: "1:293834414398:web:8102c11d2ff6e9a1d3346f",
+        measurementId: "G-S9C7Z70HHV"
+      };
 
-<script>
-document.getElementById("loginBtn").addEventListener("click", function() {
-  const u = document.getElementById("username").value.trim();
-  const p = document.getElementById("password").value.trim();
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      
+      const btnLogin = document.getElementById('btnLogin');
+      const txtEmail = document.getElementById('email');
+      const txtPassword = document.getElementById('password');
+      const errorMsg = document.getElementById('error-msg');
 
-  // Usuarios de prueba por código INE
-  const usuarios = {
-    "019": { pass: "1234", nombre: "Aspe" },
-    "066": { pass: "abcd", nombre: "Elda" },
-    "009": { pass: "2025", nombre: "Alcoy" }
-  };
-
-  if (usuarios[u] && usuarios[u].pass === p) {
-    localStorage.setItem("usuarioActual", u);
-    localStorage.setItem("usuarioNombre", usuarios[u].nombre);  // ← Guardar nombre también
-    window.location.href = "index.html";
-  } else {
-    document.getElementById("mensaje").textContent = "Credenciales incorrectas";
-  }
-});
-</script>
-
+      btnLogin.addEventListener('click', () => {
+        const email = txtEmail.value;
+        const password = txtPassword.value;
+        
+        signInWithEmailAndPassword(auth, email, password)
+          .then((userCredential) => {
+            // Éxito: Redirige a la página protegida
+            
+            // 🚨 AÑADIR ESTA LÍNEA 🚨
+            localStorage.setItem("userEmailActual", userCredential.user.email); // Nuevo nombre de clave!
+            // Y borrar la clave de municipio (si existe) para evitar conflictos
+            localStorage.removeItem("municipioCodigoActual");
+            
+            errorMsg.textContent = "Acceso concedido...";
+            window.location.href = 'index.html';
+          })
+          .catch((error) => {
+            console.error(error);
+            errorMsg.textContent = "Error de acceso: Usuario o contraseña incorrectos.";
+          });
+      });
+    </script>
 </body>
 </html>

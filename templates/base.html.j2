@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>{% block title %}EIEL - Encuesta de Infraestructuras{% endblock %}</title>
+
+    <link rel="stylesheet" href="css/style.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">Fase 2024</span>
+            </div>
+            
+            <div class="user-area" id="userContainer" style="display: none;">
+                <span id="userEmail" class="user-email">Cargando...</span>
+                <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">
+                ⬅ Volver al listado de municipios
+            </a>
+            <span class="separator">/</span>
+            <span class="current-page">{{ muni_display }}</span>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header">
+                {% block header_icon %}📝{% endblock %}
+            </div>
+            <div class="title-header">
+                <h2>{% block header_title %}Formulario{% endblock %}</h2>
+                <p class="subtitle">{{ muni_display }} (Código: {{ muni_code }})</p>
+            </div>
+        </div>
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>Diputación Provincial - Encuesta de Infraestructuras y Equipamientos Locales</p>
+    </footer>
+
+    <script>
+        // 1. Configuración de Firebase (Inyectada desde Python)
+        // Usamos | safe para que Jinja no escape las comillas del JSON
+        const firebaseConfig = JSON.parse('{{ firebase_config | safe }}');
+        
+        // 2. Inicializar Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        // 3. Control de Sesión
+        firebase.auth().onAuthStateChanged((user) => {
+            if (user) {
+                // --- USUARIO LOGUEADO ---
+                const userArea = document.getElementById("userContainer");
+                const userEmailSpan = document.getElementById("userEmail");
+                
+                if(userArea) userArea.style.display = "flex";
+                if(userEmailSpan) userEmailSpan.textContent = user.email;
+                
+                // Guardamos email para los scripts de envío
+                localStorage.setItem("userEmailActual", user.email);
+            } else {
+                // --- USUARIO NO LOGUEADO ---
+                
+                // IMPORTANTE: Evitar bucle infinito. 
+                // Solo redirigimos si NO estamos ya en el index.html
+                const path = window.location.pathname;
+                
+                // Si la URL no termina en 'index.html' ni es la raíz '/', entonces echamos al usuario
+                if (!path.endsWith("index.html") && !path.endsWith("/")) {
+                    console.warn("Usuario no identificado. Redirigiendo al index...");
+                    window.location.href = "index.html"; 
+                }
+            }
+        });
+
+        // 4. Función de Logout
+        function logout() {
+            firebase.auth().signOut().then(() => {
+                window.location.href = "index.html";
+            });
+        }
+    </script>
+
+    {% block scripts %}
+    {% endblock %}
+
+</body>
+</html>

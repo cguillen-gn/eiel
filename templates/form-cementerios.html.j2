@@ -1,0 +1,320 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Cementerios{% endblock %}
+{% block header_icon %}⚰️{% endblock %}
+{% block header_title %}Cementerios Municipales{% endblock %}
+
+{% block content %}
+
+{# 1. Estado Vacío #}
+{% if cementerios|length == 0 %}
+<div class="card" style="text-align: center; padding: 3rem;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">⚰️</div>
+    <h3 style="color: var(--text-secondary);">No hay cementerios registrados</h3>
+    <p style="color: var(--text-secondary);">Su municipio no tiene cementerios en la base de datos.</p>
+</div>
+{% else %}
+
+{# 2. Tarjeta de Información #}
+<div class="card" style="background-color: #f8fafc; border-left: 4px solid var(--theme-cementerios);">
+    <p style="font-size: 0.9rem; color: #475569;">
+      <strong>OCUPACIÓN:</strong> Para la correcta valoración del nivel de saturación, indique el número de unidades ocupadas.<br>
+        El total se calcula sumando: Ocupadas + Concesión + Propiedad + Libres.
+    </p>
+</div>
+
+{# 3. Bucle de Cementerios #}
+{% for cem in cementerios %}
+<div class="card">
+    <h2 class="section-title" style="color: var(--theme-cementerios);">📍 {{ cem.nombre }}</h2>
+    
+    <div class="cementerio-table-wrapper">
+        <table class="cementerio-table">
+            <thead>
+                <tr>
+                    <th class="header-ocupacion" colspan="2">OCUPACIÓN</th>
+                    <th>FOSAS</th>
+                    <th>NICHOS</th>
+                    <th>COLUMBARIOS</th>
+                    <th>OSARIOS</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="label-cell">OCUPADAS</td>
+                    <td class="sublabel-cell"></td> 
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="ocupadas_fosas" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="ocupadas_nichos" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="ocupadas_columbarios" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="ocupadas_osarios" placeholder="0"></td>
+                </tr>
+
+                <tr>
+                    <td class="label-cell" rowspan="3">LIBRES</td> 
+                    <td class="sublabel-cell">EN CONCESIÓN</td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_concesion_fosas" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_concesion_nichos" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_concesion_columbarios" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_concesion_osarios" placeholder="0"></td>
+                </tr>
+
+                <tr>
+                    <td class="sublabel-cell">PROPIEDAD PRIVADA</td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_propiedad_fosas" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_propiedad_nichos" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_propiedad_columbarios" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_propiedad_osarios" placeholder="0"></td>
+                </tr>
+
+                <tr>
+                    <td class="sublabel-cell">
+                        PROPIEDAD MUNICIPAL<br>
+                        <span style="font-size: 0.75rem;">(DISPONIBLES)</span>
+                    </td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_municipal_fosas" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_municipal_nichos" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_municipal_columbarios" placeholder="0"></td>
+                    <td><input type="number" min="0" data-cem="{{ loop.index }}" data-tipo="libres_municipal_osarios" placeholder="0"></td>
+                </tr>
+
+                <tr class="total-row">
+                    <td class="label-cell" colspan="2">TOTAL</td> 
+                    <td id="total_fosas_{{ loop.index }}">0</td>
+                    <td id="total_nichos_{{ loop.index }}">0</td>
+                    <td id="total_columbarios_{{ loop.index }}">0</td>
+                    <td id="total_osarios_{{ loop.index }}">0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    </div>
+{% endfor %}
+
+{# 4. OBSERVACIONES (AÑADIDO NUEVO) #}
+<div class="card">
+    <h2 class="section-title" style="color: var(--theme-cementerios);">📝 Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia sobre el estado del cementerio..."></textarea>
+    </div>
+</div>
+
+{# 5. Adjuntos (TÍTULO GRIS) #}
+<div class="card">
+    <h2 class="section-title" style="color: var(--theme-cementerios);">Documentación Adjunta (Opcional)</h2>
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
+        <div style="color: var(--primary); font-weight: 600;">Haga clic para adjuntar archivos</div>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+</div>
+
+{# 6. Botón Firmar (BOTÓN GRIS) #}
+<div class="card">
+    <button id="firmarBtn" class="btn btn-primary btn-cementerios">
+        <span>✓</span> Firmar y enviar formulario
+    </button>
+    <div id="mensaje" class="message"></div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 1. CAMBIAR COLOR CABECERA A GRIS (NUEVO)
+    document.querySelector('.site-header').classList.add('header-cementerios');
+
+    // Inyectamos datos del servidor
+    const cementerios = {{ cementerios_json | safe }};
+    
+    // Inyectamos configuración necesaria para UploadService
+    window.EIEL_CONFIG = {
+        muniCode: "{{ muni_code }}",
+        muniName: "{{ muni_display }}",
+        urlGenerarPdf: "{{ url_generar_pdf }}",
+        urlAdjuntos: "{{ url_adjuntos }}"
+    };
+    
+    // ==========================================
+    // 1. LÓGICA DE CÁLCULO (TU LÓGICA ORIGINAL INTACTA)
+    // ==========================================
+    function calcularTotales() {
+        cementerios.forEach((cem, index) => {
+            const cemIndex = index + 1;
+            const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
+            
+            let totales = { fosas: 0, nichos: 0, columbarios: 0, osarios: 0 };
+            
+            inputs.forEach(input => {
+                const tipo = input.dataset.tipo;
+                const valor = parseInt(input.value) || 0;
+                
+                if (tipo.includes('fosas')) totales.fosas += valor;
+                if (tipo.includes('nichos')) totales.nichos += valor;
+                if (tipo.includes('columbarios')) totales.columbarios += valor;
+                if (tipo.includes('osarios')) totales.osarios += valor;
+            });
+            
+            // Actualizar DOM de forma segura
+            const setTotal = (id, val) => {
+                const el = document.getElementById(id);
+                if(el) el.textContent = val;
+            };
+
+            setTotal(`total_fosas_${cemIndex}`, totales.fosas);
+            setTotal(`total_nichos_${cemIndex}`, totales.nichos);
+            setTotal(`total_columbarios_${cemIndex}`, totales.columbarios);
+            setTotal(`total_osarios_${cemIndex}`, totales.osarios);
+        });
+    }
+
+    document.addEventListener('input', (e) => {
+        if (e.target.type === 'number' && e.target.dataset.cem) {
+            calcularTotales();
+        }
+    });
+
+    // ==========================================
+    // 2. GESTIÓN DE ARCHIVOS (NECESITA UPLOADSERVICE PARA FUNCIONAR)
+    // ==========================================
+    // Definimos UploadService aquí por si no está en base
+    const UploadService = {
+        toBase64: file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        }),
+        async uploadFile(file, tipoFicha, muniCode) {
+            try {
+                const base64 = await this.toBase64(file);
+                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
+                await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                        municipio: muniCode, usuario: userEmail, tipo: tipoFicha
+                    })
+                });
+                return true;
+            } catch (e) { return false; }
+        }
+    };
+
+    let archivos = [];
+    const fileInput = document.getElementById("fileInput");
+    const fileList = document.getElementById("fileList");
+
+    if (fileInput) {
+        fileInput.onchange = () => {
+            archivos.push(...Array.from(fileInput.files));
+            renderArchivos();
+            fileInput.value = '';
+        };
+    }
+
+    window.eliminarArchivo = (i) => {
+        archivos.splice(i, 1);
+        renderArchivos();
+    }
+
+    function renderArchivos() {
+        if (archivos.length === 0) {
+            fileList.innerHTML = '';
+            return;
+        }
+        fileList.innerHTML = archivos.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
+                <span>📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger">✖</button>
+            </div>
+        `).join("");
+    }
+
+    // ==========================================
+    // 3. ENVÍO
+    // ==========================================
+    const btnFirmar = document.getElementById("firmarBtn");
+    const mensajeDiv = document.getElementById("mensaje");
+
+    function mostrarMensaje(texto, tipo) {
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`;
+        mensajeDiv.style.display = 'block';
+    }
+
+    if (btnFirmar) {
+        btnFirmar.addEventListener("click", async () => {
+            btnFirmar.disabled = true;
+            mostrarMensaje("⏳ Subiendo archivos...", "info");
+
+            // A) Subir Archivos a Drive
+            let erroresSubida = 0;
+            for (const file of archivos) {
+                const ok = await UploadService.uploadFile(
+                    file, 
+                    'cementerios', 
+                    window.EIEL_CONFIG.muniCode
+                );
+                if (!ok) erroresSubida++;
+            }
+
+            if (erroresSubida > 0) {
+                mostrarMensaje(`⚠️ Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
+            }
+
+            // B) Recopilar Datos (TU LÓGICA ORIGINAL)
+            mostrarMensaje("⏳ Generando justificante...", "info");
+            const datosCementerios = cementerios.map((cem, index) => {
+                const cemIndex = index + 1;
+                const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
+                let datos = { nombre: cem.nombre };
+                
+                inputs.forEach(input => {
+                    const tipo = input.dataset.tipo;
+                    const val = parseInt(input.value);
+                    datos[tipo] = isNaN(val) ? 0 : val;
+                });
+                return datos;
+            });
+            
+            const userEmail = localStorage.getItem("userEmailActual");
+            const payload = {
+                tipo_formulario: "cementerios",
+                cementerios_data: JSON.stringify(datosCementerios),
+                email_usuario: userEmail,
+                municipio_codigo: window.EIEL_CONFIG.muniCode,
+                municipio_nombre: window.EIEL_CONFIG.muniName,
+                timestamp_envio: new Date().toISOString(),
+                archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                // AÑADIDO: OBSERVACIONES AL ENVÍO
+                observaciones: document.getElementById("observaciones").value || ""
+            };
+
+            // C) Enviar a Generar PDF
+            try {
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                
+                mostrarMensaje("✅ Formulario enviado correctamente. Revisa tu email.", "success");
+                archivos = [];
+                renderArchivos();
+                // Limpieza opcional de campos...
+
+            } catch (error) {
+                console.error(error);
+                mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            } finally {
+                btnFirmar.disabled = false;
+            }
+        });
+    }
+</script>
+{% endblock %}
