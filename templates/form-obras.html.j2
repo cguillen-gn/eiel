@@ -108,9 +108,20 @@
 </div>
 
 <div class="card">
-    <button id="firmarBtn" class="btn btn-primary btn-obras">
-        <span>✓</span> Firmar y enviar formulario
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: flex-start;">
+            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
+            <span style="font-size: 0.95rem; color: #334155; line-height: 1.4;">
+                <strong>Declaración de veracidad:</strong> Como técnico responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
+            </span>
+        </label>
+    </div>
+
+    <button id="btnEnviar" class="btn btn-primary" disabled style="opacity: 0.6; cursor: not-allowed;">
+        🚀 Registrar y Enviar Datos
     </button>
+    
     <div id="mensaje" class="message"></div>
 </div>
 
@@ -226,7 +237,8 @@
     };
 
     // 5. ENVÍO
-    const btnFirmar = document.getElementById("firmarBtn");
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
@@ -235,26 +247,46 @@
         mensajeDiv.style.display = 'block';
     }
 
-    btnFirmar.addEventListener("click", async () => {
-        // --- VALIDACIÓN CONTACTO ---
+    // Lógica del Checkbox
+    if (checkConformidad) {
+        checkConformidad.addEventListener('change', function() {
+            if (this.checked) {
+                btnEnviar.disabled = false;
+                btnEnviar.style.opacity = "1";
+                btnEnviar.style.cursor = "pointer";
+            } else {
+                btnEnviar.disabled = true;
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed";
+            }
+        });
+    }
+
+    // Click Final
+    btnEnviar.addEventListener("click", async () => {
+        // 1. Bloqueo inicial
+        btnEnviar.disabled = true;
+        btnEnviar.style.cursor = "wait";
+
+        // 2. Validación de Contacto
         const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
         const emailContacto = document.getElementById("tecnicoEmail").value.trim();
 
         if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
             mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+            btnEnviar.disabled = false; // Reactivar
+            btnEnviar.style.cursor = "pointer";
             return;
         }
 
-        btnFirmar.disabled = true;
         mostrarMensaje("⏳ Recopilando datos...", "info");
 
-        // A) Recopilar datos
+        // A) Recopilar datos de la tabla
         const filas = document.querySelectorAll(".select-estado");
         const estados = [];
 
         filas.forEach(select => {
             const estado = select.value;
-            // Enviamos si tiene valor
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
@@ -269,9 +301,11 @@
             }
         });
 
+        // Validar si hay datos
         if (estados.length === 0) {
-            mostrarMensaje("⚠️ No ha seleccionado ningún estado (ni siquiera finalizadas).", "warning");
-            btnFirmar.disabled = false;
+            mostrarMensaje("⚠️ No ha seleccionado ningún estado (o confirmado las finalizadas).", "warning");
+            btnEnviar.disabled = false;
+            btnEnviar.style.cursor = "pointer";
             return;
         }
 
@@ -301,12 +335,18 @@
             });
 
             mostrarMensaje(`✅ Estados actualizados. El justificante llegará a ${emailContacto}`, "success");
+            
+            // Opcional: Desmarcar check
+            if(checkConformidad) {
+                checkConformidad.checked = false;
+                btnEnviar.style.opacity = "0.6";
+            }
 
         } catch (error) {
             console.error(error);
             mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-        } finally {
-            btnFirmar.disabled = false;
+            btnEnviar.disabled = false;
+            btnEnviar.style.cursor = "pointer";
         }
     });
 </script>

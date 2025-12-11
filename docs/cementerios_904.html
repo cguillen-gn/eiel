@@ -7,12 +7,9 @@
     <title>Cementerios</title>
 
     <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-</head>
+    </head>
 <body>
 
     <header class="site-header">
@@ -22,9 +19,9 @@
                 <span class="badge-fase">Fase 2024</span>
             </div>
             
-            <div class="user-area" id="userContainer" style="display: none;">
-                <span id="userEmail" class="user-email">Cargando...</span>
-                <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
             </div>
         </div>
     </header>
@@ -32,7 +29,7 @@
     <nav class="breadcrumb-nav">
         <div class="container">
             <a href="index.html" class="back-link">
-                ⬅ Volver al listado de municipios
+                ⬅ Volver al menú principal
             </a>
             <span class="separator">/</span>
             <span class="current-page">San Isidro</span>
@@ -166,9 +163,20 @@
 
 
 <div class="card">
-    <button id="firmarBtn" class="btn btn-primary btn-cementerios">
-        <span>✓</span> Firmar y enviar formulario
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: flex-start;">
+            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
+            <span style="font-size: 0.95rem; color: #334155; line-height: 1.4;">
+                <strong>Declaración de veracidad:</strong> Como técnico responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
+            </span>
+        </label>
+    </div>
+
+    <button id="btnEnviar" class="btn btn-primary" disabled style="opacity: 0.6; cursor: not-allowed;">
+        🚀 Registrar y Enviar Datos
     </button>
+    
     <div id="mensaje" class="message"></div>
 </div>
 
@@ -176,52 +184,32 @@
 
     </main>
 
-    <footer class="site-footer">
+    <footer class="site-footer" style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">
         <p>Diputación Provincial - Encuesta de Infraestructuras y Equipamientos Locales</p>
     </footer>
 
     <script>
-        // 1. Configuración de Firebase (Inyectada desde Python)
-        // Usamos | safe para que Jinja no escape las comillas del JSON
-        const firebaseConfig = JSON.parse('');
-        
-        // 2. Inicializar Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        // 1. COMPROBAR SESIÓN LOCAL (Ya no usamos Firebase)
+        document.addEventListener("DOMContentLoaded", () => {
+            const sessionCode = localStorage.getItem("eiel_session_code");
+            const sessionName = localStorage.getItem("eiel_session_name");
 
-        // 3. Control de Sesión
-        firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                // --- USUARIO LOGUEADO ---
-                const userArea = document.getElementById("userContainer");
-                const userEmailSpan = document.getElementById("userEmail");
-                
-                if(userArea) userArea.style.display = "flex";
-                if(userEmailSpan) userEmailSpan.textContent = user.email;
-                
-                // Guardamos email para los scripts de envío
-                localStorage.setItem("userEmailActual", user.email);
+            // Si no hay código de sesión, expulsamos al index
+            if (!sessionCode) {
+                console.warn("⛔ Sin sesión activa. Redirigiendo...");
+                window.location.href = "index.html";
             } else {
-                // --- USUARIO NO LOGUEADO ---
-                
-                // IMPORTANTE: Evitar bucle infinito. 
-                // Solo redirigimos si NO estamos ya en el index.html
-                const path = window.location.pathname;
-                
-                // Si la URL no termina en 'index.html' ni es la raíz '/', entonces echamos al usuario
-                if (!path.endsWith("index.html") && !path.endsWith("/")) {
-                    console.warn("Usuario no identificado. Redirigiendo al index...");
-                    window.location.href = "index.html"; 
-                }
+                // Si hay sesión, ponemos el nombre en la cabecera
+                const headerName = document.getElementById("headerMuniName");
+                if(headerName) headerName.textContent = sessionName || "Municipio";
             }
         });
 
-        // 4. Función de Logout
+        // 2. FUNCIÓN SALIR
         function logout() {
-            firebase.auth().signOut().then(() => {
-                window.location.href = "index.html";
-            });
+            localStorage.removeItem("eiel_session_code");
+            localStorage.removeItem("eiel_session_name");
+            window.location.href = "index.html";
         }
     </script>
 
@@ -331,7 +319,8 @@
     }
 
     // 6. ENVÍO
-    const btnFirmar = document.getElementById("firmarBtn");
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
@@ -340,17 +329,38 @@
         mensajeDiv.style.display = 'block';
     }
 
-    btnFirmar.addEventListener("click", async () => {
-        // --- VALIDACIÓN CONTACTO ---
+    // Lógica del Checkbox
+    if (checkConformidad) {
+        checkConformidad.addEventListener('change', function() {
+            if (this.checked) {
+                btnEnviar.disabled = false;
+                btnEnviar.style.opacity = "1";
+                btnEnviar.style.cursor = "pointer";
+            } else {
+                btnEnviar.disabled = true;
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed";
+            }
+        });
+    }
+
+    // Click Final
+    btnEnviar.addEventListener("click", async () => {
+        // 1. Bloqueo
+        btnEnviar.disabled = true;
+        btnEnviar.style.cursor = "wait";
+
+        // 2. Validación de Contacto
         const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
         const emailContacto = document.getElementById("tecnicoEmail").value.trim();
 
         if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
             mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+            btnEnviar.disabled = false; 
+            btnEnviar.style.cursor = "pointer";
             return;
         }
 
-        btnFirmar.disabled = true;
         mostrarMensaje("⏳ Subiendo archivos...", "info");
 
         // A. Subir
@@ -392,7 +402,7 @@
             archivos_adjuntos: archivos.map(a => a.name).join("\n")
         };
 
-        // C. Enviar (NO-CORS)
+        // C. Enviar
         try {
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
@@ -404,12 +414,16 @@
             mostrarMensaje("✅ Formulario enviado correctamente. Revisa tu email.", "success");
             archivos = [];
             renderArchivos();
+            if(checkConformidad) {
+                checkConformidad.checked = false;
+                btnEnviar.style.opacity = "0.6";
+            }
 
         } catch (error) {
             console.error(error);
             mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-        } finally {
-            btnFirmar.disabled = false;
+            btnEnviar.disabled = false;
+            btnEnviar.style.cursor = "pointer";
         }
     });
 </script>
