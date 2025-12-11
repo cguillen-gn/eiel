@@ -191,6 +191,20 @@
     </div>
 </div>
 
+<div class="card" style="border-left: 4px solid var(--primary);">
+    <h2 class="section-title">Datos de Contacto</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label class="form-label">Nombre y Apellidos del Técnico *</label>
+            <input type="text" id="tecnicoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email de contacto (Para recibir el PDF) *</label>
+            <input type="email" id="tecnicoEmail" class="form-input" placeholder="ejemplo@ayuntamiento.es" required>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <button id="firmarBtn" class="btn btn-primary btn-residuos">
         <span>✓</span> Firmar y enviar formulario
@@ -208,7 +222,7 @@
     <script>
         // 1. Configuración de Firebase (Inyectada desde Python)
         // Usamos | safe para que Jinja no escape las comillas del JSON
-        const firebaseConfig = JSON.parse('{"apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ", "authDomain": "eiel-autenticacion-formularios.firebaseapp.com", "projectId": "eiel-autenticacion-formularios", "storageBucket": "eiel-autenticacion-formularios.firebasestorage.app", "messagingSenderId": "293834414398", "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f", "measurementId": "G-S9C7Z70HHV"}');
+        const firebaseConfig = JSON.parse('');
         
         // 2. Inicializar Firebase
         if (!firebase.apps.length) {
@@ -252,18 +266,18 @@
 
     
 <script>
-    // 1. APLICAR COLOR VERDE AL HEADER
+    // 1. HEADER VERDE
     document.querySelector('.site-header').classList.add('header-residuos');
 
-    // 2. INYECTAR CONFIGURACIÓN DE PYTHON
+    // 2. CONFIG
     window.EIEL_CONFIG = {
         muniCode: "047",
         muniName: "Calp",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbziIeQp8N8QdSAtq3a4kFHVS1jR_Enfs9pGh4xS5s_qeqLwQeG2FsZ08_OMZs762M6m/exec"
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbxIJ9ZAGvaEWLeRJf-j_JhuA3AFOPfbKqLNkZimeqwUrkLWzI1NQpkZ908t5ttFZLQ2Ow/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
 
-    // 3. MAPEO DE CAMPOS (IGUAL QUE ANTES)
+    // 3. MAPEO
     const RESIDUO_FIELDS = [
       { type: "Plásticos y Envases (amarillo)", prod: "prod_plastico", cont: "cont_plastico", period: "period_plastico", dest: "dest_plastico" },
       { type: "Papel y Cartón (azul)", prod: "prod_papel", cont: "cont_papel", period: "period_papel", dest: "dest_papel" },
@@ -272,8 +286,7 @@
       { type: "No selectiva/resto", prod: "prod_resto", cont: "cont_resto", period: "period_resto", dest: "dest_resto" },
     ];
 
-    // 4. SERVICIO DE SUBIDA (UploadService)
-    // Es necesario definirlo aquí si no está en base.html.j2
+    // 4. UPLOAD SERVICE
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -285,7 +298,7 @@
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
-                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
+                const userEmail = document.getElementById("tecnicoEmail").value || "anonimo";
 
                 const payload = {
                     filename: file.name,
@@ -304,13 +317,13 @@
                 });
                 return true;
             } catch (e) {
-                console.error("Error subiendo archivo:", e);
+                console.error("Error:", e);
                 return false;
             }
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS UI
+    // 5. ARCHIVOS UI
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -350,6 +363,15 @@
     }
 
     btnFirmar.addEventListener("click", async () => {
+        // --- VALIDACIÓN CONTACTO ---
+        const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
+        const emailContacto = document.getElementById("tecnicoEmail").value.trim();
+
+        if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
+            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+            return;
+        }
+
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Subiendo archivos...", "info");
 
@@ -362,8 +384,8 @@
 
         if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
-        // B. Recopilar Datos
-        mostrarMensaje("⏳ Generando justificante...", "info");
+        // B. Payload
+        mostrarMensaje("⏳ Enviando datos...", "info");
 
         const residuosData = RESIDUO_FIELDS.map(r => ({
             tipo: r.type,
@@ -373,23 +395,22 @@
             destino: document.getElementById(r.dest).value || "N/A"
         }));
 
-        const personasLimpieza = document.getElementById("personasLimpieza").value || "N/A";
-        // --- NUEVO: Recoger observaciones ---
-        const observaciones = document.getElementById("observaciones").value || "";
-
         const payload = {
             tipo_formulario: "residuos",
             residuos_data: JSON.stringify(residuosData),
-            personas_limpieza: personasLimpieza,
-            email_usuario: localStorage.getItem("userEmailActual"),
+            personas_limpieza: document.getElementById("personasLimpieza").value || "N/A",
+            observaciones: document.getElementById("observaciones").value || "",
+            // Contacto
+            email_usuario: emailContacto,
+            nombre_tecnico: nombreTecnico,
+            // Técnico
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
             timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: archivos.map(a => a.name).join("\n"),
-            observaciones: observaciones // <--- AÑADIDO AL ENVÍO
+            archivos_adjuntos: archivos.map(a => a.name).join("\n")
         };
 
-        // C. Fetch PDF
+        // C. Enviar (NO-CORS)
         try {
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
@@ -408,7 +429,7 @@
             });
 
         } catch (error) {
-            mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
         } finally {
             btnFirmar.disabled = false;
         }

@@ -202,6 +202,20 @@
     <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
 </div>
 
+<div class="card" style="border-left: 4px solid var(--primary);">
+    <h2 class="section-title">Datos de Contacto</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label class="form-label">Nombre y Apellidos del Técnico *</label>
+            <input type="text" id="tecnicoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email de contacto (Para recibir el PDF) *</label>
+            <input type="email" id="tecnicoEmail" class="form-input" placeholder="ejemplo@ayuntamiento.es" required>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <button id="firmarBtn" class="btn btn-primary btn-agua" style="width: 100%; padding: 1rem; font-size: 1.1rem;">
         <span>✓</span> Firmar y enviar formulario
@@ -219,7 +233,7 @@
     <script>
         // 1. Configuración de Firebase (Inyectada desde Python)
         // Usamos | safe para que Jinja no escape las comillas del JSON
-        const firebaseConfig = JSON.parse('{"apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ", "authDomain": "eiel-autenticacion-formularios.firebaseapp.com", "projectId": "eiel-autenticacion-formularios", "storageBucket": "eiel-autenticacion-formularios.firebasestorage.app", "messagingSenderId": "293834414398", "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f", "measurementId": "G-S9C7Z70HHV"}');
+        const firebaseConfig = JSON.parse('');
         
         // 2. Inicializar Firebase
         if (!firebase.apps.length) {
@@ -263,15 +277,15 @@
 
     
 <script>
-    // 1. CONFIGURACIÓN Header (Color tema Agua)
+    // 1. CONFIGURACIÓN DEL HEADER
     document.querySelector('.site-header').classList.add('header-agua');
 
-    // 2. Variables de Python
+    // 2. CONFIGURACIÓN
     window.EIEL_CONFIG = {
         muniCode: "021",
         muniName: "Banyeres de Mariola",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbziIeQp8N8QdSAtq3a4kFHVS1jR_Enfs9pGh4xS5s_qeqLwQeG2FsZ08_OMZs762M6m/exec"
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbxIJ9ZAGvaEWLeRJf-j_JhuA3AFOPfbKqLNkZimeqwUrkLWzI1NQpkZ908t5ttFZLQ2Ow/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
 
     // 3. SERVICIO DE SUBIDA
@@ -286,7 +300,8 @@
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
-                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
+                // Usamos el email escrito en el formulario o anonimo si falla
+                const userEmail = document.getElementById("tecnicoEmail").value || "anonimo";
 
                 const payload = {
                     filename: file.name,
@@ -340,23 +355,26 @@
         `).join("");
     }
 
-    // 5. LÓGICA DE ENVÍO
+    // 5. ENVÍO
     const btnFirmar = document.getElementById("firmarBtn");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
         mensajeDiv.textContent = texto;
-        let color = "#e2e8f0";
-        if(tipo === 'success') color = "#d1fae5";
-        if(tipo === 'error') color = "#fee2e2";
-        if(tipo === 'warning') color = "#fef3c7";
-        
-        mensajeDiv.style.background = color;
-        mensajeDiv.style.color = "#333";
+        mensajeDiv.className = `message ${tipo}`;
         mensajeDiv.style.display = 'block';
     }
 
     btnFirmar.addEventListener("click", async () => {
+        // --- VALIDACIÓN CONTACTO ---
+        const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
+        const emailContacto = document.getElementById("tecnicoEmail").value.trim();
+
+        if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
+            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
+            return;
+        }
+
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Subiendo archivos...", "info");
 
@@ -370,7 +388,7 @@
         if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
         // B. Recopilar Datos
-        mostrarMensaje("⏳ Generando justificante...", "info");
+        mostrarMensaje("⏳ Enviando datos...", "info");
 
         const depositosData = [];
         document.querySelectorAll('.input-limpieza').forEach(input => {
@@ -380,30 +398,30 @@
             });
         });
 
-        const userEmail = localStorage.getItem("userEmailActual");
-
         const payload = {
             tipo_formulario: "agua",
             consumo: document.getElementById("consumoInput").value || "No indicado",
             depositos: JSON.stringify(depositosData),
-            observaciones: document.getElementById("observaciones").value || "", // Observaciones
-            email_usuario: userEmail,
+            observaciones: document.getElementById("observaciones").value || "",
+            // Datos de contacto
+            email_usuario: emailContacto,
+            nombre_tecnico: nombreTecnico,
+            // Datos técnicos
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
             timestamp_envio: new Date().toISOString(),
             archivos_adjuntos: archivos.map(a => a.name).join("\n")
         };
 
-        // C. Enviar a Script PDF
+        // C. Enviar (NO-CORS)
         try {
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                mode: "no-cors", // <--- ESTA ES LA CLAVE
+                mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
-            // Con no-cors, no podemos leer la respuesta (result), así que asumimos éxito si no salta al catch
             mostrarMensaje("✅ ¡Éxito! Datos enviados. Recibirás el PDF en tu email.", "success");
             
             // Limpieza
@@ -414,7 +432,7 @@
             
         } catch (error) {
             console.error(error);
-            mostrarMensaje(`❌ Error de conexión: ${error.message}`, "error");
+            mostrarMensaje(`❌ Error técnico (aunque puede que se haya enviado): ${error.message}`, "error");
         } finally {
             btnFirmar.disabled = false;
         }

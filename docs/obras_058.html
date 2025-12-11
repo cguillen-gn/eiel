@@ -3159,6 +3159,20 @@
     </div>
 </div>
 
+<div class="card" style="border-left: 4px solid var(--primary);">
+    <h2 class="section-title">Datos de Contacto</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label class="form-label">Nombre y Apellidos del Técnico *</label>
+            <input type="text" id="tecnicoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email de contacto (Para recibir el PDF) *</label>
+            <input type="email" id="tecnicoEmail" class="form-input" placeholder="ejemplo@ayuntamiento.es" required>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <button id="firmarBtn" class="btn btn-primary btn-obras">
         <span>✓</span> Firmar y enviar formulario
@@ -3178,7 +3192,7 @@
     <script>
         // 1. Configuración de Firebase (Inyectada desde Python)
         // Usamos | safe para que Jinja no escape las comillas del JSON
-        const firebaseConfig = JSON.parse('{"apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ", "authDomain": "eiel-autenticacion-formularios.firebaseapp.com", "projectId": "eiel-autenticacion-formularios", "storageBucket": "eiel-autenticacion-formularios.firebasestorage.app", "messagingSenderId": "293834414398", "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f", "measurementId": "G-S9C7Z70HHV"}');
+        const firebaseConfig = JSON.parse('');
         
         // 2. Inicializar Firebase
         if (!firebase.apps.length) {
@@ -3222,18 +3236,18 @@
 
     
 <script>
-    // 1. CONFIGURACIÓN DEL HEADER
+    // 1. HEADER COLOR
     document.querySelector('.site-header').classList.add('header-obras');
 
-    // 2. CONFIGURACIÓN
+    // 2. CONFIG
     window.EIEL_CONFIG = {
         muniCode: "058",
         muniName: "Cox",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbziIeQp8N8QdSAtq3a4kFHVS1jR_Enfs9pGh4xS5s_qeqLwQeG2FsZ08_OMZs762M6m/exec"
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbxIJ9ZAGvaEWLeRJf-j_JhuA3AFOPfbKqLNkZimeqwUrkLWzI1NQpkZ908t5ttFZLQ2Ow/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
 
-    // 3. SERVICIO DE SUBIDA
+    // 3. SERVICIO SUBIDA
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -3245,7 +3259,8 @@
         async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
-                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
+                // Intentamos coger el email si ya está relleno, si no anonimo
+                const userEmail = document.getElementById("tecnicoEmail")?.value || "anonimo";
 
                 const payload = {
                     filename: file.name,
@@ -3265,17 +3280,15 @@
                 });
                 return true;
             } catch (e) {
-                console.error("Error subiendo archivo:", e);
+                console.error("Error subiendo:", e);
                 return false;
             }
         }
     };
 
-    // 4. ESTADO LOCAL DE ADJUNTOS
+    // 4. GESTIÓN DE ADJUNTOS POR OBRA
     const adjuntosPorObra = {};
     let obraActualEnSubida = null;
-
-    // 5. GESTIÓN DE ADJUNTOS
     const hiddenInput = document.getElementById("hiddenFileInput");
 
     window.gestionarAdjuntos = (codigoObra) => {
@@ -3328,7 +3341,7 @@
         obraActualEnSubida = null;
     };
 
-    // 6. ENVÍO DEL FORMULARIO
+    // 5. ENVÍO
     const btnFirmar = document.getElementById("firmarBtn");
     const mensajeDiv = document.getElementById("mensaje");
 
@@ -3339,16 +3352,25 @@
     }
 
     btnFirmar.addEventListener("click", async () => {
+        // --- VALIDACIÓN CONTACTO ---
+        const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
+        const emailContacto = document.getElementById("tecnicoEmail").value.trim();
+
+        if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
+            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+            return;
+        }
+
         btnFirmar.disabled = true;
         mostrarMensaje("⏳ Recopilando datos...", "info");
 
-        // A) Recopilar datos de la tabla
+        // A) Recopilar datos
         const filas = document.querySelectorAll(".select-estado");
         const estados = [];
 
         filas.forEach(select => {
-            const estado = select.value || select.getAttribute("value");
-            // Permitir enviar estados que ya están precargados (Finalizada) o nuevos seleccionados
+            const estado = select.value;
+            // Enviamos si tiene valor
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
@@ -3364,24 +3386,26 @@
         });
 
         if (estados.length === 0) {
-            mostrarMensaje("⚠️ No ha actualizado el estado de ninguna obra.", "warning");
+            mostrarMensaje("⚠️ No ha seleccionado ningún estado (ni siquiera finalizadas).", "warning");
             btnFirmar.disabled = false;
             return;
         }
 
-        // B) Preparar Payload
-        const userEmail = localStorage.getItem("userEmailActual");
+        // B) Payload
         const payload = {
             tipo_formulario: "obras",
             datos_obras_json: JSON.stringify(estados),
-            email_usuario: userEmail,
+            observaciones: document.getElementById("observaciones").value || "",
+            // Contacto
+            email_usuario: emailContacto,
+            nombre_tecnico: nombreTecnico,
+            // Técnico
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
-            timestamp_envio: new Date().toISOString(),
-            observaciones: document.getElementById("observaciones").value || ""
+            timestamp_envio: new Date().toISOString()
         };
 
-        // C) Enviar
+        // C) Enviar (NO-CORS)
         try {
             mostrarMensaje("⏳ Enviando datos...", "info");
             
@@ -3392,12 +3416,11 @@
                 body: JSON.stringify(payload)
             });
 
-            mostrarMensaje(`✅ Estados actualizados. El justificante llegará a ${userEmail}`, "success");
-            // Nota: En modo no-cors no podemos abrir el PDF automáticamente
+            mostrarMensaje(`✅ Estados actualizados. El justificante llegará a ${emailContacto}`, "success");
 
         } catch (error) {
             console.error(error);
-            mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
         } finally {
             btnFirmar.disabled = false;
         }
