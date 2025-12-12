@@ -46,26 +46,26 @@
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        {% if o.cond in [1, 2] %}
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="{{ codigo_obra }}" 
-                                    data-nombre="{{ o.nombre }}" 
-                                    data-plan="{{ o.plan_obra }}">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" {% if o.cond == 2 %}selected{% endif %}>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        {% else %}
-                            <span style="color: #cbd5e1;">-</span>
-                        {% endif %}
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
+                                data-obra-id="{{ codigo_obra }}" 
+                                data-nombre="{{ o.nombre }}" 
+                                data-plan="{{ o.plan_obra }}">
+                            
+                            <option value="En curso / No iniciada" {% if o.cond == 1 %}selected{% endif %}>En curso / No iniciada</option>
+                            <option value="Finalizada" {% if o.cond == 2 %}selected{% endif %}>Finalizada</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Anulada">Anulada</option>
+                        </select>
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        {% if o.cond in [1, 2] %}
+                        
+                        {% if o.proyecto == 'RE' %}
+                            <div style="background-color: #dcfce7; color: #166534; padding: 0.5rem; border-radius: 6px; border: 1px solid #bbf7d0; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                ✅ Proyecto<br>disponible
+                            </div>
+                        {% else %}
                             <button type="button" class="btn btn-secondary" 
                                 style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
                                 onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
@@ -74,9 +74,8 @@
                                 📎 Adjuntar
                             </button>
                             <div id="lista_adjuntos_{{ codigo_obra }}" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        {% else %}
-                            <span style="color: #cbd5e1;">-</span>
                         {% endif %}
+
                     </td>
                 </tr>
                 {% endfor %}
@@ -287,6 +286,7 @@
 
         filas.forEach(select => {
             const estado = select.value;
+            // Enviamos si tiene valor
             if (estado && estado !== "") {
                 const obraId = select.dataset.obraId;
                 const archivosSubidos = adjuntosPorObra[obraId] || [];
@@ -301,7 +301,6 @@
             }
         });
 
-        // Validar si hay datos
         if (estados.length === 0) {
             mostrarMensaje("⚠️ No ha seleccionado ningún estado (o confirmado las finalizadas).", "warning");
             btnEnviar.disabled = false;
@@ -340,6 +339,8 @@
             if(checkConformidad) {
                 checkConformidad.checked = false;
                 btnEnviar.style.opacity = "0.6";
+                btnEnviar.disabled = true; // Forzamos disable visual también
+                btnEnviar.style.cursor = "not-allowed";
             }
 
         } catch (error) {
