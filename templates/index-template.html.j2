@@ -100,9 +100,9 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
 <script>
     // DATOS DE PYTHON
     const MUNICIPIOS = {{ municipios_lista | safe }}; 
-    const AUTH_HASHES = {{ auth_hashes | safe }}; 
+    const URL_LOGIN = "{{ url_login_api }}"; // Variable nueva
 
-    // Referencias UI
+    // Referencias UI (Igual que antes)
     const ui = {
         login: document.getElementById('viewLogin'),
         menu: document.getElementById('viewMenu'),
@@ -120,7 +120,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         }
     };
 
-    // 1. Llenar Select
+    // 1. Llenar Select (Igual que antes)
     MUNICIPIOS.forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.code;
@@ -128,15 +128,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         ui.select.appendChild(opt);
     });
 
-    // 2. Función Hash SHA-256 (Nativa navegador)
-    async function sha256(message) {
-        const msgBuffer = new TextEncoder().encode(message);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    }
-
-    // 3. Login
+    // 2. NUEVA FUNCION LOGIN (Conectada a Google)
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
         const enteredPass = ui.input.value.trim();
@@ -145,22 +137,41 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
             showError("Seleccione un municipio e introduzca el código.");
             return;
         }
+        
+        // Bloqueo visual mientras carga
+        ui.btn.disabled = true;
+        ui.btn.textContent = "Verificando...";
+        ui.error.style.display = 'none';
 
-        // Validar
-        const trueHash = AUTH_HASHES[selectedCode]; // Hash real del municipio
-        const inputHash = await sha256(enteredPass); // Hash de lo que ha escrito el usuario
+        try {
+            // PETICIÓN AL NUEVO SCRIPT
+            // Nota: Usamos redirect: 'follow' y text/plain para evitar errores CORS complejos
+            const response = await fetch(URL_LOGIN, {
+                method: 'POST',
+                body: JSON.stringify({ codigo: selectedCode, password: enteredPass }),
+                headers: { "Content-Type": "text/plain" } 
+            });
+            
+            const data = await response.json();
 
-        if (trueHash === inputHash) {
-            // ÉXITO
-            const muniName = ui.select.options[ui.select.selectedIndex].text.split('(')[0].trim();
-            loginSuccess(selectedCode, muniName);
-        } else {
-            // ERROR
-            showError("Código de acceso incorrecto.");
+            if (data.valid) {
+                // EXITO: Google dice que es correcto
+                loginSuccess(selectedCode, data.nombre);
+            } else {
+                // ERROR: Google dice que no coincide
+                showError("Contraseña incorrecta.");
+            }
+
+        } catch (e) {
+            console.error(e);
+            showError("Error de conexión. Inténtelo de nuevo.");
+        } finally {
+            ui.btn.disabled = false;
+            ui.btn.textContent = "Entrar";
         }
     });
 
-    // 4. Gestión Sesión
+    // 3. Gestión Sesión (Igual que antes)
     function loginSuccess(code, name) {
         localStorage.setItem("eiel_session_code", code);
         localStorage.setItem("eiel_session_name", name);
@@ -175,30 +186,25 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
 
         ui.login.classList.add('hidden');
         ui.menu.classList.remove('hidden');
-        ui.error.style.display = 'none';
     }
-
-    function checkSession() {
-        const code = localStorage.getItem("eiel_session_code");
-        const name = localStorage.getItem("eiel_session_name");
-        if(code && name) {
-            loginSuccess(code, name);
-        }
-    }
-
-    window.logout = function() {
-        localStorage.removeItem("eiel_session_code");
-        window.location.reload();
-    }
-
+    
     function showError(msg) {
         ui.error.textContent = msg;
         ui.error.style.display = 'block';
     }
 
-    // Init
-    checkSession();
-
+    // Init: Comprobar si ya estaba logueado
+    const sessionCode = localStorage.getItem("eiel_session_code");
+    const sessionName = localStorage.getItem("eiel_session_name");
+    if(sessionCode && sessionName) {
+        loginSuccess(sessionCode, sessionName);
+    }
+    
+    // Logout
+    window.logout = function() {
+        localStorage.removeItem("eiel_session_code");
+        window.location.reload();
+    }
 </script>
 </body>
 </html>
