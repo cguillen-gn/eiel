@@ -24,7 +24,8 @@ body { display: flex; align-items: center; justify-content: center; }
 .form-section { padding: 2rem; }
 label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155; }
 .input-field { 
-    width: 100%; padding: 0.9rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; margin-bottom: 1.5rem; background: white;
+    width: 100%; padding: 0.9rem; border: 1px solid #cbd5e1;
+    border-radius: 8px; font-size: 1rem; margin-bottom: 1.5rem; background: white;
 }
 .input-field:focus { outline: none; border-color: var(--primary); ring: 2px var(--primary); }
 
@@ -34,6 +35,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
     transition: background 0.2s;
 }
 .btn-entrar:hover { background-color: var(--primary-hover); }
+.btn-entrar:disabled { background-color: #94a3b8; cursor: wait; }
 
 /* Menú */
 .menu-header { text-align: center; padding-bottom: 1.5rem; border-bottom: 1px solid #e2e8f0; margin-bottom: 1.5rem; }
@@ -43,7 +45,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
 .btn-grid { display: flex; flex-direction: column; gap: 0.8rem; }
 .btn-menu { 
     display: flex; align-items: center; padding: 1.2rem; font-weight: 600; 
-    border-radius: 8px; text-decoration: none; color: #334155; 
+    border-radius: 8px; text-decoration: none; color: #334155;
     background-color: white; border: 1px solid #e2e8f0; border-left-width: 6px; 
     transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
@@ -71,7 +73,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         <label>1. Seleccione su Municipio</label>
         <select id="muniSelect" class="input-field">
             <option value="">-- Buscar en la lista --</option>
-            </select>
+        </select>
 
         <label>2. Código de Acceso</label>
         <input type="password" id="muniCode" class="input-field" placeholder="Introduzca el código facilitado">
@@ -98,11 +100,11 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
 </div>
 
 <script>
-    // DATOS DE PYTHON
+    // --- CONFIGURACIÓN INYECTADA DESDE PYTHON ---
     const MUNICIPIOS = {{ municipios_lista | safe }}; 
-    const URL_LOGIN = "{{ url_login_api }}"; // Variable nueva
+    const URL_LOGIN_API = "{{ url_login_api }}"; // La URL de tu nuevo script de Google
 
-    // Referencias UI (Igual que antes)
+    // --- REFERENCIAS UI ---
     const ui = {
         login: document.getElementById('viewLogin'),
         menu: document.getElementById('viewMenu'),
@@ -120,7 +122,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         }
     };
 
-    // 1. Llenar Select (Igual que antes)
+    // 1. LLENAR SELECTOR
     MUNICIPIOS.forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.code;
@@ -128,7 +130,7 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         ui.select.appendChild(opt);
     });
 
-    // 2. NUEVA FUNCION LOGIN (Conectada a Google)
+    // 2. EVENTO LOGIN (CONEXIÓN CON GOOGLE APPS SCRIPT)
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
         const enteredPass = ui.input.value.trim();
@@ -137,33 +139,36 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
             showError("Seleccione un municipio e introduzca el código.");
             return;
         }
-        
-        // Bloqueo visual mientras carga
+
+        // Estado de carga
         ui.btn.disabled = true;
         ui.btn.textContent = "Verificando...";
         ui.error.style.display = 'none';
 
         try {
-            // PETICIÓN AL NUEVO SCRIPT
-            // Nota: Usamos redirect: 'follow' y text/plain para evitar errores CORS complejos
-            const response = await fetch(URL_LOGIN, {
+            // Petición al Script de Login
+            const response = await fetch(URL_LOGIN_API, {
                 method: 'POST',
-                body: JSON.stringify({ codigo: selectedCode, password: enteredPass }),
-                headers: { "Content-Type": "text/plain" } 
+                // Usamos text/plain para evitar errores CORS complejos (Preflight)
+                headers: { "Content-Type": "text/plain" },
+                body: JSON.stringify({ 
+                    codigo: selectedCode, 
+                    password: enteredPass 
+                })
             });
             
             const data = await response.json();
 
-            if (data.valid) {
-                // EXITO: Google dice que es correcto
+            if (data.valid === true) {
+                // Éxito: Guardamos sesión
                 loginSuccess(selectedCode, data.nombre);
             } else {
-                // ERROR: Google dice que no coincide
-                showError("Contraseña incorrecta.");
+                // Error: Contraseña incorrecta
+                showError("Código de acceso incorrecto.");
             }
 
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
             showError("Error de conexión. Inténtelo de nuevo.");
         } finally {
             ui.btn.disabled = false;
@@ -171,40 +176,48 @@ label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #334155;
         }
     });
 
-    // 3. Gestión Sesión (Igual que antes)
+    // 3. GESTIÓN DE SESIÓN
     function loginSuccess(code, name) {
         localStorage.setItem("eiel_session_code", code);
         localStorage.setItem("eiel_session_name", name);
-        
+
         ui.name.textContent = name;
         ui.code.textContent = code;
         
+        // Actualizamos los enlaces a los formularios
         ui.links.agua.href = `agua_${code}.html`;
         ui.links.obras.href = `obras_${code}.html`;
         ui.links.residuos.href = `residuos_${code}.html`;
         ui.links.cementerios.href = `cementerios_${code}.html`;
 
+        // Cambio de vista
         ui.login.classList.add('hidden');
         ui.menu.classList.remove('hidden');
+        ui.error.style.display = 'none';
     }
-    
+
+    function checkSession() {
+        const code = localStorage.getItem("eiel_session_code");
+        const name = localStorage.getItem("eiel_session_name");
+        if(code && name) {
+            loginSuccess(code, name);
+        }
+    }
+
+    window.logout = function() {
+        localStorage.removeItem("eiel_session_code");
+        localStorage.removeItem("eiel_session_name");
+        window.location.reload();
+    }
+
     function showError(msg) {
         ui.error.textContent = msg;
         ui.error.style.display = 'block';
     }
 
-    // Init: Comprobar si ya estaba logueado
-    const sessionCode = localStorage.getItem("eiel_session_code");
-    const sessionName = localStorage.getItem("eiel_session_name");
-    if(sessionCode && sessionName) {
-        loginSuccess(sessionCode, sessionName);
-    }
-    
-    // Logout
-    window.logout = function() {
-        localStorage.removeItem("eiel_session_code");
-        window.location.reload();
-    }
+    // Inicializar comprobando si ya hay sesión
+    checkSession();
+
 </script>
 </body>
 </html>
