@@ -40,7 +40,7 @@
                 ⚰️
             </div>
             <div class="title-header">
-                <h2>Cementerios</h2>
+                <h2>Cementerios Municipales</h2>
                 <p class="subtitle">Daya Vieja (Código: 062)</p>
             </div>
         </div>
@@ -54,7 +54,6 @@
     <h3 style="color: var(--text-secondary);">No hay cementerios registrados</h3>
     <p style="color: var(--text-secondary);">Su municipio no tiene cementerios en la base de datos.</p>
 </div>
-
 
 
     </main>
@@ -90,19 +89,63 @@
 
     
 <script>
+    // 1. CAMBIAR COLOR CABECERA A GRIS (NUEVO)
     document.querySelector('.site-header').classList.add('header-cementerios');
 
+    // Inyectamos datos del servidor
+    const cementerios = [];
+    
+    // Inyectamos configuración necesaria para UploadService
     window.EIEL_CONFIG = {
         muniCode: "062",
         muniName: "Daya Vieja",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwvrPCwtr2ByRlvDmwex-ipbHuhAtXKeGw0-aUSCKIRROKfxu1wVWrSlf-nOTn38gPW/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
+    
+    // ==========================================
+    // 1. LÓGICA DE CÁLCULO (TU LÓGICA ORIGINAL INTACTA)
+    // ==========================================
+    function calcularTotales() {
+        cementerios.forEach((cem, index) => {
+            const cemIndex = index + 1;
+            const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
+            
+            let totales = { fosas: 0, nichos: 0, columbarios: 0, osarios: 0 };
+            
+            inputs.forEach(input => {
+                const tipo = input.dataset.tipo;
+                const valor = parseInt(input.value) || 0;
+                
+                if (tipo.includes('fosas')) totales.fosas += valor;
+                if (tipo.includes('nichos')) totales.nichos += valor;
+                if (tipo.includes('columbarios')) totales.columbarios += valor;
+                if (tipo.includes('osarios')) totales.osarios += valor;
+            });
+            
+            // Actualizar DOM de forma segura
+            const setTotal = (id, val) => {
+                const el = document.getElementById(id);
+                if(el) el.textContent = val;
+            };
 
-    // DATOS INYECTADOS
-    const CEMENTERIOS = [];
+            setTotal(`total_fosas_${cemIndex}`, totales.fosas);
+            setTotal(`total_nichos_${cemIndex}`, totales.nichos);
+            setTotal(`total_columbarios_${cemIndex}`, totales.columbarios);
+            setTotal(`total_osarios_${cemIndex}`, totales.osarios);
+        });
+    }
 
-    // 1. SERVICIO SUBIDA
+    document.addEventListener('input', (e) => {
+        if (e.target.type === 'number' && e.target.dataset.cem) {
+            calcularTotales();
+        }
+    });
+
+    // ==========================================
+    // 2. GESTIÓN DE ARCHIVOS (NECESITA UPLOADSERVICE PARA FUNCIONAR)
+    // ==========================================
+    // Definimos UploadService aquí por si no está en base
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -110,143 +153,115 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
-                const userEmail = document.getElementById("tecnicoEmail")?.value || "anonimo";
-                
-                const payload = {
-                    filename: file.name,
-                    mimeType: file.type,
-                    bytesBase64: base64,
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha
-                };
-                
+                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                        municipio: muniCode, usuario: userEmail, tipo: tipoFicha
+                    })
                 });
                 return true;
-            } catch (e) {
-                console.error("Error subiendo:", e);
-                return false;
-            }
+            } catch (e) { return false; }
         }
     };
 
-    // 2. GESTIÓN DE COLA
-    let colaAdjuntos = [];
+    let archivos = [];
     const fileInput = document.getElementById("fileInput");
-    const listaDiv = document.getElementById("listaArchivos");
+    const fileList = document.getElementById("fileList");
 
-    if(fileInput) {
-        fileInput.addEventListener('change', () => {
-            if(fileInput.files.length > 0) {
-                colaAdjuntos.push(...Array.from(fileInput.files));
-                renderCola();
-                fileInput.value = "";
-            }
-        });
+    if (fileInput) {
+        fileInput.onchange = () => {
+            archivos.push(...Array.from(fileInput.files));
+            renderArchivos();
+            fileInput.value = '';
+        };
     }
 
-    function renderCola() {
-        if (!listaDiv) return;
-        if (colaAdjuntos.length === 0) {
-            listaDiv.innerHTML = "";
+    window.eliminarArchivo = (i) => {
+        archivos.splice(i, 1);
+        renderArchivos();
+    }
+
+    function renderArchivos() {
+        if (archivos.length === 0) {
+            fileList.innerHTML = '';
             return;
         }
-        listaDiv.innerHTML = colaAdjuntos.map((f, i) => `
-            <div style="display: flex; justify-content: space-between; align-items: center; 
-                        background: white; padding: 8px 12px; border-radius: 6px; 
-                        margin-bottom: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                <span style="font-size: 0.9rem; color: #334155;">📄 ${f.name}</span>
-                <button onclick="eliminarDeCola(${i})" style="color: #ef4444; font-weight: bold; background: none; border: none; cursor: pointer;">✖</button>
+        fileList.innerHTML = archivos.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
+                <span>📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger">✖</button>
             </div>
         `).join("");
     }
 
-    window.eliminarDeCola = (index) => {
-        colaAdjuntos.splice(index, 1);
-        renderCola();
-    }
-
+    // ==========================================
     // 3. ENVÍO
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConformidad = document.getElementById("checkConformidad");
+    // ==========================================
+    const btnFirmar = document.getElementById("firmarBtn");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
-        if(!mensajeDiv) return;
         mensajeDiv.textContent = texto;
         mensajeDiv.className = `message ${tipo}`;
         mensajeDiv.style.display = 'block';
     }
 
-    if(checkConformidad) {
-        checkConformidad.addEventListener('change', function() {
-            if (this.checked) {
-                btnEnviar.disabled = false;
-                btnEnviar.style.opacity = "1";
-                btnEnviar.style.cursor = "pointer";
-            } else {
-                btnEnviar.disabled = true;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
-            }
-        });
-    }
+    if (btnFirmar) {
+        btnFirmar.addEventListener("click", async () => {
+            btnFirmar.disabled = true;
+            mostrarMensaje("⏳ Subiendo archivos...", "info");
 
-    if(btnEnviar) {
-        btnEnviar.addEventListener("click", async () => {
-            const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
-            const emailContacto = document.getElementById("tecnicoEmail").value.trim();
-
-            if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
-                mostrarMensaje("⚠️ Indique nombre y email de contacto válidos.", "warning");
-                return;
+            // A) Subir Archivos a Drive
+            let erroresSubida = 0;
+            for (const file of archivos) {
+                const ok = await UploadService.uploadFile(
+                    file, 
+                    'cementerios', 
+                    window.EIEL_CONFIG.muniCode
+                );
+                if (!ok) erroresSubida++;
             }
 
-            // Bloqueo
-            btnEnviar.disabled = true;
-            btnEnviar.style.cursor = "wait";
-            mostrarMensaje("⏳ Procesando...", "info");
-
-            // A. Subida diferida
-            const totalArchivos = colaAdjuntos.length;
-            if (totalArchivos > 0) {
-                for (let i = 0; i < totalArchivos; i++) {
-                    const file = colaAdjuntos[i];
-                    mostrarMensaje(`⏳ Subiendo archivo ${i + 1} de ${totalArchivos}... (${file.name})`, "info");
-                    
-                    await UploadService.uploadFile(file, "cementerios", window.EIEL_CONFIG.muniCode);
-                }
+            if (erroresSubida > 0) {
+                mostrarMensaje(`⚠️ Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
             }
 
-            // B. Datos
-            // En cementerios solo confirmamos que existen, así que enviamos la lista tal cual
-            const datosCementerios = CEMENTERIOS;
-
+            // B) Recopilar Datos (TU LÓGICA ORIGINAL)
+            mostrarMensaje("⏳ Generando justificante...", "info");
+            const datosCementerios = cementerios.map((cem, index) => {
+                const cemIndex = index + 1;
+                const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
+                let datos = { nombre: cem.nombre };
+                
+                inputs.forEach(input => {
+                    const tipo = input.dataset.tipo;
+                    const val = parseInt(input.value);
+                    datos[tipo] = isNaN(val) ? 0 : val;
+                });
+                return datos;
+            });
+            
+            const userEmail = localStorage.getItem("userEmailActual");
             const payload = {
                 tipo_formulario: "cementerios",
                 cementerios_data: JSON.stringify(datosCementerios),
-                observaciones: document.getElementById("observaciones").value || "",
-                email_usuario: emailContacto,
-                nombre_tecnico: nombreTecnico,
+                email_usuario: userEmail,
                 municipio_codigo: window.EIEL_CONFIG.muniCode,
                 municipio_nombre: window.EIEL_CONFIG.muniName,
                 timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: colaAdjuntos.map(a => a.name).join("\n")
+                archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                // AÑADIDO: OBSERVACIONES AL ENVÍO
+                observaciones: document.getElementById("observaciones").value || ""
             };
 
-            // C. PDF
+            // C) Enviar a Generar PDF
             try {
-                mostrarMensaje("⏳ Generando informe PDF...", "info");
-                
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
                     mode: "no-cors",
@@ -255,20 +270,15 @@
                 });
                 
                 mostrarMensaje("✅ Formulario enviado correctamente. Revisa tu email.", "success");
-                
-                colaAdjuntos = [];
-                renderCola();
-                if(checkConformidad) {
-                    checkConformidad.checked = false;
-                    btnEnviar.style.opacity = "0.6";
-                    btnEnviar.disabled = true;
-                }
+                archivos = [];
+                renderArchivos();
+                // Limpieza opcional de campos...
 
             } catch (error) {
                 console.error(error);
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-                btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
+                mostrarMensaje(`❌ Error: ${error.message}`, "error");
+            } finally {
+                btnFirmar.disabled = false;
             }
         });
     }
