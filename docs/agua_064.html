@@ -58,55 +58,56 @@
         <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc;">
             <li><strong>Consumo Anual:</strong> Indique el volumen total en <strong>metros cúbicos (m³)</strong>.</li>
             <li><strong>Depósitos:</strong> Actualice el año de la <strong>última limpieza</strong> realizada. Si no se ha limpiado nunca o se desconoce, déjelo en blanco o indique el año de construcción.</li>
+            <li><strong>Adjuntos:</strong> Puede añadir facturas o informes al final. Se subirán automáticamente al enviar.</li>
         </ul>
     </div>
 </div>
 
 <div class="card" style="border-left: 4px solid var(--theme-agua);">
-    <h2 class="section-title" style="color: var(--theme-agua);">Consumo Anual</h2>
+    <h2 class="section-title" style="color: var(--theme-agua);">Datos de Consumo</h2>
     <div class="form-group">
-        <label for="consumoInput" class="form-label">
-            Consumo de agua potable en el año 2025 (m³)
-        </label>
-        <input 
-            type="number" 
-            id="consumoInput" 
-            class="form-input" 
-            placeholder="Ej: 15000" 
-            min="0"
-            style="max-width: 300px;"
-        >
+        <label class="form-label">Consumo Anual Total (m³) *</label>
+        <input type="number" id="consumoInput" class="form-input" placeholder="Ej: 15000" min="0">
     </div>
 </div>
 
 <div class="card" style="border-left: 4px solid var(--theme-agua);">
-    <h2 class="section-title" style="color: var(--theme-agua);">Depósitos Municipales</h2>
+    <h2 class="section-title" style="color: var(--theme-agua);">Estado de los Depósitos</h2>
     
-    
-    
-        <p style="color: var(--text-secondary); font-style: italic; padding: 1rem;">
-            ℹ️ No constan depósitos registrados para este municipio.
-        </p>
-    
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 70%;">Nombre del Depósito</th>
+                    <th style="width: 30%;">Año Última Limpieza</th>
+                </tr>
+            </thead>
+            <tbody id="tablaDepositos">
+                </tbody>
+        </table>
+    </div>
 </div>
 
 <div class="card" style="border-left: 4px solid var(--theme-agua);">
     <h2 class="section-title" style="color: var(--theme-agua);">📝 Observaciones</h2>
     <div class="form-group">
         <label for="observaciones" class="form-label">Comentarios adicionales:</label>
-        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia o aclaración..."></textarea>
     </div>
 </div>
 
 <div class="card" style="border-left: 4px solid var(--theme-agua);">
-    <h2 class="section-title" style="color: var(--theme-agua);">Documentación Adjunta (Opcional)</h2>
-    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed var(--border); padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; transition: background 0.2s;">
-        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
-        <div style="color: var(--primary); font-weight: 600;">Haga clic para adjuntar archivos</div>
-        <p style="font-size: 0.9rem; color: #666;">(Fotos, informes, análisis...)</p>
+    <h2 class="section-title" style="color: var(--theme-agua);">Documentación Adjunta</h2>
+    <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 2rem; text-align: center;">
+        <p style="color: #64748b; margin-bottom: 1rem;">Puede adjuntar facturas de consumo, informes de limpieza o analíticas.</p>
+        
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">
+            📎 Seleccionar Archivos
+        </button>
         <input type="file" id="fileInput" multiple style="display: none;">
+        
+        <div id="listaArchivos" style="margin-top: 1.5rem; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto;"></div>
     </div>
-    <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
 </div>
 
 <div class="card" style="border-left: 4px solid var(--theme-agua);">
@@ -175,10 +176,9 @@
 
     
 <script>
-    // 1. CONFIGURACIÓN DEL HEADER
+    // 1. CONFIG
     document.querySelector('.site-header').classList.add('header-agua');
-
-    // 2. CONFIGURACIÓN
+    
     window.EIEL_CONFIG = {
         muniCode: "064",
         muniName: "Dolores",
@@ -186,7 +186,32 @@
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
 
-    // 3. SERVICIO DE SUBIDA
+    // DATOS INYECTADOS
+    const DEPOSITOS = [];
+
+    // 2. RENDERIZAR TABLA DEPÓSITOS
+    const tbody = document.getElementById("tablaDepositos");
+    if(DEPOSITOS.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center; padding: 1rem; color: #64748b;">No hay depósitos registrados para este municipio.</td></tr>';
+    } else {
+        DEPOSITOS.forEach((d, index) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td style="font-weight: 500; color: #334155;">${d.nombre}</td>
+                <td>
+                    <input type="number" class="form-input input-limpieza" 
+                           data-nombre="${d.nombre}" 
+                           value="${d.limpieza}" 
+                           placeholder="Año (Ej: 2023)" 
+                           min="1900" max="2100"
+                           style="width: 100%;">
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // 3. SERVICIO SUBIDA (Reutilizable)
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -198,18 +223,17 @@
         async uploadFile(file, tipoFicha, muniCode) {
             try {
                 const base64 = await this.toBase64(file);
-                // Usamos el email escrito en el formulario o anonimo si falla
-                const userEmail = document.getElementById("tecnicoEmail").value || "anonimo";
-
+                const userEmail = document.getElementById("tecnicoEmail")?.value || "anonimo";
+                
                 const payload = {
                     filename: file.name,
                     mimeType: file.type,
-                    bytesBase64: base64, 
+                    bytesBase64: base64,
                     municipio: muniCode,
                     usuario: userEmail,
                     tipo: tipoFicha
                 };
-
+                
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
                     method: 'POST',
                     mode: 'no-cors',
@@ -218,42 +242,46 @@
                 });
                 return true;
             } catch (e) {
-                console.error("Error subiendo archivo:", e);
+                console.error("Error subiendo:", e);
                 return false;
             }
         }
     };
 
-    // 4. GESTIÓN DE ARCHIVOS UI
-    let archivos = [];
+    // 4. GESTIÓN DE COLA DE ARCHIVOS
+    let colaAdjuntos = []; // Aquí guardamos los Files reales
     const fileInput = document.getElementById("fileInput");
-    const fileList = document.getElementById("fileList");
+    const listaDiv = document.getElementById("listaArchivos");
 
-    fileInput.onchange = () => {
-        archivos.push(...Array.from(fileInput.files));
-        renderArchivos();
-        fileInput.value = '';
-    };
+    fileInput.addEventListener('change', () => {
+        if(fileInput.files.length > 0) {
+            colaAdjuntos.push(...Array.from(fileInput.files));
+            renderCola();
+            fileInput.value = ""; // Limpiar input
+        }
+    });
 
-    window.eliminarArchivo = (i) => {
-        archivos.splice(i, 1);
-        renderArchivos();
-    };
-
-    function renderArchivos() {
-        if (archivos.length === 0) {
-            fileList.innerHTML = '';
+    function renderCola() {
+        if (colaAdjuntos.length === 0) {
+            listaDiv.innerHTML = "";
             return;
         }
-        fileList.innerHTML = archivos.map((f, i) => `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
-                <span>📄 ${f.name}</span>
-                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger" style="background:none; border:none; color:red; cursor:pointer;">✖</button>
+        listaDiv.innerHTML = colaAdjuntos.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        background: white; padding: 8px 12px; border-radius: 6px; 
+                        margin-bottom: 8px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                <span style="font-size: 0.9rem; color: #334155;">📄 ${f.name}</span>
+                <button onclick="eliminarDeCola(${i})" style="color: #ef4444; font-weight: bold; background: none; border: none; cursor: pointer;">✖</button>
             </div>
         `).join("");
     }
 
-    // 5. ENVÍO
+    window.eliminarDeCola = (index) => {
+        colaAdjuntos.splice(index, 1);
+        renderCola();
+    }
+
+    // 5. ENVÍO DEL FORMULARIO
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -263,9 +291,9 @@
         mensajeDiv.className = `message ${tipo}`;
         mensajeDiv.style.display = 'block';
     }
-    
-    // Lógica del Checkbox
-    if (checkConformidad) {
+
+    // Checkbox lógica
+    if(checkConformidad) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
                 btnEnviar.disabled = false;
@@ -279,90 +307,81 @@
         });
     }
 
-    // Lógica del Click (UNIFICADA)
+    // CLICK EN ENVIAR
     btnEnviar.addEventListener("click", async () => {
-        // 1. Bloqueo inicial visual
-        btnEnviar.disabled = true;
-        btnEnviar.style.cursor = "wait";
-
-        // 2. Validación de Contacto
+        // Validación Contacto
         const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
         const emailContacto = document.getElementById("tecnicoEmail").value.trim();
+        const consumoVal = document.getElementById("consumoInput").value;
 
         if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
-            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
-            // Si falla, reactivamos el botón
-            btnEnviar.disabled = false; 
-            btnEnviar.style.cursor = "pointer";
+            mostrarMensaje("⚠️ Indique nombre y email de contacto válidos.", "warning");
+            return;
+        }
+        if (!consumoVal) {
+            mostrarMensaje("⚠️ Debe indicar el consumo anual.", "warning");
             return;
         }
 
-        // 3. Inicio del proceso
-        mostrarMensaje("⏳ Subiendo archivos...", "info");
+        // Bloqueo UI
+        btnEnviar.disabled = true;
+        btnEnviar.style.cursor = "wait";
+        mostrarMensaje("⏳ Procesando...", "info");
 
-        // A. Subir Archivos
-        let errores = 0;
-        for (const file of archivos) {
-            const ok = await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode);
-            if (!ok) errores++;
+        // A. Subida de Archivos (Cola)
+        const totalArchivos = colaAdjuntos.length;
+        if (totalArchivos > 0) {
+            for (let i = 0; i < totalArchivos; i++) {
+                const file = colaAdjuntos[i];
+                mostrarMensaje(`⏳ Subiendo archivo ${i + 1} de ${totalArchivos}... (${file.name})`, "info");
+                
+                await UploadService.uploadFile(file, "agua", window.EIEL_CONFIG.muniCode);
+            }
         }
-        
-        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
-        // B. Recopilar Datos
-        mostrarMensaje("⏳ Enviando datos...", "info");
-
-        const depositosData = [];
-        document.querySelectorAll('.input-limpieza').forEach(input => {
-            depositosData.push({
-                nombre: input.dataset.nombre,
-                limpieza: input.value || "No indicado"
-            });
-        });
+        // B. Recopilar datos
+        const inputsLimpieza = document.querySelectorAll(".input-limpieza");
+        const datosDepositos = Array.from(inputsLimpieza).map(inp => ({
+            nombre: inp.dataset.nombre,
+            limpieza: inp.value
+        }));
 
         const payload = {
             tipo_formulario: "agua",
-            consumo: document.getElementById("consumoInput").value || "No indicado",
-            depositos: JSON.stringify(depositosData),
+            consumo: consumoVal,
+            depositos: JSON.stringify(datosDepositos),
             observaciones: document.getElementById("observaciones").value || "",
-            // Datos de contacto
             email_usuario: emailContacto,
             nombre_tecnico: nombreTecnico,
-            // Datos técnicos
             municipio_codigo: window.EIEL_CONFIG.muniCode,
             municipio_nombre: window.EIEL_CONFIG.muniName,
             timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: archivos.map(a => a.name).join("\n")
+            // Enviamos la lista de nombres para que aparezcan en el PDF
+            archivos_adjuntos: colaAdjuntos.map(a => a.name).join("\n")
         };
 
-        // C. Enviar (NO-CORS)
+        // C. Enviar a PDF
         try {
+            mostrarMensaje("⏳ Generando informe PDF...", "info");
+            
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
-                mode: "no-cors",
+                mode: "no-cors", // Mantenemos no-cors por compatibilidad
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
-            mostrarMensaje("✅ ¡Éxito! Datos enviados. Recibirás el PDF en tu email.", "success");
+            mostrarMensaje("✅ ¡Enviado! Recibirá el justificante en su correo.", "success");
             
-            // Limpieza
-            archivos = [];
-            renderArchivos();
-            document.getElementById("consumoInput").value = "";
-            document.getElementById("observaciones").value = "";
-            
-            // Opcional: Desmarcar el check para obligar a aceptar de nuevo
+            // Reset
+            colaAdjuntos = [];
+            renderCola();
             if(checkConformidad) {
                 checkConformidad.checked = false;
                 btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
-                // Dejamos el botón disabled (ya está así por el inicio de la función)
-            } else {
-                btnEnviar.disabled = false; // Si no hay check, lo habilitamos
-                btnEnviar.style.cursor = "pointer";
+                btnEnviar.disabled = true;
             }
-            
+
         } catch (error) {
             console.error(error);
             mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
