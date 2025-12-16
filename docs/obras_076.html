@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>Obras</title>
+    <title>Obras y Actuaciones</title>
 
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -17,7 +17,9 @@
             <div class="logo-area">
             <h1>EIEL</h1>
             <span class="badge-fase">
-                Fase --
+                
+    Fase 2026
+
             </span>
         </div>
             <div class="user-area">
@@ -41,7 +43,7 @@
                 🏗️
             </div>
             <div class="title-header">
-                <h2>Obras</h2>
+                <h2>Obras y Actuaciones</h2>
                 <p class="subtitle">Guardamar del Segura (Código: 076)</p>
             </div>
         </div>
@@ -1113,7 +1115,7 @@
     <h2 class="section-title" style="color: var(--theme-obras);">📝 Observaciones</h2>
     <div class="form-group">
         <label for="observaciones" class="form-label">Comentarios adicionales:</label>
-        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia o comentario sobre las obras..."></textarea>
+        <textarea id="observaciones" class="form-input" rows="4" style="font-family: inherit;" placeholder="Indique aquí cualquier incidencia o comentario sobre las obras..."></textarea>
     </div>
 </div>
 
@@ -1185,8 +1187,11 @@
 
     
 <script>
+document.addEventListener("DOMContentLoaded", () => {
+    
     // 1. HEADER COLOR
-    document.querySelector('.site-header').classList.add('header-obras');
+    const header = document.querySelector('.site-header');
+    if(header) header.classList.add('header-obras');
 
     // 2. CONFIG
     window.EIEL_CONFIG = {
@@ -1196,7 +1201,7 @@
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
     };
 
-    // 3. SERVICIO SUBIDA (Mantiene la lógica técnica, pero se llamará al final)
+    // 3. SERVICIO SUBIDA
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1235,42 +1240,52 @@
         }
     };
 
-    // 4. GESTIÓN DE ADJUNTOS EN COLA (NUEVO SISTEMA)
-    // Estructura: { "066001": [File1, File2], "066002": [File3] }
-    const colaAdjuntos = {}; 
+    // 4. GESTIÓN DE ADJUNTOS EN COLA (Lógica específica de Obras)
+    // Usamos 'let' pero lo exponemos a window para que el HTML onclick funcione
+    let colaAdjuntos = {}; 
     let obraActualSeleccion = null;
     const hiddenInput = document.getElementById("hiddenFileInput");
 
-    // A) Click en "Adjuntar"
+    // Exponemos las funciones al ámbito global (window)
     window.gestionarAdjuntos = (codigoObra) => {
         obraActualSeleccion = codigoObra;
         hiddenInput.click();
     };
 
-    // B) Al seleccionar archivos
-    hiddenInput.onchange = () => {
-        const files = Array.from(hiddenInput.files);
-        if (!files.length || !obraActualSeleccion) return;
-
-        // Inicializar array si no existe para esta obra
-        if (!colaAdjuntos[obraActualSeleccion]) {
-            colaAdjuntos[obraActualSeleccion] = [];
+    window.eliminarDeCola = (codigoObra, index) => {
+        if (colaAdjuntos[codigoObra]) {
+            colaAdjuntos[codigoObra].splice(index, 1);
+            renderCola(codigoObra);
         }
-
-        // Añadir a la cola en memoria
-        colaAdjuntos[obraActualSeleccion].push(...files);
-        
-        // Renderizar visualmente
-        renderCola(obraActualSeleccion);
-        
-        // Limpiar input
-        hiddenInput.value = "";
-        obraActualSeleccion = null;
     };
 
-    // C) Renderizar la lista visual debajo del botón
+    // Al seleccionar archivos
+    if(hiddenInput) {
+        hiddenInput.onchange = () => {
+            const files = Array.from(hiddenInput.files);
+            if (!files.length || !obraActualSeleccion) return;
+
+            // Inicializar array si no existe para esta obra
+            if (!colaAdjuntos[obraActualSeleccion]) {
+                colaAdjuntos[obraActualSeleccion] = [];
+            }
+
+            // Añadir a la cola en memoria
+            colaAdjuntos[obraActualSeleccion].push(...files);
+            
+            // Renderizar visualmente
+            renderCola(obraActualSeleccion);
+            
+            // Limpiar input
+            hiddenInput.value = "";
+            obraActualSeleccion = null;
+        };
+    }
+
     function renderCola(codigoObra) {
         const contenedor = document.getElementById(`lista_adjuntos_${codigoObra}`);
+        if(!contenedor) return;
+
         const archivos = colaAdjuntos[codigoObra] || [];
         
         if (archivos.length === 0) {
@@ -1293,14 +1308,6 @@
         `).join("");
     }
 
-    // D) Eliminar archivo de la cola
-    window.eliminarDeCola = (codigoObra, index) => {
-        if (colaAdjuntos[codigoObra]) {
-            colaAdjuntos[codigoObra].splice(index, 1);
-            renderCola(codigoObra);
-        }
-    };
-
 
     // 5. ENVÍO DEL FORMULARIO
     const btnEnviar = document.getElementById("btnEnviar");
@@ -1308,13 +1315,14 @@
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
+        if(!mensajeDiv) return;
         mensajeDiv.textContent = texto;
         mensajeDiv.className = `message ${tipo}`;
         mensajeDiv.style.display = 'block';
     }
 
     // Checkbox
-    if (checkConformidad) {
+    if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
                 btnEnviar.disabled = false;
@@ -1329,137 +1337,134 @@
     }
 
     // CLICK FINAL: PROCESO DE SUBIDA Y ENVÍO
-    btnEnviar.addEventListener("click", async () => {
-        // 1. Bloqueo inicial
-        btnEnviar.disabled = true;
-        btnEnviar.style.cursor = "wait";
+    if(btnEnviar) {
+        btnEnviar.addEventListener("click", async () => {
+            // 1. Bloqueo inicial
+            btnEnviar.disabled = true;
+            btnEnviar.style.cursor = "wait";
 
-        // 2. Validación de Contacto
-        const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
-        const emailContacto = document.getElementById("tecnicoEmail").value.trim();
+            // 2. Validación de Contacto
+            const nombreTecnico = document.getElementById("tecnicoNombre").value.trim();
+            const emailContacto = document.getElementById("tecnicoEmail").value.trim();
 
-        if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
-            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
-            return;
-        }
+            if (!nombreTecnico || !emailContacto || !emailContacto.includes('@')) {
+                mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+                btnEnviar.disabled = false;
+                btnEnviar.style.cursor = "pointer";
+                return;
+            }
 
-        // 3. CÁLCULO DE TOTALES PARA PROGRESO
-        let totalArchivos = 0;
-        let archivosSubidosCount = 0;
-        
-        // Contamos cuántos archivos hay en total en todas las colas
-        Object.keys(colaAdjuntos).forEach(obraKey => {
-            totalArchivos += colaAdjuntos[obraKey].length;
-        });
-
-        // 4. SUBIDA DE ARCHIVOS (Barra de progreso)
-        if (totalArchivos > 0) {
-            mostrarMensaje(`⏳ Iniciando subida de ${totalArchivos} archivos...`, "info");
+            // 3. CÁLCULO DE TOTALES PARA PROGRESO
+            let totalArchivos = 0;
+            let archivosSubidosCount = 0;
             
-            // Recorremos cada obra que tenga adjuntos
-            for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
-                
-                // Recorremos los archivos de esa obra
-                for (const file of archivos) {
-                    archivosSubidosCount++;
-                    // Mensaje de progreso
-                    mostrarMensaje(`⏳ Subiendo archivo ${archivosSubidosCount} de ${totalArchivos}... (${file.name})`, "info");
-                    
-                    // Subida real
-                    const ok = await UploadService.uploadFile(
-                        file, 
-                        'obra', 
-                        window.EIEL_CONFIG.muniCode, 
-                        obraId
-                    );
-                    
-                    if (!ok) console.error(`Fallo al subir ${file.name}`);
-                }
-            }
-        }
-
-        // 5. RECOPILAR DATOS FINALES
-        mostrarMensaje("⏳ Generando justificante PDF...", "info");
-
-        const filas = document.querySelectorAll(".select-estado");
-        const estados = [];
-
-        filas.forEach(select => {
-            const estado = select.value;
-            if (estado && estado !== "") {
-                const obraId = select.dataset.obraId;
-                
-                // Obtenemos los nombres de los archivos que acabamos de subir
-                const listaNombres = (colaAdjuntos[obraId] || []).map(f => f.name);
-
-                estados.push({
-                    obra: obraId,
-                    clave: select.dataset.clave,
-                    orden: select.dataset.orden,
-                    nombre: select.dataset.nombre,
-                    plan: select.dataset.plan,
-                    estado: estado,
-                    archivos: listaNombres.join(";")
-                });
-            }
-        });
-
-        if (estados.length === 0) {
-            mostrarMensaje("⚠️ No ha seleccionado ningún estado.", "warning");
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
-            return;
-        }
-
-        // 6. PAYLOAD Y ENVÍO FINAL
-        const payload = {
-            tipo_formulario: "obras",
-            datos_obras_json: JSON.stringify(estados),
-            observaciones: document.getElementById("observaciones").value || "",
-            email_usuario: emailContacto,
-            nombre_tecnico: nombreTecnico,
-            municipio_codigo: window.EIEL_CONFIG.muniCode,
-            municipio_nombre: window.EIEL_CONFIG.muniName,
-            timestamp_envio: new Date().toISOString()
-        };
-
-        try {
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+            // Contamos cuántos archivos hay en total en todas las colas
+            Object.keys(colaAdjuntos).forEach(obraKey => {
+                totalArchivos += colaAdjuntos[obraKey].length;
             });
 
-            mostrarMensaje(`✅ ¡Completado! Se han subido ${totalArchivos} archivos y enviado el informe.`, "success");
-            
-            // Limpieza y bloqueo final
-            colaAdjuntos = {}; // Vaciar cola
-            if(checkConformidad) {
-                checkConformidad.checked = false;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.disabled = true;
-                btnEnviar.style.cursor = "not-allowed";
+            // 4. SUBIDA DE ARCHIVOS (Barra de progreso)
+            if (totalArchivos > 0) {
+                mostrarMensaje(`⏳ Iniciando subida de ${totalArchivos} archivos...`, "info");
+                
+                // Recorremos cada obra que tenga adjuntos
+                for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
+                    
+                    // Recorremos los archivos de esa obra
+                    for (const file of archivos) {
+                        archivosSubidosCount++;
+                        // Mensaje de progreso
+                        mostrarMensaje(`⏳ Subiendo archivo ${archivosSubidosCount} de ${totalArchivos}... (${file.name})`, "info");
+                        
+                        // Subida real
+                        const ok = await UploadService.uploadFile(
+                            file, 
+                            'obra', 
+                            window.EIEL_CONFIG.muniCode, 
+                            obraId
+                        );
+                        
+                        if (!ok) console.error(`Fallo al subir ${file.name}`);
+                    }
+                }
             }
 
-        } catch (error) {
-            console.error(error);
-            mostrarMensaje(`❌ Error técnico al generar PDF: ${error.message}`, "error");
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
-        }
-        
-        document.addEventListener("DOMContentLoaded", function() {
-        const faseDeEsteFormulario = "2026"; // Aquí gen_forms inyecta el dato
-        const elementoHeader = document.getElementById("fase-header");
-        
-        if (elementoHeader) {
-            elementoHeader.innerText = "Fase " + faseDeEsteFormulario;
-        }
-        
-    });
+            // 5. RECOPILAR DATOS FINALES
+            mostrarMensaje("⏳ Generando justificante PDF...", "info");
+
+            const filas = document.querySelectorAll(".select-estado");
+            const estados = [];
+
+            filas.forEach(select => {
+                const estado = select.value;
+                if (estado && estado !== "") {
+                    const obraId = select.dataset.obraId;
+                    
+                    // Obtenemos los nombres de los archivos que acabamos de subir
+                    const listaNombres = (colaAdjuntos[obraId] || []).map(f => f.name);
+
+                    estados.push({
+                        obra: obraId,
+                        clave: select.dataset.clave,
+                        orden: select.dataset.orden,
+                        nombre: select.dataset.nombre,
+                        plan: select.dataset.plan,
+                        estado: estado,
+                        archivos: listaNombres.join(";")
+                    });
+                }
+            });
+
+            if (estados.length === 0) {
+                mostrarMensaje("⚠️ No ha seleccionado ningún estado.", "warning");
+                btnEnviar.disabled = false;
+                btnEnviar.style.cursor = "pointer";
+                return;
+            }
+
+            // 6. PAYLOAD Y ENVÍO FINAL
+            const payload = {
+                tipo_formulario: "obras",
+                datos_obras_json: JSON.stringify(estados),
+                observaciones: document.getElementById("observaciones").value || "",
+                email_usuario: emailContacto,
+                nombre_tecnico: nombreTecnico,
+                municipio_codigo: window.EIEL_CONFIG.muniCode,
+                municipio_nombre: window.EIEL_CONFIG.muniName,
+                timestamp_envio: new Date().toISOString()
+            };
+
+            try {
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                mostrarMensaje(`✅ ¡Completado! Se han subido ${totalArchivos} archivos y enviado el informe.`, "success");
+                
+                // Limpieza y bloqueo final
+                colaAdjuntos = {}; // Vaciar cola
+                if(checkConformidad) {
+                    checkConformidad.checked = false;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.cursor = "not-allowed";
+                } else {
+                    btnEnviar.disabled = false;
+                }
+
+            } catch (error) {
+                console.error(error);
+                mostrarMensaje(`❌ Error técnico al generar PDF: ${error.message}`, "error");
+                btnEnviar.disabled = false;
+                btnEnviar.style.cursor = "pointer";
+            }
+        });
+    }
+
+}); // CIERRE DEL DOMContentLoaded
 </script>
 
 
