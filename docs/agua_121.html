@@ -349,10 +349,13 @@
 
     
 <script>
-    // 1. CONFIGURACIÓN DEL HEADER
-    document.querySelector('.site-header').classList.add('header-agua');
+document.addEventListener("DOMContentLoaded", () => {
 
-    // 2. CONFIGURACIÓN
+    // 1. SETUP DE ESTILOS
+    const header = document.querySelector('.site-header');
+    if(header) header.classList.add('header-agua');
+
+    // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "121",
         muniName: "Santa Pola",
@@ -362,7 +365,16 @@
         hasAvisos: false
     };
 
-    // 3. SERVICIO DE SUBIDA
+    // 3. INICIALIZACIÓN UI
+    // 3.1 Marcado visual de obligatoriedad en observaciones
+    if (window.EIEL_CONFIG.hasAvisos) {
+        const labelObs = document.querySelector("label[for='observaciones']");
+        if (labelObs) {
+            labelObs.innerHTML += " <span style='color:#ef4444; font-weight:bold;'>(* Obligatorio por requerimiento)</span>";
+        }
+    }
+
+    // 4. SERVICIOS
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -370,12 +382,11 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
-        async uploadFile(file, tipoFicha, muniCode) {
+        // Firma estandarizada con 4 argumentos (codigoObra es opcional/null aquí)
+        async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
-                // Usamos el email escrito en el formulario o anonimo si falla
-                const contactoEmail = document.getElementById("contactoEmail").value || "anonimo";
+                const contactoEmail = document.getElementById("contactoEmail")?.value || "anonimo";
 
                 const payload = {
                     filename: file.name,
@@ -383,7 +394,8 @@
                     bytesBase64: base64, 
                     municipio: muniCode,
                     usuario: contactoEmail,
-                    tipo: tipoFicha
+                    tipo: tipoFicha,
+                    obra: codigoObra 
                 };
 
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
@@ -400,16 +412,18 @@
         }
     };
 
-    // 4. GESTIÓN DE ARCHIVOS UI
+    // 5. GESTIÓN DE ARCHIVOS (UI)
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
 
-    fileInput.onchange = () => {
-        archivos.push(...Array.from(fileInput.files));
-        renderArchivos();
-        fileInput.value = '';
-    };
+    if (fileInput) {
+        fileInput.onchange = () => {
+            archivos.push(...Array.from(fileInput.files));
+            renderArchivos();
+            fileInput.value = '';
+        };
+    }
 
     window.eliminarArchivo = (i) => {
         archivos.splice(i, 1);
@@ -417,6 +431,7 @@
     };
 
     function renderArchivos() {
+        if (!fileList) return;
         if (archivos.length === 0) {
             fileList.innerHTML = '';
             return;
@@ -429,19 +444,20 @@
         `).join("");
     }
 
-    // 5. ENVÍO
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
+        if(!mensajeDiv) return;
         mensajeDiv.textContent = texto;
         mensajeDiv.className = `message ${tipo}`;
         mensajeDiv.style.display = 'block';
     }
-    
-    // Lógica del Checkbox
-    if (checkConformidad) {
+
+    // 6.1 Checkbox Habilitador
+    if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
                 btnEnviar.disabled = false;
@@ -455,128 +471,127 @@
         });
     }
 
-    // Lógica del Click (UNIFICADA)
-    btnEnviar.addEventListener("click", async () => {
-        // 1. Bloqueo inicial visual
-        btnEnviar.disabled = true;
-        btnEnviar.style.cursor = "wait";
+    // 6.2 Listener Principal
+    if (btnEnviar) {
+        btnEnviar.addEventListener("click", async () => {
+            // A. Bloqueo UI
+            btnEnviar.disabled = true;
+            btnEnviar.style.cursor = "wait";
 
-        // 2. Validación de Contacto
-        const nombreContacto = document.getElementById("contactoNombre").value.trim();
-        const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
-        const emailContacto = document.getElementById("contactoEmail").value.trim();
-
-        if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
-            mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
-            // Si falla, reactivamos el botón
-            btnEnviar.disabled = false; 
-            btnEnviar.style.cursor = "pointer";
-            return;
-        }
-        
-         // Validación de "si hay requerimientos especiales en el municipio, obligatorio escribir observaciones"
-        const obsField = document.getElementById("observaciones");
-        const obsValue = obsField.value.trim();
-
-        // Si hay avisos (hasAvisos es true) Y el campo observaciones está vacío
-        if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
+            // B. Lectura de Variables
+            const nombreContacto = document.getElementById("contactoNombre").value.trim();
+            const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
+            const emailContacto = document.getElementById("contactoEmail").value.trim();
             
-            // 1. Mostramos mensaje de error
-            mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error"); // Usa estilo 'error' (rojo) o 'warning'
-            
-            // 2. Resaltamos el campo en rojo para que lo vea
-            obsField.style.border = "2px solid #ef4444";
-            obsField.focus(); // Llevamos el cursor allí
-            
-            // 3. Restauramos el botón para que pueda volver a intentarlo
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
-            btnEnviar.style.opacity = "1";
-            
-            // 4. Detenemos todo. No se envía nada.
-            return; 
-        } else {
-            // Si escribe algo, quitamos el borde rojo por si acaso
-            obsField.style.border = ""; 
-        }
+            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
 
-        // 3. Inicio del proceso
-        mostrarMensaje("⏳ Subiendo archivos...", "info");
+            const obsField = document.getElementById("observaciones");
+            const obsValue = obsField.value.trim();
 
-        // A. Subir Archivos
-        let errores = 0;
-        for (const file of archivos) {
-            const ok = await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode);
-            if (!ok) errores++;
-        }
-        
-        if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
+            // C. Validaciones
+            // C.1 Contacto y Emails
+            if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
+                mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
+                btnEnviar.disabled = false; 
+                btnEnviar.style.cursor = "pointer";
+                return;
+            }
 
-        // B. Recopilar Datos
-        mostrarMensaje("⏳ Enviando datos...", "info");
-
-        const depositosData = [];
-        document.querySelectorAll('.input-limpieza').forEach(input => {
-            depositosData.push({
-                nombre: input.dataset.nombre,
-                limpieza: input.value || "No indicado"
-            });
-        });
-
-        const payload = {
-            tipo_formulario: "agua",
-            fase: window.EIEL_CONFIG.fase,
-            consumo: document.getElementById("consumoInput").value || "No indicado",
-            depositos: JSON.stringify(depositosData),
-            observaciones: document.getElementById("observaciones").value || "",
-            // Datos de contacto
-            nombre_contacto: nombreContacto,
-            departamento_contacto: departamentoContacto,
-            email_contacto: emailContacto,
-            // Datos técnicos
-            municipio_codigo: window.EIEL_CONFIG.muniCode,
-            municipio_nombre: window.EIEL_CONFIG.muniName,
-            timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: archivos.map(a => a.name).join("\n")
-        };
-
-        // C. Enviar (NO-CORS)
-        try {
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-
-            mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
-            
-            // Limpieza
-            archivos = [];
-            renderArchivos();
-            document.getElementById("consumoInput").value = "";
-            document.getElementById("observaciones").value = "";
-            
-            // Opcional: Desmarcar el check para obligar a aceptar de nuevo
-            if(checkConformidad) {
-                checkConformidad.checked = false;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
-                // Dejamos el botón disabled (ya está así por el inicio de la función)
+            if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden. Por favor, verifíquelos.", "error");
+                document.getElementById("contactoEmail").style.border = "2px solid #ef4444";
+                if(emailConfirmInput) emailConfirmInput.style.border = "2px solid #ef4444";
+                btnEnviar.disabled = false;
+                btnEnviar.style.cursor = "pointer";
+                return;
             } else {
-                btnEnviar.disabled = false; // Si no hay check, lo habilitamos
+                document.getElementById("contactoEmail").style.border = "";
+                if(emailConfirmInput) emailConfirmInput.style.border = "";
+            }
+
+            // C.2 Observaciones Obligatorias
+            if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
+                mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error");
+                obsField.style.border = "2px solid #ef4444";
+                obsField.focus(); 
+                btnEnviar.disabled = false;
+                btnEnviar.style.cursor = "pointer";
+                return; 
+            } else {
+                obsField.style.border = ""; 
+            }
+
+            // D. Proceso de Subida
+            mostrarMensaje("⏳ Subiendo archivos...", "info");
+            let errores = 0;
+            for (const file of archivos) {
+                // Pasamos null como codigoObra
+                const ok = await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode, null);
+                if (!ok) errores++;
+            }
+            if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
+
+            // E. Recopilación de Datos
+            mostrarMensaje("⏳ Enviando datos...", "info");
+            
+            const depositosData = [];
+            document.querySelectorAll('.input-limpieza').forEach(input => {
+                depositosData.push({
+                    nombre: input.dataset.nombre,
+                    limpieza: input.value || "No indicado"
+                });
+            });
+
+            const payload = {
+                tipo_formulario: "agua",
+                fase: window.EIEL_CONFIG.fase,
+                consumo: document.getElementById("consumoInput").value || "No indicado",
+                depositos: JSON.stringify(depositosData),
+                observaciones: obsValue,
+                nombre_contacto: nombreContacto,
+                departamento_contacto: departamentoContacto,
+                email_contacto: emailContacto,
+                municipio_codigo: window.EIEL_CONFIG.muniCode,
+                municipio_nombre: window.EIEL_CONFIG.muniName,
+                timestamp_envio: new Date().toISOString(),
+                archivos_adjuntos: archivos.map(a => a.name).join("\n")
+            };
+
+            // F. Fetch Final
+            try {
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
+                
+                // G. Limpieza (Reset Escoba)
+                archivos = [];
+                renderArchivos();
+                document.querySelectorAll("input, select, textarea").forEach(el => {
+                   if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
+                });
+
+                if(checkConformidad) {
+                    checkConformidad.checked = false;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+                    btnEnviar.disabled = true;
+                } 
+                
+            } catch (error) {
+                console.error(error);
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
             }
-            
-        } catch (error) {
-            console.error(error);
-            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
-        }
-       
-        
-    });
+        });
+    }
+});
 </script>
 
 

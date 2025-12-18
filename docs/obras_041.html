@@ -1500,22 +1500,22 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     
-    // 1. HEADER COLOR
+    // 1. SETUP DE ESTILOS
     const header = document.querySelector('.site-header');
     if(header) header.classList.add('header-obras');
 
-    // 2. CONFIG
+    // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "041",
         muniName: "Benissa",
         fase: "2026",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwdnkGWSsgPwyFEMosrW5-xDXu8zu-HJrM2HoyfFkdSuy81eWIY4wOZtOkgVOBP8BQV/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec",
-        // Si hay avisos, esta variable es true
         hasAvisos: false
     };
 
-    // 2.1 MARCAR OBSERVACIONES COMO OBLIGATORIO VISUALMENTE SI HAY AVISOS
+    // 3. INICIALIZACIÓN UI
+    // 3.1 Marcado visual de obligatoriedad en observaciones
     if (window.EIEL_CONFIG.hasAvisos) {
         const labelObs = document.querySelector("label[for='observaciones']");
         if (labelObs) {
@@ -1523,7 +1523,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 3. SERVICIO SUBIDA
+    // 4. SERVICIOS
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1531,7 +1531,7 @@ document.addEventListener("DOMContentLoaded", () => {
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
+        // Firma estandarizada con 4 argumentos
         async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
@@ -1561,7 +1561,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 4. GESTIÓN DE ADJUNTOS EN COLA
+    // 5. GESTIÓN DE ARCHIVOS (UI & COLA)
     let colaAdjuntos = {}; 
     let obraActualSeleccion = null;
     const hiddenInput = document.getElementById("hiddenFileInput");
@@ -1619,8 +1619,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `).join("");
     }
 
-
-    // 5. ENVÍO DEL FORMULARIO Y VALIDACIONES
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -1632,7 +1631,7 @@ document.addEventListener("DOMContentLoaded", () => {
         mensajeDiv.style.display = 'block';
     }
 
-    // Checkbox Habilitador
+    // 6.1 Checkbox Habilitador
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
@@ -1647,28 +1646,26 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // LOGICA PRINCIPAL DE ENVÍO
+    // 6.2 Listener Principal
     if(btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            // Bloqueo inicial
+            // A. Bloqueo UI
             btnEnviar.disabled = true;
             btnEnviar.style.cursor = "wait";
 
-            // Recuperamos valores clave
+            // B. Lectura de Variables
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
             
-            // --- NUEVO: RECUPERAR EMAIL CONFIRMACIÓN ---
             const emailConfirmInput = document.getElementById("contactoEmailConfirm");
             const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
 
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
 
-            // -------------------------------------------------------------------
-            // VALIDACIÓN 0: CONTACTO Y DOBLE EMAIL
-            // -------------------------------------------------------------------
+            // C. Validaciones
+            // C.1 Contacto y Emails
             if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
                 mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
                 btnEnviar.disabled = false;
@@ -1676,39 +1673,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Validar coincidencia de emails
             if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
                 mostrarMensaje("⚠️ Los correos electrónicos NO coinciden. Por favor, verifíquelos.", "error");
-                
                 document.getElementById("contactoEmail").style.border = "2px solid #ef4444";
                 if(emailConfirmInput) emailConfirmInput.style.border = "2px solid #ef4444";
-                
                 btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
                 return;
             } else {
-                // Limpiamos bordes
                 document.getElementById("contactoEmail").style.border = "";
                 if(emailConfirmInput) emailConfirmInput.style.border = "";
             }
             
-            // -------------------------------------------------------------------
-            // VALIDACIÓN 1: AVISOS PERSONALIZADOS -> OBSERVACIONES OBLIGATORIAS
-            // -------------------------------------------------------------------
+            // C.2 Observaciones Obligatorias
             if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
                 mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error");
-                
                 obsField.style.border = "2px solid #ef4444";
                 obsField.focus();
-                
                 btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
                 return; // STOP
             } 
 
-            // -------------------------------------------------------------------
-            // VALIDACIÓN 2: OBRAS FINALIZADAS SIN ADJUNTOS
-            // -------------------------------------------------------------------
+            // C.3 Obras Finalizadas sin Adjuntos
             const selects = document.querySelectorAll(".select-estado");
             let obrasFiSinDocs = [];
 
@@ -1728,35 +1715,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 const idsTexto = obrasFiSinDocs.join(", ");
                 const msgAlerta = `⚠️ Las obras [${idsTexto}] están marcadas como FINALIZADAS pero no se ha adjuntado documentación.`;
                 
-                // CASO A: Observaciones vacías -> BLOQUEO
+                // Escenario A: Observaciones vacías -> Bloqueo
                 if (obsValue === "") {
                     mostrarMensaje(`${msgAlerta}\nDebe adjuntar el proyecto o JUSTIFICAR el motivo en Observaciones obligatoriamente.`, "warning");
-                    
                     obsField.style.border = "2px solid #f59e0b"; // Naranja
                     obsField.focus();
-                    
                     btnEnviar.disabled = false;
                     btnEnviar.style.cursor = "pointer";
                     return; // STOP
                 } 
-                // CASO B: Observaciones rellenas -> CONFIRMACIÓN
+                // Escenario B: Observaciones rellenas -> Confirmación
                 else {
                     const confirmar = confirm(`${msgAlerta}\n\nHa escrito en observaciones, ¿desea enviar de todas formas sin adjuntar archivos para estas obras?`);
                     if (!confirmar) {
-                        // Usuario cancela
                         btnEnviar.disabled = false;
                         btnEnviar.style.cursor = "pointer";
                         return; // STOP
                     }
                 }
             }
-
-            // Si llegamos aquí, limpiamos bordes de error
+            // Limpiamos bordes de error si pasamos
             obsField.style.border = ""; 
 
-            // -------------------------------------------------------------------
-            // PROCESO DE SUBIDA
-            // -------------------------------------------------------------------
+            // D. Proceso de Subida
             let totalArchivos = 0;
             let archivosSubidosCount = 0;
             
@@ -1770,15 +1751,14 @@ document.addEventListener("DOMContentLoaded", () => {
                     for (const file of archivos) {
                         archivosSubidosCount++;
                         mostrarMensaje(`⏳ Subiendo archivo ${archivosSubidosCount} de ${totalArchivos}... (${file.name})`, "info");
+                        // Aquí usamos el 4º argumento (obraId)
                         const ok = await UploadService.uploadFile(file, 'obra', window.EIEL_CONFIG.muniCode, obraId);
                         if (!ok) console.error(`Fallo al subir ${file.name}`);
                     }
                 }
             }
 
-            // -------------------------------------------------------------------
-            // RECOPILACIÓN DE DATOS
-            // -------------------------------------------------------------------
+            // E. Recopilación de Datos
             mostrarMensaje("⏳ Generando justificante PDF...", "info");
 
             const estados = [];
@@ -1807,9 +1787,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // -------------------------------------------------------------------
-            // ENVÍO FINAL
-            // -------------------------------------------------------------------
             const payload = {
                 tipo_formulario: "obras",
                 fase: window.EIEL_CONFIG.fase,
@@ -1823,6 +1800,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 timestamp_envio: new Date().toISOString()
             };
 
+            // F. Fetch Final
             try {
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
@@ -1833,8 +1811,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 mostrarMensaje(`✅ Datos enviados correctamente. Revise su email.`, "success");
                 
-                // Limpieza final
+                // G. Limpieza (Reset Escoba + Cola)
                 colaAdjuntos = {};
+                // Limpieza visual de inputs y selects
+                document.querySelectorAll("input, select, textarea").forEach(el => {
+                   if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
+                });
+
                 if(checkConformidad) {
                     checkConformidad.checked = false;
                     btnEnviar.style.opacity = "0.6";
@@ -1850,7 +1833,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-
 });
 </script>
 

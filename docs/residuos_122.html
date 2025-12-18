@@ -282,10 +282,13 @@
 
     
 <script>
-    // 1. HEADER VERDE
-    document.querySelector('.site-header').classList.add('header-residuos');
+document.addEventListener("DOMContentLoaded", () => {
+    
+    // 1. SETUP DE ESTILOS
+    const header = document.querySelector('.site-header');
+    if(header) header.classList.add('header-residuos');
 
-    // 2. CONFIG
+    // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "122",
         muniName: "San Vicente del Raspeig / Sant Vicent del Raspeig",
@@ -295,7 +298,8 @@
         hasAvisos: false
     };
 
-    // 2.1 MARCAR OBSERVACIONES COMO OBLIGATORIO VISUALMENTE SI HAY AVISOS
+    // 3. INICIALIZACIÓN UI
+    // 3.1 Marcado visual de obligatoriedad en observaciones
     if (window.EIEL_CONFIG.hasAvisos) {
         const labelObs = document.querySelector("label[for='observaciones']");
         if (labelObs) {
@@ -303,7 +307,7 @@
         }
     }
 
-    // 3. MAPEO
+    // 3.2 Mapeo de campos Residuos
     const RESIDUO_FIELDS = [
       { type: "Plásticos y Envases (amarillo)", prod: "prod_plastico", cont: "cont_plastico", period: "period_plastico", dest: "dest_plastico" },
       { type: "Papel y Cartón (azul)", prod: "prod_papel", cont: "cont_papel", period: "period_papel", dest: "dest_papel" },
@@ -312,7 +316,7 @@
       { type: "No selectiva/resto", prod: "prod_resto", cont: "cont_resto", period: "period_resto", dest: "dest_resto" },
     ];
 
-    // 4. UPLOAD SERVICE
+    // 4. SERVICIOS
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -320,8 +324,8 @@
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
-        async uploadFile(file, tipoFicha, muniCode) {
+        // Firma estandarizada con 4 argumentos (codigoObra null)
+        async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
                 const userEmail = document.getElementById("contactoEmail").value || "anonimo";
@@ -332,7 +336,8 @@
                     bytesBase64: base64, 
                     municipio: muniCode,
                     usuario: userEmail,
-                    tipo: tipoFicha
+                    tipo: tipoFicha,
+                    obra: codigoObra
                 };
 
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
@@ -349,7 +354,7 @@
         }
     };
 
-    // 5. ARCHIVOS UI
+    // 5. GESTIÓN DE ARCHIVOS (UI)
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -381,7 +386,7 @@
         `).join("");
     }
 
-    // 6. ENVÍO
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -393,7 +398,7 @@
         mensajeDiv.style.display = 'block';
     }
 
-    // Lógica del Checkbox
+    // 6.1 Checkbox Habilitador
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
@@ -408,28 +413,26 @@
         });
     }
 
-    // Click Final
+    // 6.2 Listener Principal
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            // 1. Bloqueo
+            // A. Bloqueo UI
             btnEnviar.disabled = true;
             btnEnviar.style.cursor = "wait";
 
-            // 2. Validación de Contacto
+            // B. Lectura de Variables
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
             
-            // Campo de confirmación
             const emailConfirmInput = document.getElementById("contactoEmailConfirm");
             const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
 
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
 
-            // -------------------------------------------------------------------
-            // VALIDACIÓN 0: CONTACTO Y DOBLE EMAIL
-            // -------------------------------------------------------------------
+            // C. Validaciones
+            // C.1 Contacto y Emails
             if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
                 mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
                 btnEnviar.disabled = false; 
@@ -439,28 +442,21 @@
 
             if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
                 mostrarMensaje("⚠️ Los correos electrónicos NO coinciden. Por favor, verifíquelos.", "error");
-                
                 document.getElementById("contactoEmail").style.border = "2px solid #ef4444";
                 if(emailConfirmInput) emailConfirmInput.style.border = "2px solid #ef4444";
-                
                 btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
                 return;
             } else {
-                // Limpiamos bordes
                 document.getElementById("contactoEmail").style.border = "";
                 if(emailConfirmInput) emailConfirmInput.style.border = "";
             }
             
-            // -------------------------------------------------------------------
-            // VALIDACIÓN 1: AVISOS PERSONALIZADOS -> OBSERVACIONES OBLIGATORIAS
-            // -------------------------------------------------------------------
+            // C.2 Observaciones Obligatorias
             if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
                 mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error");
-                
                 obsField.style.border = "2px solid #ef4444";
                 obsField.focus(); 
-                
                 btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
                 return; 
@@ -468,18 +464,17 @@
                 obsField.style.border = ""; 
             }
 
+            // D. Proceso de Subida
             mostrarMensaje("⏳ Subiendo archivos...", "info");
-
-            // A. Subir archivos
             let errores = 0;
             for (const file of archivos) {
-                const ok = await UploadService.uploadFile(file, 'residuos', window.EIEL_CONFIG.muniCode);
+                // Pasamos null como codigoObra
+                const ok = await UploadService.uploadFile(file, 'residuos', window.EIEL_CONFIG.muniCode, null);
                 if (!ok) errores++;
             }
-
             if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
-            // B. Payload
+            // E. Recopilación de Datos
             mostrarMensaje("⏳ Enviando datos...", "info");
 
             const residuosData = RESIDUO_FIELDS.map(r => ({
@@ -505,7 +500,7 @@
                 archivos_adjuntos: archivos.map(a => a.name).join("\n")
             };
 
-            // C. Enviar
+            // F. Fetch Final
             try {
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
@@ -516,10 +511,9 @@
 
                 mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
                 
-                // Limpieza
+                // G. Limpieza (Reset Escoba)
                 archivos = [];
                 renderArchivos();
-                // Limpiamos inputs excepto botones
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
                 });
@@ -528,6 +522,7 @@
                     checkConformidad.checked = false;
                     btnEnviar.style.opacity = "0.6";
                     btnEnviar.disabled = true;
+                    btnEnviar.style.cursor = "not-allowed";
                 }
 
             } catch (error) {
@@ -537,6 +532,7 @@
             }
         });
     }
+});
 </script>
 
 
