@@ -172,6 +172,11 @@
             <label class="form-label">Email (Para recibir justificante) *</label>
             <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
         </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
     </div>
 </div>
 
@@ -228,217 +233,283 @@
 
     
 <script>
-    // 1. HEADER GRIS
-    document.querySelector('.site-header').classList.add('header-cementerios');
+    document.addEventListener("DOMContentLoaded", () => {
 
-    // 2. CONFIG
-    window.EIEL_CONFIG = {
-        muniCode: "094",
-        muniName: "La Nucia",
-        fase: "2026",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwdnkGWSsgPwyFEMosrW5-xDXu8zu-HJrM2HoyfFkdSuy81eWIY4wOZtOkgVOBP8BQV/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
-    };
-    
-    const cementerios = [{"nombre": "CEMENTERI MUNICIPAL"}];
-    
-    // 3. CALCULO DE TOTALES
-    function calcularTotales() {
-        cementerios.forEach((cem, index) => {
-            const cemIndex = index + 1;
-            const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
-            
-            let totales = { fosas: 0, nichos: 0, columbarios: 0, osarios: 0 };
-            
-            inputs.forEach(input => {
-                const tipo = input.dataset.tipo;
-                const valor = parseInt(input.value) || 0;
+        // 1. HEADER GRIS
+        const header = document.querySelector('.site-header');
+        if(header) header.classList.add('header-cementerios');
+
+        // 2. CONFIG
+        window.EIEL_CONFIG = {
+            muniCode: "094",
+            muniName: "La Nucia",
+            fase: "2026",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwdnkGWSsgPwyFEMosrW5-xDXu8zu-HJrM2HoyfFkdSuy81eWIY4wOZtOkgVOBP8BQV/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec",
+            hasAvisos: false
+        };
+        
+        // 2.1 MARCAR OBSERVACIONES COMO OBLIGATORIO VISUALMENTE SI HAY AVISOS
+        if (window.EIEL_CONFIG.hasAvisos) {
+            const labelObs = document.querySelector("label[for='observaciones']");
+            if (labelObs) {
+                labelObs.innerHTML += " <span style='color:#ef4444; font-weight:bold;'>(* Obligatorio por requerimiento)</span>";
+            }
+        }
+
+        const cementerios = [{"nombre": "CEMENTERI MUNICIPAL"}];
+        
+        // 3. CALCULO DE TOTALES
+        function calcularTotales() {
+            cementerios.forEach((cem, index) => {
+                const cemIndex = index + 1;
+                const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
                 
-                if (tipo.includes('fosas')) totales.fosas += valor;
-                if (tipo.includes('nichos')) totales.nichos += valor;
-                if (tipo.includes('columbarios')) totales.columbarios += valor;
-                if (tipo.includes('osarios')) totales.osarios += valor;
-            });
-            
-            const setTotal = (id, val) => {
-                const el = document.getElementById(id);
-                if(el) el.textContent = val;
-            };
-
-            setTotal(`total_fosas_${cemIndex}`, totales.fosas);
-            setTotal(`total_nichos_${cemIndex}`, totales.nichos);
-            setTotal(`total_columbarios_${cemIndex}`, totales.columbarios);
-            setTotal(`total_osarios_${cemIndex}`, totales.osarios);
-        });
-    }
-
-    document.addEventListener('input', (e) => {
-        if (e.target.type === 'number' && e.target.dataset.cem) {
-            calcularTotales();
-        }
-    });
-
-    // 4. UPLOAD SERVICE
-    const UploadService = {
-        toBase64: file => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = error => reject(error);
-        }),
-        async uploadFile(file, tipoFicha, muniCode) {
-            try {
-                const base64 = await this.toBase64(file);
-                const userEmail = document.getElementById("contactoEmail").value || "anonimo";
-                await fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        filename: file.name, mimeType: file.type, bytesBase64: base64, 
-                        municipio: muniCode, usuario: userEmail, tipo: tipoFicha
-                    })
+                let totales = { fosas: 0, nichos: 0, columbarios: 0, osarios: 0 };
+                
+                inputs.forEach(input => {
+                    const tipo = input.dataset.tipo;
+                    const valor = parseInt(input.value) || 0;
+                    
+                    if (tipo.includes('fosas')) totales.fosas += valor;
+                    if (tipo.includes('nichos')) totales.nichos += valor;
+                    if (tipo.includes('columbarios')) totales.columbarios += valor;
+                    if (tipo.includes('osarios')) totales.osarios += valor;
                 });
-                return true;
-            } catch (e) { return false; }
+                
+                const setTotal = (id, val) => {
+                    const el = document.getElementById(id);
+                    if(el) el.textContent = val;
+                };
+
+                setTotal(`total_fosas_${cemIndex}`, totales.fosas);
+                setTotal(`total_nichos_${cemIndex}`, totales.nichos);
+                setTotal(`total_columbarios_${cemIndex}`, totales.columbarios);
+                setTotal(`total_osarios_${cemIndex}`, totales.osarios);
+            });
         }
-    };
 
-    // 5. UI ARCHIVOS
-    let archivos = [];
-    const fileInput = document.getElementById("fileInput");
-    const fileList = document.getElementById("fileList");
-
-    fileInput.onchange = () => {
-        archivos.push(...Array.from(fileInput.files));
-        renderArchivos();
-        fileInput.value = '';
-    };
-
-    window.eliminarArchivo = (i) => {
-        archivos.splice(i, 1);
-        renderArchivos();
-    }
-
-    function renderArchivos() {
-        if (archivos.length === 0) {
-            fileList.innerHTML = '';
-            return;
-        }
-        fileList.innerHTML = archivos.map((f, i) => `
-            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
-                <span>📄 ${f.name}</span>
-                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger">✖</button>
-            </div>
-        `).join("");
-    }
-
-    // 6. ENVIO
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConformidad = document.getElementById("checkConformidad");
-    const mensajeDiv = document.getElementById("mensaje");
-
-    function mostrarMensaje(texto, tipo) {
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`;
-        mensajeDiv.style.display = 'block';
-    }
-
-    // Logica del Checkbox
-    if (checkConformidad) {
-        checkConformidad.addEventListener('change', function() {
-            if (this.checked) {
-                btnEnviar.disabled = false;
-                btnEnviar.style.opacity = "1";
-                btnEnviar.style.cursor = "pointer";
-            } else {
-                btnEnviar.disabled = true;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
+        document.addEventListener('input', (e) => {
+            if (e.target.type === 'number' && e.target.dataset.cem) {
+                calcularTotales();
             }
         });
-    }
 
-    // Click Final
-    btnEnviar.addEventListener("click", async () => {
-        // 1. Bloqueo
-        btnEnviar.disabled = true;
-        btnEnviar.style.cursor = "wait";
-
-        // 2. Validacion de Contacto
-        const nombreContacto = document.getElementById("contactoNombre").value.trim();
-        const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
-        const emailContacto = document.getElementById("contactoEmail").value.trim();
-
-        if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
-            mostrarMensaje("?ая? Por favor, rellene el Nombre y el Email de contacto.", "warning");
-            btnEnviar.disabled = false; 
-            btnEnviar.style.cursor = "pointer";
-            return;
-        }
-
-        mostrarMensaje("⏳Subiendo archivos...", "info");
-
-        // A. Subir
-        let erroresSubida = 0;
-        for (const file of archivos) {
-            const ok = await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode);
-            if (!ok) erroresSubida++;
-        }
-
-        if (erroresSubida > 0) {
-            mostrarMensaje(`?ая? Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
-        }
-
-        // B. Datos
-        mostrarMensaje("⏳Enviando datos...", "info");
-        const datosCementerios = cementerios.map((cem, index) => {
-            const cemIndex = index + 1;
-            const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
-            let datos = { nombre: cem.nombre };
-            inputs.forEach(input => {
-                const tipo = input.dataset.tipo;
-                const val = parseInt(input.value);
-                datos[tipo] = isNaN(val) ? 0 : val;
-            });
-            return datos;
-        });
-        
-        const payload = {
-            tipo_formulario: "cementerios",
-            fase: window.EIEL_CONFIG.fase,
-            cementerios_data: JSON.stringify(datosCementerios),
-            observaciones: document.getElementById("observaciones").value || "",
-            nombre_contacto: nombreContacto,
-            departamento_contacto: departamentoContacto,
-            email_usuario: emailContacto,
-            municipio_codigo: window.EIEL_CONFIG.muniCode,
-            municipio_nombre: window.EIEL_CONFIG.muniName,
-            timestamp_envio: new Date().toISOString(),
-            archivos_adjuntos: archivos.map(a => a.name).join("\n")
+        // 4. UPLOAD SERVICE
+        const UploadService = {
+            toBase64: file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            }),
+            async uploadFile(file, tipoFicha, muniCode) {
+                try {
+                    const base64 = await this.toBase64(file);
+                    const userEmail = document.getElementById("contactoEmail").value || "anonimo";
+                    await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                        method: 'POST', mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                            municipio: muniCode, usuario: userEmail, tipo: tipoFicha
+                        })
+                    });
+                    return true;
+                } catch (e) { return false; }
+            }
         };
 
-        // C. Enviar
-        try {
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            
-            mostrarMensaje("✅Formulario enviado correctamente. Revisa tu email.", "success");
-            archivos = [];
-            renderArchivos();
-            if(checkConformidad) {
-                checkConformidad.checked = false;
-                btnEnviar.style.opacity = "0.6";
-            }
+        // 5. UI ARCHIVOS
+        let archivos = [];
+        const fileInput = document.getElementById("fileInput");
+        const fileList = document.getElementById("fileList");
 
-        } catch (error) {
-            console.error(error);
-            mostrarMensaje(`❌Error tecnico: ${error.message}`, "error");
-            btnEnviar.disabled = false;
-            btnEnviar.style.cursor = "pointer";
+        if (fileInput) {
+            fileInput.onchange = () => {
+                archivos.push(...Array.from(fileInput.files));
+                renderArchivos();
+                fileInput.value = '';
+            };
+        }
+
+        window.eliminarArchivo = (i) => {
+            archivos.splice(i, 1);
+            renderArchivos();
+        }
+
+        function renderArchivos() {
+            if (!fileList) return;
+            if (archivos.length === 0) {
+                fileList.innerHTML = '';
+                return;
+            }
+            fileList.innerHTML = archivos.map((f, i) => `
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
+                    <span>📄 ${f.name}</span>
+                    <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger" style="background:none; border:none; color:red; cursor:pointer;">✖</button>
+                </div>
+            `).join("");
+        }
+
+        // 6. ENVIO
+        const btnEnviar = document.getElementById("btnEnviar");
+        const checkConformidad = document.getElementById("checkConformidad");
+        const mensajeDiv = document.getElementById("mensaje");
+
+        function mostrarMensaje(texto, tipo) {
+            if(!mensajeDiv) return;
+            mensajeDiv.textContent = texto;
+            mensajeDiv.className = `message ${tipo}`;
+            mensajeDiv.style.display = 'block';
+        }
+
+        // Logica del Checkbox
+        if (checkConformidad && btnEnviar) {
+            checkConformidad.addEventListener('change', function() {
+                if (this.checked) {
+                    btnEnviar.disabled = false;
+                    btnEnviar.style.opacity = "1";
+                    btnEnviar.style.cursor = "pointer";
+                } else {
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+                }
+            });
+        }
+
+        // Click Final
+        if (btnEnviar) {
+            btnEnviar.addEventListener("click", async () => {
+                // 1. Bloqueo
+                btnEnviar.disabled = true;
+                btnEnviar.style.cursor = "wait";
+
+                // 2. Validacion de Contacto
+                const nombreContacto = document.getElementById("contactoNombre").value.trim();
+                const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
+                const emailContacto = document.getElementById("contactoEmail").value.trim();
+                
+                // Campo de confirmación
+                const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+                const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
+
+                const obsField = document.getElementById("observaciones");
+                const obsValue = obsField.value.trim();
+
+                // -------------------------------------------------------------------
+                // VALIDACIÓN 0: CONTACTO Y DOBLE EMAIL
+                // -------------------------------------------------------------------
+                if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
+                    mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
+                    btnEnviar.disabled = false; 
+                    btnEnviar.style.cursor = "pointer";
+                    return;
+                }
+
+                if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                    mostrarMensaje("⚠️ Los correos electrónicos NO coinciden. Por favor, verifíquelos.", "error");
+                    
+                    document.getElementById("contactoEmail").style.border = "2px solid #ef4444";
+                    if(emailConfirmInput) emailConfirmInput.style.border = "2px solid #ef4444";
+                    
+                    btnEnviar.disabled = false;
+                    btnEnviar.style.cursor = "pointer";
+                    return;
+                } else {
+                    // Limpiamos bordes
+                    document.getElementById("contactoEmail").style.border = "";
+                    if(emailConfirmInput) emailConfirmInput.style.border = "";
+                }
+                
+                // -------------------------------------------------------------------
+                // VALIDACIÓN 1: AVISOS PERSONALIZADOS -> OBSERVACIONES OBLIGATORIAS
+                // -------------------------------------------------------------------
+                if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
+                    mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error");
+                    
+                    obsField.style.border = "2px solid #ef4444";
+                    obsField.focus(); 
+                    
+                    btnEnviar.disabled = false;
+                    btnEnviar.style.cursor = "pointer";
+                    return; 
+                } else {
+                    obsField.style.border = ""; 
+                }
+                
+                // 3. Inicio Proceso
+                mostrarMensaje("⏳Subiendo archivos...", "info");
+
+                // A. Subir
+                let erroresSubida = 0;
+                for (const file of archivos) {
+                    const ok = await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode);
+                    if (!ok) erroresSubida++;
+                }
+
+                if (erroresSubida > 0) {
+                    mostrarMensaje(`⚠️ Se subieron archivos con ${erroresSubida} errores. Continuando...`, "warning");
+                }
+
+                // B. Datos
+                mostrarMensaje("⏳Enviando datos...", "info");
+                const datosCementerios = cementerios.map((cem, index) => {
+                    const cemIndex = index + 1;
+                    const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
+                    let datos = { nombre: cem.nombre };
+                    inputs.forEach(input => {
+                        const tipo = input.dataset.tipo;
+                        const val = parseInt(input.value);
+                        datos[tipo] = isNaN(val) ? 0 : val;
+                    });
+                    return datos;
+                });
+                
+                const payload = {
+                    tipo_formulario: "cementerios",
+                    fase: window.EIEL_CONFIG.fase,
+                    cementerios_data: JSON.stringify(datosCementerios),
+                    observaciones: obsValue,
+                    nombre_contacto: nombreContacto,
+                    departamento_contacto: departamentoContacto,
+                    email_usuario: emailContacto,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                };
+
+                // C. Enviar
+                try {
+                    await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                        method: "POST", mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
+                    
+                    // Limpieza
+                    archivos = [];
+                    renderArchivos();
+                    document.querySelectorAll("input, select, textarea").forEach(el => {
+                       if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
+                    });
+                    if(checkConformidad) {
+                        checkConformidad.checked = false;
+                        btnEnviar.style.opacity = "0.6";
+                        btnEnviar.disabled = true;
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    mostrarMensaje(`❌Error tecnico: ${error.message}`, "error");
+                    btnEnviar.disabled = false;
+                    btnEnviar.style.cursor = "pointer";
+                }
+            });
         }
     });
 </script>

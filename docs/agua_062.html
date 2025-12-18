@@ -128,10 +128,15 @@
             <label class="form-label">Departamento</label>
             <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
         </div>
-        <div class="form-group">
+       <div class="form-group">
             <label class="form-label">Email (Para recibir justificante) *</label>
             <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
         </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
     </div>
 </div>
 
@@ -196,7 +201,8 @@
         muniName: "Daya Vieja",
         fase: "2026",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwdnkGWSsgPwyFEMosrW5-xDXu8zu-HJrM2HoyfFkdSuy81eWIY4wOZtOkgVOBP8BQV/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec"
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbxB76WlQ6nv67br0hoSB5A16yCCrg39jRSY16gsILtCCVQV9FoF70kWsl7sB7Gky2Tn/exec",
+        hasAvisos: false
     };
 
     // 3. SERVICIO DE SUBIDA
@@ -310,6 +316,32 @@
             btnEnviar.style.cursor = "pointer";
             return;
         }
+        
+         // Validación de "si hay requerimientos especiales en el municipio, obligatorio escribir observaciones"
+        const obsField = document.getElementById("observaciones");
+        const obsValue = obsField.value.trim();
+
+        // Si hay avisos (hasAvisos es true) Y el campo observaciones está vacío
+        if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
+            
+            // 1. Mostramos mensaje de error
+            mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error"); // Usa estilo 'error' (rojo) o 'warning'
+            
+            // 2. Resaltamos el campo en rojo para que lo vea
+            obsField.style.border = "2px solid #ef4444";
+            obsField.focus(); // Llevamos el cursor allí
+            
+            // 3. Restauramos el botón para que pueda volver a intentarlo
+            btnEnviar.disabled = false;
+            btnEnviar.style.cursor = "pointer";
+            btnEnviar.style.opacity = "1";
+            
+            // 4. Detenemos todo. No se envía nada.
+            return; 
+        } else {
+            // Si escribe algo, quitamos el borde rojo por si acaso
+            obsField.style.border = ""; 
+        }
 
         // 3. Inicio del proceso
         mostrarMensaje("⏳ Subiendo archivos...", "info");
@@ -360,7 +392,7 @@
                 body: JSON.stringify(payload)
             });
 
-            mostrarMensaje("✅ ¡Éxito! Datos enviados. Recibirás el PDF en tu email.", "success");
+            mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
             
             // Limpieza
             archivos = [];
