@@ -449,41 +449,47 @@
     </div>
 </div>
 
-<div class="card" style="border: 2px dashed #cbd5e1; background-color: #f8fafc;">
-        <div class="card-header" style="background-color: transparent; border-bottom: 1px solid #e2e8f0;">
-            <div class="card-title" style="color: #334155;">
-                <span class="status-indicator status-pend">Info Adicional</span>
-                ➕ Otras Obras en el Municipio
-            </div>
-        </div>
-        <div class="card-body">
-            <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1rem;">
-                Indique cualquier otra obra aprobada (iniciada o no) en su municipio que 
-                <strong>no aparezca en el listado superior</strong>, para que podamos realizar su seguimiento. 
-                Si no hay ninguna, indíquelo con "Ninguna".
-            </p>
-           
-            <div class="form-group">
-                <label for="observaciones" class="form-label">Comentarios adicionales:</label>
-                <textarea id="observaciones" class="form-input" rows="4" style="font-family: inherit;" placeholder="Ej: Reurbanización calle Mayor"></textarea>
-            </div>
 
-            <div class="form-group" style="margin-top: 1rem;">
-                <label class="form-label">Adjuntar proyecto o memoria (Opcional):</label>
-                <div class="file-upload-wrapper" id="dropZone_nuevas">
-                    <input type="file" id="file_nuevas" class="file-input" onchange="handleFileSelect('nuevas', 'otras_obras')">
-                    <label for="file_nuevas" class="file-label">
-                    </label>
-                </div>
-                <div id="progress_nuevas" class="progress-bar-container" style="display:none;">
-                    <div class="progress-bar-fill" style="width: 0%"></div>
-                    <span class="progress-text">Subiendo...</span>
-                </div>
-                <input type="hidden" name="adjunto_otras_obras" id="driveId_nuevas">
-            </div>
+<div class="card" style="border: 2px dashed #94a3b8; background-color: #f8fafc;">
+    
+    <h2 class="section-title" style="color: #475569; border-bottom-color: #cbd5e1; display: flex; align-items: center; gap: 10px;">
+        ➕ Otras Obras en el Municipio
+    </h2>
+
+    <div class="card-body">
+        <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1.5rem;">
+            Indique cualquier otra obra aprobada (iniciada o no) que <strong>no aparezca en el listado superior</strong>. 
+            Si no hay ninguna, déjelo en blanco.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label" for="otras_obras_texto" style="font-weight: 600;">Descripción / Denominación de la Obra:</label>
+            <textarea 
+                class="form-input" 
+                id="otras_obras_texto" 
+                name="otras_obras_texto" 
+                rows="4" 
+                style="resize: vertical; min-height: 100px;"
+                placeholder="Ej: Reurbanización calle Mayor (POS 2025), Renovación alumbrado Polígono..."
+            ></textarea>
         </div>
+
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" style="font-weight: 600;">Adjuntar proyecto o memoria (Opcional):</label>
+            
+            <div class="file-upload-area" onclick="document.getElementById('fileInputNuevas').click()" 
+                 style="border: 2px dashed #cbd5e1; padding: 1.5rem; text-align: center; cursor: pointer; border-radius: 8px; background: white; transition: all 0.2s;">
+                <div style="font-size: 1.8rem; margin-bottom: 0.5rem; opacity: 0.7;">📂</div>
+                <div style="font-weight: 600; color: #475569;">Haga clic para adjuntar documentos</div>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">(Proyectos, memorias, planos...)</p>
+                <input type="file" id="fileInputNuevas" multiple style="display: none;">
+            </div>
+            
+            <div id="fileListNuevas" style="margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        </div>
+
     </div>
-
+</div>
 
 
 
@@ -639,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS (UI & COLA)
+    // 5. GESTIÓN DE ARCHIVOS (TABLA)
     let colaAdjuntos = {}; 
     let obraActualSeleccion = null;
     const hiddenInput = document.getElementById("hiddenFileInput");
@@ -697,6 +703,41 @@ document.addEventListener("DOMContentLoaded", () => {
         `).join("");
     }
 
+    // 5.1 GESTIÓN DE ARCHIVOS (NUEVAS OBRAS) -> LÓGICA AÑADIDA
+    let archivosNuevas = [];
+    const fileInputNuevas = document.getElementById("fileInputNuevas");
+    const fileListNuevas = document.getElementById("fileListNuevas");
+
+    if (fileInputNuevas) {
+        fileInputNuevas.addEventListener('change', () => {
+            archivosNuevas.push(...Array.from(fileInputNuevas.files));
+            renderArchivosNuevas();
+            fileInputNuevas.value = '';
+        });
+    }
+
+    window.eliminarArchivoNuevas = (i) => {
+        archivosNuevas.splice(i, 1);
+        renderArchivosNuevas();
+    };
+
+    function renderArchivosNuevas() {
+        if (!fileListNuevas) return;
+        if (archivosNuevas.length === 0) {
+            fileListNuevas.innerHTML = "";
+            return;
+        }
+        fileListNuevas.innerHTML = archivosNuevas.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        background: white; padding: 0.5rem 1rem; border-radius: 6px; 
+                        border: 1px solid #e2e8f0; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                <span style="display:flex; align-items:center; gap:8px;">📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoNuevas(${i})" 
+                        style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold;">✕</button>
+            </div>
+        `).join("");
+    }
+
     // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
@@ -741,6 +782,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
+
+            // Variables de Nuevas Obras
+            const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim();
 
             // C. Validaciones
             // C.1 Contacto y Emails
@@ -817,22 +861,32 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // D. Proceso de Subida
             let totalArchivos = 0;
+            // Contamos archivos de la tabla + archivos de nuevas obras
+            Object.keys(colaAdjuntos).forEach(obraKey => totalArchivos += colaAdjuntos[obraKey].length);
+            totalArchivos += archivosNuevas.length;
+
             let archivosSubidosCount = 0;
-            
-            Object.keys(colaAdjuntos).forEach(obraKey => {
-                totalArchivos += colaAdjuntos[obraKey].length;
-            });
 
             if (totalArchivos > 0) {
                 mostrarMensaje(`⏳ Iniciando subida de ${totalArchivos} archivos...`, "info");
+                
+                // 1. Subir archivos de la tabla (asociados a ID)
                 for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
                     for (const file of archivos) {
                         archivosSubidosCount++;
                         mostrarMensaje(`⏳ Subiendo archivo ${archivosSubidosCount} de ${totalArchivos}... (${file.name})`, "info");
-                        // Aquí usamos el 4º argumento (obraId)
                         const ok = await UploadService.uploadFile(file, 'obra', window.EIEL_CONFIG.muniCode, obraId);
                         if (!ok) console.error(`Fallo al subir ${file.name}`);
                     }
+                }
+
+                // 2. Subir archivos de NUEVAS OBRAS (Sin ID, carpeta general)
+                for (const file of archivosNuevas) {
+                    archivosSubidosCount++;
+                    mostrarMensaje(`⏳ Subiendo archivo ${archivosSubidosCount} de ${totalArchivos}... (${file.name})`, "info");
+                    // Usamos 'OTRAS_OBRAS' para que el script cree una carpeta específica
+                    const ok = await UploadService.uploadFile(file, 'obra', window.EIEL_CONFIG.muniCode, 'OTRAS_OBRAS');
+                    if (!ok) console.error(`Fallo al subir ${file.name}`);
                 }
             }
 
@@ -858,18 +912,28 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
 
-            if (estados.length === 0) {
-                mostrarMensaje("⚠️ No ha seleccionado ningún estado para ninguna obra.", "warning");
+            if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
+                mostrarMensaje("⚠️ No ha seleccionado ningún estado para las obras ni ha indicado obras nuevas.", "warning");
                 btnEnviar.disabled = false;
                 btnEnviar.style.cursor = "pointer";
                 return;
+            }
+
+            // Preparamos observaciones ampliadas para incluir la info de obras nuevas en el PDF
+            let obsFinal = obsValue;
+            if (textoOtrasObras || archivosNuevas.length > 0) {
+                obsFinal += "\n\n=== ➕ OTRAS OBRAS EN EL MUNICIPIO ===\n";
+                if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
+                if(archivosNuevas.length > 0) {
+                    obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
+                }
             }
 
             const payload = {
                 tipo_formulario: "obras",
                 fase: window.EIEL_CONFIG.fase,
                 datos_obras_json: JSON.stringify(estados),
-                observaciones: obsValue,
+                observaciones: obsFinal, // Enviamos el texto combinado
                 nombre_contacto: nombreContacto,
                 departamento_contacto: document.getElementById("contactoDepartamento").value,
                 email_usuario: emailContacto,
@@ -889,8 +953,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 mostrarMensaje(`✅ Datos enviados correctamente. Revise su email.`, "success");
                 
-                // G. Limpieza (Reset Escoba + Cola)
+                // G. Limpieza TOTAL
                 colaAdjuntos = {};
+                archivosNuevas = [];
+                renderArchivosNuevas(); // Limpia visualmente la lista nueva
+                
                 // Limpieza visual de inputs y selects
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
