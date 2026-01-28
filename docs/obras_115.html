@@ -396,13 +396,13 @@ document.addEventListener("DOMContentLoaded", () => {
         complete() {
             if (this.bar) {
                 this.bar.style.width = "100%";
-                this.bar.style.backgroundColor = "#22c55e"; // Color verde éxito
+                this.bar.style.backgroundColor = "#22c55e"; // Verde éxito
             }
             if (this.percent) this.percent.textContent = "100%";
-            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email proporcionado.";
+            // Mensaje final dentro de la barra
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
         }
     };
-
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -498,7 +498,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `).join("");
     }
 
-    // 5.1 GESTIÓN DE ARCHIVOS (NUEVAS OBRAS) -> LÓGICA AÑADIDA
+    // 5.1 GESTIÓN DE ARCHIVOS (NUEVAS OBRAS)
     let archivosNuevas = [];
     const fileInputNuevas = document.getElementById("fileInputNuevas");
     const fileListNuevas = document.getElementById("fileListNuevas");
@@ -534,18 +534,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
-    const btnEnviar = document.getElementById("btnEnviar"); 
+    const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad"); 
     const mensajeDiv = document.getElementById("mensaje"); 
 
     function mostrarMensaje(texto, tipo) {
-        if(!mensajeDiv) return; 
+        if(!mensajeDiv) return;
         mensajeDiv.textContent = texto; 
         mensajeDiv.className = `message ${tipo}`; 
-        mensajeDiv.style.display = 'block'; 
+        mensajeDiv.style.display = 'block';
     }
 
-    // 6.1 Checkbox Habilitador (Se mantiene igual)
+    // 6.1 Checkbox Habilitador
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             if (this.checked) {
@@ -560,21 +560,21 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 6.2 Listener Principal Refactorizado
+    // 6.2 Listener Principal
     if(btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             // A. Preparación y Bloqueo UI
             btnEnviar.disabled = true;
             btnEnviar.style.cursor = "wait";
 
-            // B. Lectura de Variables y Validaciones (Tu lógica original)
+            // B. Lectura de Variables y Validaciones
             const nombreContacto = document.getElementById("contactoNombre").value.trim(); 
             const emailContacto = document.getElementById("contactoEmail").value.trim(); 
             const emailConfirmInput = document.getElementById("contactoEmailConfirm");
             const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim(); 
-            const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim(); 
+            const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim();
 
             // C. Validaciones de Contacto, Email y Observaciones
             if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
@@ -613,8 +613,8 @@ document.addEventListener("DOMContentLoaded", () => {
             for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
                 archivos.forEach(file => listaArchivosSubida.push({ file, obraId }));
             }
-            archivosNuevas.forEach(file => listaArchivosSubida.push({ file, obraId: 'OTRAS_OBRAS' })); 
-
+            archivosNuevas.forEach(file => listaArchivosSubida.push({ file, obraId: 'OTRAS_OBRAS' }));
+            
             const totalArchivos = listaArchivosSubida.length;
             let completados = 0;
 
@@ -629,14 +629,11 @@ document.addEventListener("DOMContentLoaded", () => {
                             return res;
                         });
                 });
-
-                const resultados = await Promise.all(promesas); 
-                const fallidos = resultados.filter(r => r === false).length;
-                if (fallidos > 0) mostrarMensaje(`⚠️ ${fallidos} archivos no subieron bien.`, "warning"); 
+                await Promise.all(promesas);
             }
 
             // E. GENERACIÓN DE PDF FINAL
-            UIProgress.update(completados, totalArchivos, "Generando justificante PDF..."); 
+            UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
             
             // Recopilación de estados para el PDF 
             const estados = [];
@@ -683,43 +680,40 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             try {
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
 
             // G. FINALIZACIÓN Y LIMPIEZA TOTAL
             UIProgress.complete();
+            if(mensajeDiv) mensajeDiv.style.display = 'none';
 
                 // 1. Limpieza de variables de archivos
-                colaAdjuntos = {}; [cite: 173]
-                archivosNuevas = []; [cite: 174]
+                colaAdjuntos = {};
+                archivosNuevas = [];
 
                 // 2. Limpieza VISUAL de listas de archivos en la tabla
-                document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = ""); [cite: 113, 114]
+                document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = "");
+                renderArchivosNuevas();
                 
-                // 3. Limpieza VISUAL de archivos en "Otras Obras"
-                renderArchivosNuevas(); [cite: 120]
-
-                // 4. Limpieza de inputs, selects y textareas
-                document.querySelectorAll("input, select, textarea").forEach(el => { [cite: 175]
+                // 3. Limpieza de inputs y reseteo
+                document.querySelectorAll("input, select, textarea").forEach(el => { 
                     if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                     if(el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
-
-                // 5. Reseteo del botón y conformidad
-                if(checkConformidad) checkConformidad.checked = false; [cite: 176]
-                btnEnviar.disabled = true; [cite: 177]
+                if(checkConformidad) checkConformidad.checked = false;
+                btnEnviar.disabled = true;
                 btnEnviar.style.opacity = "0.6";
                 btnEnviar.style.cursor = "not-allowed";
 
-        } catch (error) {
-            console.error(error);
-            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error"); [cite: 178]
-            btnEnviar.disabled = false;
-        }
+            } catch (error) {
+                console.error(error);
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                btnEnviar.disabled = false;
+            }
         });
     }
 });
