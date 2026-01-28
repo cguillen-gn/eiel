@@ -365,15 +365,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 obsField.style.border = ""; 
             }
 
-            // D. Proceso de Subida
-            mostrarMensaje("⏳ Subiendo archivos...", "info");
-            let errores = 0;
-            for (const file of archivos) {
-                // Pasamos null como codigoObra
-                const ok = await UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, null);
-                if (!ok) errores++;
+            // D. Proceso de Subida (OPTIMIZADO)
+            if (archivos.length > 0) {
+                mostrarMensaje(`⏳ Subiendo ${archivos.length} archivos simultáneamente...`, "info");
+                
+                // 1. Creamos el mapa de promesas (sin await interno)
+                const promesasSubida = archivos.map(file => 
+                    UploadService.uploadFile(file, 'TIPO_FICHA', window.EIEL_CONFIG.muniCode, null)
+                );
+
+                // 2. Ejecución en paralelo
+                const resultados = await Promise.all(promesasSubida);
+                
+                // 3. Verificación de errores
+                const errores = resultados.filter(r => r === false).length;
+                if (errores > 0) {
+                    mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir. Continuando...`, "warning");
+                    await new Promise(res => setTimeout(res, 1500));
+                }
             }
-            if (errores > 0) mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir.`, "warning");
 
             // E. Recopilación de Datos
             mostrarMensaje("⏳ Enviando datos...", "info");
