@@ -645,7 +645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    // 4. SERVICIOS
+    // 4. SERVICIOS Y UTILIDADES DE UI
     const UIProgress = {
         container: document.getElementById("progressContainer"),
         bar: document.getElementById("progressBar"),
@@ -662,7 +662,6 @@ document.addEventListener("DOMContentLoaded", () => {
             let percentage = 0;
 
             if (total > 0) {
-                // Los archivos representan el 90% del progreso total
                 const fileWeight = 90 / total;
                 percentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
             } else {
@@ -675,10 +674,12 @@ document.addEventListener("DOMContentLoaded", () => {
         },
 
         complete() {
-            if (this.bar) this.bar.style.width = "100%";
+            if (this.bar) {
+                this.bar.style.width = "100%";
+                this.bar.style.backgroundColor = "#22c55e"; // Color verde éxito
+            }
             if (this.percent) this.percent.textContent = "100%";
-            if (this.text) this.text.textContent = "¡Todo enviado con éxito!";
-            setTimeout(() => { if (this.container) this.container.style.display = 'none'; }, 4000);
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email proporcionado.";
         }
     };
 
@@ -686,35 +687,35 @@ document.addEventListener("DOMContentLoaded", () => {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result.split(',')[1]); 
-            reader.onerror = error => reject(error); 
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
         }),
 
         async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
-                const base64 = await this.toBase64(file); 
-                const contactoEmail = document.getElementById("contactoEmail")?.value || "anonimo"; 
+                const base64 = await this.toBase64(file);
+                const contactoEmail = document.getElementById("contactoEmail")?.value || "anonimo";
 
                 const payload = {
                     filename: file.name,
                     mimeType: file.type,
                     bytesBase64: base64, 
                     municipio: muniCode,
-                    usuario: contactoEmail, 
+                    usuario: contactoEmail,
                     tipo: tipoFicha,
                     obra: codigoObra 
-                }; 
+                };
 
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
                     method: 'POST',
-                    mode: 'no-cors', // Mantenemos tu configuración original
+                    mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload) 
+                    body: JSON.stringify(payload)
                 });
-                return true; 
+                return true;
             } catch (e) {
-                console.error("Error subiendo:", e); 
-                return false; 
+                console.error("Error subiendo:", e);
+                return false;
             }
         }
     };
@@ -962,31 +963,43 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             try {
-                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
 
-                // G. FINALIZACIÓN Y LIMPIEZA
-                UIProgress.complete();
-                mostrarMensaje(`✅ ¡Éxito! Justificante enviado a su email.`, "success"); 
+            // G. FINALIZACIÓN Y LIMPIEZA TOTAL
+            UIProgress.complete();
+
+                // 1. Limpieza de variables de archivos
+                colaAdjuntos = {}; [cite: 173]
+                archivosNuevas = []; [cite: 174]
+
+                // 2. Limpieza VISUAL de listas de archivos en la tabla
+                document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = ""); [cite: 113, 114]
                 
-                // Reseteo de formulario 
-                colaAdjuntos = {}; archivosNuevas = [];
-                renderArchivosNuevas();
-                document.querySelectorAll("input, select, textarea").forEach(el => {
-                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                });
-                if(checkConformidad) checkConformidad.checked = false;
-                btnEnviar.disabled = true; btnEnviar.style.opacity = "0.6";
+                // 3. Limpieza VISUAL de archivos en "Otras Obras"
+                renderArchivosNuevas(); [cite: 120]
 
-            } catch (error) {
-                console.error(error);
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-                btnEnviar.disabled = false;
-            }
+                // 4. Limpieza de inputs, selects y textareas
+                document.querySelectorAll("input, select, textarea").forEach(el => { [cite: 175]
+                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                    if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                });
+
+                // 5. Reseteo del botón y conformidad
+                if(checkConformidad) checkConformidad.checked = false; [cite: 176]
+                btnEnviar.disabled = true; [cite: 177]
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed";
+
+        } catch (error) {
+            console.error(error);
+            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error"); [cite: 178]
+            btnEnviar.disabled = false;
+        }
         });
     }
 });
