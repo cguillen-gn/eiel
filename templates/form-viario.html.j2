@@ -102,6 +102,15 @@
         </label>
     </div>
 
+<div id="progressContainer" style="display: none; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span id="progressText" style="font-size: 0.85rem; font-weight: 600; color: #475569;">Preparando envío...</span>
+        <span id="progressPercentage" style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary);">0%</span>
+    </div>
+    <div style="width: 100%; background-color: #e2e8f0; border-radius: 999px; height: 10px; overflow: hidden;">
+        <div id="progressBar" style="width: 0%; height: 100%; background-color: #3b82f6; transition: width 0.4s ease; border-radius: 999px;"></div>
+    </div>
+</div>
     
 <button id="btnEnviar" class="btn btn-primary" disabled style="opacity: 0.6; cursor: not-allowed; background-color: var(--theme-saneamiento);">
         Enviar Datos
@@ -138,7 +147,44 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
     
-    // 4. SERVICIOS
+    // 4. SERVICIOS Y UTILIDADES DE UI
+    const UIProgress = {
+        container: document.getElementById("progressContainer"),
+        bar: document.getElementById("progressBar"),
+        text: document.getElementById("progressText"),
+        percent: document.getElementById("progressPercentage"),
+
+        show(totalTasks) {
+            if (this.container) this.container.style.display = 'block';
+            this.update(0, totalTasks, "Iniciando proceso de envío...");
+        },
+
+        update(completed, total, message) {
+            const isFinalStep = message.toLowerCase().includes("pdf");
+            let percentage = 0;
+
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                percentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                percentage = isFinalStep ? 95 : 0;
+            }
+
+            if (this.bar) this.bar.style.width = percentage + "%";
+            if (this.percent) this.percent.textContent = percentage + "%";
+            if (this.text && message) this.text.textContent = message;
+        },
+
+        complete() {
+            if (this.bar) {
+                this.bar.style.width = "100%";
+                this.bar.style.backgroundColor = "#22c55e"; 
+            }
+            if (this.percent) this.percent.textContent = "100%";
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
+        }
+    };
+
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -146,33 +192,27 @@ document.addEventListener("DOMContentLoaded", () => {
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-        // Firma estandarizada
+
         async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
-                const contactoEmail = document.getElementById("contactoEmail")?.value || "anonimo";
-
+                const userEmail = document.getElementById("contactoEmail").value || "anonimo";
                 const payload = {
                     filename: file.name,
                     mimeType: file.type,
                     bytesBase64: base64, 
                     municipio: muniCode,
-                    usuario: contactoEmail,
+                    usuario: userEmail,
                     tipo: tipoFicha,
-                    obra: codigoObra 
+                    obra: codigoObra
                 };
-
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 return true;
-            } catch (e) {
-                console.error("Error subiendo archivo:", e);
-                return false;
-            }
+            } catch (e) { return false; }
         }
     };
 
@@ -239,91 +279,56 @@ document.addEventListener("DOMContentLoaded", () => {
     // 6.2 Listener Principal
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            // A. Bloqueo UI
             btnEnviar.disabled = true;
             btnEnviar.style.cursor = "wait";
 
-            // B. Lectura de Variables
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
-            
             const emailConfirmInput = document.getElementById("contactoEmailConfirm");
             const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
 
             // C. Validaciones
-            // C.1 Contacto y Emails
             if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
                 mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
-                btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
+                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
             }
-
             if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden. Por favor, verifíquelos.", "error");
-                document.getElementById("contactoEmail").style.border = "2px solid #ef4444";
-                if(emailConfirmInput) emailConfirmInput.style.border = "2px solid #ef4444";
-                btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
-                return;
-            } else {
-                document.getElementById("contactoEmail").style.border = "";
-                if(emailConfirmInput) emailConfirmInput.style.border = "";
+                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden.", "error");
+                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
             }
-
-            // C.2 Observaciones Obligatorias
             if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
-                mostrarMensaje("⚠️ ALTO: Al tener requerimientos específicos solicitados, es OBLIGATORIO responder en el campo 'Observaciones'.", "error");
-                obsField.style.border = "2px solid #ef4444";
-                obsField.focus(); 
-                btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
-                return; 
-            } else {
-                obsField.style.border = ""; 
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones'.", "error");
+                obsField.focus(); btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
             }
 
-            // D. Proceso de Subida (OPTIMIZADO)
-            if (archivos.length > 0) {
-                mostrarMensaje(`⏳ Subiendo ${archivos.length} archivos simultáneamente...`, "info");
-                
-                // 1. Creamos el mapa de promesas (sin await interno)
+            // D. Proceso de Subida
+            const totalArchivos = archivos.length;
+            let completados = 0;
+            UIProgress.show(totalArchivos);
+
+            if (totalArchivos > 0) {
                 const promesasSubida = archivos.map(file => 
-                    UploadService.uploadFile(file, 'TIPO_FICHA', window.EIEL_CONFIG.muniCode, null)
+                    UploadService.uploadFile(file, 'viario', window.EIEL_CONFIG.muniCode, null)
+                    .then(res => {
+                        completados++;
+                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
+                        return res;
+                    })
                 );
-
-                // 2. Ejecución en paralelo
-                const resultados = await Promise.all(promesasSubida);
-                
-                // 3. Verificación de errores
-                const errores = resultados.filter(r => r === false).length;
-                if (errores > 0) {
-                    mostrarMensaje(`⚠️ ${errores} archivos fallaron al subir. Continuando...`, "warning");
-                    await new Promise(res => setTimeout(res, 1500));
-                }
+                await Promise.all(promesasSubida);
             }
 
-            // E. Recopilación de Datos
-            mostrarMensaje("⏳ Enviando datos...", "info");
-            
-            const depositosData = [];
-            document.querySelectorAll('.input-limpieza').forEach(input => {
-                depositosData.push({
-                    nombre: input.dataset.nombre,
-                    limpieza: input.value || "No indicado"
-                });
-            });
+            // E. Recopilación de Datos para el PDF
+            UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
 
             const payload = {
                 tipo_formulario: "viario",
                 fase: window.EIEL_CONFIG.fase,
                 observaciones: obsValue,
                 nombre_contacto: nombreContacto,
-                departamento_contacto: departamentoContacto,
+                departamento_contacto: document.getElementById("contactoDepartamento").value,
                 email_contacto: emailContacto,
                 municipio_codigo: window.EIEL_CONFIG.muniCode,
                 municipio_nombre: window.EIEL_CONFIG.muniName,
@@ -340,27 +345,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                mostrarMensaje("✅ Datos enviados. Se ha enviado el justificante a su email.", "success");
-                
-                // G. Limpieza (Reset Escoba)
+                // G. Finalización y Limpieza
+                UIProgress.complete();
+                if(mensajeDiv) mensajeDiv.style.display = 'none';
+
                 archivos = [];
-                renderArchivos();
+                renderArchivos(); // Limpia visualmente la lista de archivos
+
                 document.querySelectorAll("input, select, textarea").forEach(el => {
-                   if(el.type !== 'button' && el.type !== 'submit' && el.type !== 'checkbox') el.value = '';
+                   if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                   if(el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
 
-                if(checkConformidad) {
-                    checkConformidad.checked = false;
-                    btnEnviar.style.opacity = "0.6";
-                    btnEnviar.style.cursor = "not-allowed";
-                    btnEnviar.disabled = true;
-                } 
-                
+                if(checkConformidad) checkConformidad.checked = false;
+                btnEnviar.disabled = true;
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed";
+
             } catch (error) {
                 console.error(error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
             }
         });
     }
