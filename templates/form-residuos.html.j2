@@ -279,7 +279,8 @@ document.addEventListener("DOMContentLoaded", () => {
         fase: "{{ fase_actual }}",
         urlGenerarPdf: "{{ url_generar_pdf }}",
         urlAdjuntos: "{{ url_adjuntos }}",
-        hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }}
+        hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }},
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
     };
 
     // 3. INICIALIZACIÓN UI
@@ -443,6 +444,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim();
 
             // C. Validaciones
+            // 1: Identidad 
             if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
                 mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
                 btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
@@ -452,11 +454,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 mostrarMensaje("⚠️ Los correos electrónicos NO coinciden.", "error");
                 btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
             }
-            
-            if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones'.", "error");
-                obsField.focus(); btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 2: Observaciones
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                obsField.focus(); btnEnviar.disabled = false; return;
             }
+            // 3: Contenedores
+            let hayCeros = false;
+            document.querySelectorAll('input[id^="cont_"]').forEach(input => {
+                if (parseInt(input.value) === 0) hayCeros = true;
+            });
+            if (hayCeros) {
+                alert("ℹ️ Ha indicado 0 en algún campo de contenedores. Si es correcto (ej: recogida puerta a puerta), recuerde mencionarlo en Observaciones.");
+            }
+            
+            
 
             // D. Proceso de Subida
             const totalArchivos = archivos.length;
@@ -478,13 +490,16 @@ document.addEventListener("DOMContentLoaded", () => {
             // E. Recopilación de Datos para el PDF
             UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
 
-            const residuosData = RESIDUO_FIELDS.map(r => ({
-                tipo: r.type,
-                produccion: document.getElementById(r.prod).value || "N/A",
-                contenedores: document.getElementById(r.cont).value || "N/A",
-                periodicidad: document.getElementById(r.period).value || "N/A",
-                destino: document.getElementById(r.dest).value || "N/A"
-            }));
+            const residuosData = RESIDUO_FIELDS.map(r => {
+                let prodVal = document.getElementById(r.prod).value.replace(',', '.'); 
+                return {
+                    tipo: r.type,
+                    produccion: parseFloat(prodVal) || 0,
+                    contenedores: document.getElementById(r.cont).value || "0",
+                    periodicidad: document.getElementById(r.period).value || "N/A",
+                    destino: document.getElementById(r.dest).value || "N/A"
+                };
+            });
 
             const payload = {
                 tipo_formulario: "residuos",

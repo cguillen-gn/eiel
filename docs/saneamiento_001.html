@@ -262,7 +262,8 @@ document.addEventListener("DOMContentLoaded", () => {
         fase: "2026",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwkNRF9RMjZfLXTCRJrPx0M6uQ7EZ62eA7za55libfALJNSIqscGqKTe__hsfEGgUnT/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
-        hasAvisos: true
+        hasAvisos: true,
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
     };
 
     // 3. INICIALIZACIÓN UI
@@ -432,27 +433,38 @@ document.addEventListener("DOMContentLoaded", () => {
             btnEnviar.style.cursor = "wait";
 
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const departamentoContacto = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
+            const emailConfirm = document.getElementById("contactoEmailConfirm")?.value.trim() || emailContacto;
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+            const tipoGestion = document.getElementById("tipo_gestion")?.value;
+            const empresa = document.getElementById("nombre_empresa")?.value.trim();
+            
 
             // C. Validaciones
-            if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
-                mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 1: Identidad 
+            if (nombreContacto.length < 2) {
+                mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
+                btnEnviar.disabled = false; return;
             }
-            if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden.", "error");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                btnEnviar.disabled = false; return;
             }
-            if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones'.", "error");
-                obsField.focus(); btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 2: Observaciones
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                obsField.focus(); btnEnviar.disabled = false; return;
             }
             
+            // 3: Empresa obligatoria si es gestión externa
+            if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad') && !empresa) {
+                mostrarMensaje("⚠️ El nombre de la empresa es obligatorio para este tipo de gestión.", "error");
+                btnEnviar.disabled = false; return;
+            }
+                        
             // D. Proceso de Subida
             const totalArchivos = archivos.length;
             let completados = 0;
@@ -460,7 +472,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (totalArchivos > 0) {
                 const promesasSubida = archivos.map(file => 
-                    UploadService.uploadFile(file, 'cementerio', window.EIEL_CONFIG.muniCode, null)
+                    UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, null)
                     .then(res => {
                         completados++;
                         UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
@@ -472,26 +484,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // E. Recopilación de Datos para el PDF
             UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
-
-            const datosCementerios = cementerios.map((cem, index) => {
-                const cemIndex = index + 1;
-                const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
-                let datos = { nombre: cem.nombre };
-                inputs.forEach(input => {
-                    const tipo = input.dataset.tipo;
-                    const val = parseInt(input.value);
-                    datos[tipo] = isNaN(val) ? 0 : val;
-                });
-                return datos;
-            });
-            
+    
             const payload = {
-                tipo_formulario: "cementerios",
+                tipo_formulario: "saneamiento",
                 fase: window.EIEL_CONFIG.fase,
-                cementerios_data: JSON.stringify(datosCementerios),
+                gestion_tipo: tipoGestion || "",
+                gestion_empresa: empresa || "",
+                gestion_tecnico_nombre: document.getElementById("tecnicoNombre")?.value || "",
+                gestion_tecnico_tel: document.getElementById("tecnicoTel")?.value || "",
+                gestion_tecnico_email: document.getElementById("tecnicoEmail")?.value || "",
                 observaciones: obsValue,
                 nombre_contacto: nombreContacto,
-                departamento_contacto: departamentoContacto,
+                departamento_contacto: document.getElementById("contactoDepartamento").value,
                 email_contacto: emailContacto,
                 municipio_codigo: window.EIEL_CONFIG.muniCode,
                 municipio_nombre: window.EIEL_CONFIG.muniName,
@@ -507,28 +511,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
                 
-                // G. Finalización y Limpieza total
-                UIProgress.complete();
+            // G. Finalización y Limpieza total
+            UIProgress.complete();
                 if(mensajeDiv) mensajeDiv.style.display = 'none';
-
-                archivos = [];
-                renderArchivos(); 
-
+                archivos = []; renderArchivos();
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                    if(el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
-
                 if(checkConformidad) checkConformidad.checked = false;
-                btnEnviar.disabled = true;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
-
-                // Forzamos el recalculo de totales para limpiar los sumatorios visuales
-                if (typeof calcularTotales === 'function') calcularTotales();
-
+                btnEnviar.disabled = true; btnEnviar.style.opacity = "0.6";
             } catch (error) {
-                console.error(error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 btnEnviar.disabled = false;
             }

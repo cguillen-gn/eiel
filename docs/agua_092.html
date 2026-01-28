@@ -455,7 +455,8 @@ document.addEventListener("DOMContentLoaded", () => {
         fase: "2026",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwkNRF9RMjZfLXTCRJrPx0M6uQ7EZ62eA7za55libfALJNSIqscGqKTe__hsfEGgUnT/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
-        hasAvisos: true
+        hasAvisos: true,
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
     };
 
     // 3. INICIALIZACIÓN UI
@@ -630,21 +631,44 @@ document.addEventListener("DOMContentLoaded", () => {
             const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+            const tipoGestion = document.getElementById("tipo_gestion")?.value;
+            const empresa = document.getElementById("nombre_empresa")?.value.trim();
 
             // C. Validaciones
-            if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
-                mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto correctamente.", "warning");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 1: Identidad 
+            if (nombreContacto.length < 2) {
+                mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
+                btnEnviar.disabled = false; return;
             }
-            if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden.", "error");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                btnEnviar.disabled = false; return;
             }
-            if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones'.", "error");
-                obsField.focus(); btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 2: Observaciones
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                obsField.focus(); btnEnviar.disabled = false; return;
             }
+            // 3: Año limpieza depósitos
+            const yearMax = window.EIEL_CONFIG.yearActual + 1;
+            let fechaError = false;
+            document.querySelectorAll('.input-limpieza').forEach(input => {
+                const anio = parseInt(input.value);
+                if (anio && (anio < 1900 || anio > yearMax)) fechaError = true;
+            });
 
+            if (fechaError) {
+                mostrarMensaje(`⚠️ El año de limpieza debe estar entre 1900 y ${yearMax}.`, "error");
+                btnEnviar.disabled = false; return;
+            }
+            
+            // 4: Empresa obligatoria si es gestión externa
+            if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad') && !empresa) {
+                mostrarMensaje("⚠️ El nombre de la empresa es obligatorio para este tipo de gestión.", "error");
+                btnEnviar.disabled = false; return;
+            }
+            
             // D. Proceso de Subida
             const totalArchivos = archivos.length;
             let completados = 0;

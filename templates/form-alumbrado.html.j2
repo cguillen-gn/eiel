@@ -137,7 +137,8 @@ document.addEventListener("DOMContentLoaded", () => {
         fase: "{{ fase_actual }}",
         urlGenerarPdf: "{{ url_generar_pdf }}",
         urlAdjuntos: "{{ url_adjuntos }}",
-        hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }}
+        hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }},
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
     };
 
     // 3. INICIALIZACIÓN UI
@@ -286,23 +287,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
+            const emailConfirm = document.getElementById("contactoEmailConfirm")?.value.trim() || emailContacto;
             const obsField = document.getElementById("observaciones");
             const obsValue = obsField.value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
             // C. Validaciones
-            if (!nombreContacto || !emailContacto || !emailContacto.includes('@')) {
-                mostrarMensaje("⚠️ Por favor, rellene el Nombre y el Email de contacto.", "warning");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 1: Identidad 
+            if (nombreContacto.length < 2) {
+                mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
+                btnEnviar.disabled = false; return;
             }
-            if (emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Los correos electrónicos NO coinciden.", "error");
-                btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                btnEnviar.disabled = false; return;
             }
-            if (window.EIEL_CONFIG.hasAvisos && obsValue === "") {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones'.", "error");
-                obsField.focus(); btnEnviar.disabled = false; btnEnviar.style.cursor = "pointer"; return;
+            // 2: Observaciones
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                obsField.focus(); btnEnviar.disabled = false; return;
             }
 
             // D. Proceso de subida
