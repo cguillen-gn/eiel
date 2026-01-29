@@ -10,20 +10,25 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script>
-    // Definimos el objeto global que esperan los formularios y el logger
-    window.EIEL_CONFIG = {
-        muniCode: "096",
-        muniName: "Onil",
-        fase: "2026",
-        urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz3W4mZiGG13vCaVJ_DsaItogTVlS3xEsUPZfXMLIHuNQBOJZJ_0r3uSr5kjCVBzPZn/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
-        // Detectamos si el municipio tiene avisos personalizados
-        hasAvisos: false
-    };
-</script>
-    
-    
+        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        window.EIEL_CONFIG = {
+            muniCode: "096",
+            muniName: "Onil",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz3W4mZiGG13vCaVJ_DsaItogTVlS3xEsUPZfXMLIHuNQBOJZJ_0r3uSr5kjCVBzPZn/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
+            // Verifica si existen avisos personalizados para la validación de observaciones
+            hasAvisos: false
+        };
+
+        // 2. FUNCIONES GLOBALES (Accesibles desde el HTML)
+        function logout() {
+            // Limpia toda la sesión y datos del técnico por seguridad
+            localStorage.clear(); 
+            window.location.href = "index.html";
+        }
+    </script>
 </head>
 <body>
 
@@ -1427,66 +1432,53 @@
     </footer>
 
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
-        // 1. Recuperamos los datos de SESIÓN del MUNICIPIO (Claves corregidas)
-        const muniCode = localStorage.getItem("eiel_muni_code");
-        const muniName = localStorage.getItem("eiel_muni_name");
+        document.addEventListener("DOMContentLoaded", () => {
+            // A. VALIDACIÓN DE SESIÓN DEL MUNICIPIO
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            const muniName = localStorage.getItem("eiel_muni_name");
 
-        if (!muniCode) {
-            console.warn("Sin sesión activa. Redirigiendo...");
-            window.location.href = "index.html";
-            return;
-        }
-
-        // 2. Actualizamos la UI con el nombre del municipio
-        const headerName = document.getElementById("headerMuniName");
-        if(headerName) headerName.textContent = muniName || "Municipio";
-
-        // 3. LÓGICA DE AUTOCOMPLETADO (Memoria del técnico)
-        // Si el técnico ya rellenó sus datos en otro formulario de esta sesión, los recuperamos
-        const savedName = localStorage.getItem("eiel_user_name");
-        const savedEmail = localStorage.getItem("eiel_user_email");
-        const savedDept = localStorage.getItem("eiel_user_dept");
-
-        if (savedName) {
-            const input = document.getElementById("contactoNombre");
-            if (input) input.value = savedName;
-        }
-        if (savedEmail) {
-            const inputEmail = document.getElementById("contactoEmail");
-            const inputConfirm = document.getElementById("contactoEmailConfirm");
-            if (inputEmail) inputEmail.value = savedEmail;
-            if (inputConfirm) inputConfirm.value = savedEmail;
-        }
-        if (savedDept) {
-            const input = document.getElementById("contactoDepartamento");
-            if (input) input.value = savedDept;
-        }
-
-        // 4. PERSISTENCIA PROACTIVA (Escucha Activa)
-        // Guardamos los datos en localStorage MIENTRAS el usuario escribe
-        const inputsContacto = {
-            "contactoNombre": "eiel_user_name",
-            "contactoEmail": "eiel_user_email",
-            "contactoDepartamento": "eiel_user_dept"
-        };
-
-        Object.keys(inputsContacto).forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('input', (e) => {
-                    // Guardamos inmediatamente para que el Logger y otros formularios lo tengan
-                    localStorage.setItem(inputsContacto[id], e.target.value.trim());
-                    
-                    // Si es el email, actualizamos ambos campos si existiera lógica de validación
-                    if (id === "contactoEmail") {
-                        const confirm = document.getElementById("contactoEmailConfirm");
-                        // Opcional: podrías querer sincronizarlos o dejar que el usuario lo escriba
-                    }
-                });
+            if (!muniCode) {
+                console.warn("Acceso no autorizado. Redirigiendo al login...");
+                window.location.href = "index.html";
+                return;
             }
+
+            // Actualizamos el nombre del municipio en la cabecera
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = muniName || "Municipio";
+
+            // B. AUTOCOMPLETADO Y PERSISTENCIA PROACTIVA
+            const fieldsMap = {
+                "contactoNombre": "eiel_user_name",
+                "contactoEmail": "eiel_user_email",
+                "contactoDepartamento": "eiel_user_dept"
+            };
+
+            // 1. Rellenar campos si ya existen datos guardados
+            Object.keys(fieldsMap).forEach(id => {
+                const savedValue = localStorage.getItem(fieldsMap[id]);
+                const inputEl = document.getElementById(id);
+                
+                if (savedValue && inputEl) {
+                    inputEl.value = savedValue;
+                    // Caso especial: Sincronizar campo de confirmación de email
+                    if (id === "contactoEmail") {
+                        const confirmEl = document.getElementById("contactoEmailConfirm");
+                        if (confirmEl) confirmEl.value = savedValue;
+                    }
+                }
+            });
+
+            // 2. Guardar datos en tiempo real mientras el técnico escribe (Escucha Activa)
+            Object.keys(fieldsMap).forEach(id => {
+                const inputEl = document.getElementById(id);
+                if (inputEl) {
+                    inputEl.addEventListener('input', (e) => {
+                        localStorage.setItem(fieldsMap[id], e.target.value.trim());
+                    });
+                }
+            });
         });
-});
     </script>
 
     
@@ -1896,24 +1888,22 @@ document.addEventListener("DOMContentLoaded", () => {
     
     <script>
     (function() {
-        // Evitamos loguear si estamos en local (protocolo file:)
+        // No registrar accesos si se abre el archivo localmente
         if (window.location.protocol === 'file:') return;
 
-        // Preparamos los datos del payload con las nuevas claves de usuario
         const payload = {
             municipio: "Onil",
             codigo: "096",
             fase: "2026",
-            // Detecta automáticamente el tipo de formulario por el nombre del archivo
             tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
             ua: navigator.userAgent,
-            // Prioriza el nombre del técnico guardado, si no, usa un identificador genérico
-            contacto: localStorage.getItem("eiel_user_name") || "Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A"),
+            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
+            contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
             departamento: localStorage.getItem("eiel_user_dept") || "N/A",
             email: localStorage.getItem("eiel_user_email") || "N/A" 
         };
 
-        // Envío silencioso al cargar la página si existe la URL configurada
+        // Envío al Apps Script de Logs si la URL está configurada en Python
         if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
             fetch(window.EIEL_CONFIG.urlLogger, {
                 method: 'POST',
@@ -1923,6 +1913,5 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     })();
     </script>
-    
 </body>
 </html>
