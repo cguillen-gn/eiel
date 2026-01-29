@@ -596,48 +596,66 @@
     </footer>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // 1. Recuperamos los datos de SESIÓN del MUNICIPIO (Claves corregidas)
-            const muniCode = localStorage.getItem("eiel_muni_code");
-            const muniName = localStorage.getItem("eiel_muni_name");
-       
-            if (!muniCode) {
-                console.warn("Sin sesión activa. Redirigiendo...");
-                window.location.href = "index.html";
-                return;
-            }
+    document.addEventListener("DOMContentLoaded", () => {
+        // 1. Recuperamos los datos de SESIÓN del MUNICIPIO (Claves corregidas)
+        const muniCode = localStorage.getItem("eiel_muni_code");
+        const muniName = localStorage.getItem("eiel_muni_name");
 
-            // 2. Actualizamos la UI con el nombre del municipio
-            const headerName = document.getElementById("headerMuniName");
-            if(headerName) headerName.textContent = muniName || "Municipio";
+        if (!muniCode) {
+            console.warn("Sin sesión activa. Redirigiendo...");
+            window.location.href = "index.html";
+            return;
+        }
 
-            // 3. LÓGICA DE AUTOCOMPLETADO (Memoria del técnico)
-            // Si el técnico ya rellenó sus datos en otro formulario de esta sesión, los recuperamos
-            const savedName = localStorage.getItem("eiel_user_name");
-            const savedEmail = localStorage.getItem("eiel_user_email");
-            const savedDept = localStorage.getItem("eiel_user_dept");
+        // 2. Actualizamos la UI con el nombre del municipio
+        const headerName = document.getElementById("headerMuniName");
+        if(headerName) headerName.textContent = muniName || "Municipio";
 
-            if (savedName) {
-                const input = document.getElementById("contactoNombre");
-                if (input) input.value = savedName;
-            }
-            if (savedEmail) {
-                const inputEmail = document.getElementById("contactoEmail");
-                const inputConfirm = document.getElementById("contactoEmailConfirm");
-                if (inputEmail) inputEmail.value = savedEmail;
-                if (inputConfirm) inputConfirm.value = savedEmail;
-            }
-            if (savedDept) {
-                const input = document.getElementById("contactoDepartamento");
-                if (input) input.value = savedDept;
+        // 3. LÓGICA DE AUTOCOMPLETADO (Memoria del técnico)
+        // Si el técnico ya rellenó sus datos en otro formulario de esta sesión, los recuperamos
+        const savedName = localStorage.getItem("eiel_user_name");
+        const savedEmail = localStorage.getItem("eiel_user_email");
+        const savedDept = localStorage.getItem("eiel_user_dept");
+
+        if (savedName) {
+            const input = document.getElementById("contactoNombre");
+            if (input) input.value = savedName;
+        }
+        if (savedEmail) {
+            const inputEmail = document.getElementById("contactoEmail");
+            const inputConfirm = document.getElementById("contactoEmailConfirm");
+            if (inputEmail) inputEmail.value = savedEmail;
+            if (inputConfirm) inputConfirm.value = savedEmail;
+        }
+        if (savedDept) {
+            const input = document.getElementById("contactoDepartamento");
+            if (input) input.value = savedDept;
+        }
+
+        // 4. PERSISTENCIA PROACTIVA (Escucha Activa)
+        // Guardamos los datos en localStorage MIENTRAS el usuario escribe
+        const inputsContacto = {
+            "contactoNombre": "eiel_user_name",
+            "contactoEmail": "eiel_user_email",
+            "contactoDepartamento": "eiel_user_dept"
+        };
+
+        Object.keys(inputsContacto).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('input', (e) => {
+                    // Guardamos inmediatamente para que el Logger y otros formularios lo tengan
+                    localStorage.setItem(inputsContacto[id], e.target.value.trim());
+                    
+                    // Si es el email, actualizamos ambos campos si existiera lógica de validación
+                    if (id === "contactoEmail") {
+                        const confirm = document.getElementById("contactoEmailConfirm");
+                        // Opcional: podrías querer sincronizarlos o dejar que el usuario lo escriba
+                    }
+                });
             }
         });
-
-        function logout() {
-            // Limpieza total para seguridad al cerrar sesión
-            localStorage.clear(); 
-            window.location.href = "index.html";
-        }
+});
     </script>
 
     
