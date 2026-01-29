@@ -1663,51 +1663,62 @@ document.addEventListener("DOMContentLoaded", () => {
             // E. Generación de PDF
             UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
             
-            // Recopilación de estados para el PDF 
-            const estados = [];
-            selects.forEach(select => {
-                if (select.value && select.value !== "") {
-                    const obraId = select.dataset.obraId;
-                    estados.push({
-                        obra: obraId,
-                        clave: select.dataset.clave,
-                        orden: select.dataset.orden,
-                        nombre: select.dataset.nombre,
-                        plan: select.dataset.plan,
-                        estado: select.value,
-                        archivos: (colaAdjuntos[obraId] || []).map(f => f.name).join(";")
-                    });
+                // 1: Recopilación de estados para el PDF
+                const estados = [];
+                selects.forEach(select => {
+                    if (select.value && select.value !== "") {
+                        const obraId = select.dataset.obraId;
+                        estados.push({
+                            obra: obraId,
+                            clave: select.dataset.clave,
+                            orden: select.dataset.orden,
+                            nombre: select.dataset.nombre,
+                            plan: select.dataset.plan,
+                            estado: select.value,
+                            archivos: (colaAdjuntos[obraId] || []).map(f => f.name).join(";")
+                        });
+                    }
+                });
+
+                if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
+                    mostrarMensaje("⚠️ No hay datos para enviar.", "warning");
+                    UIProgress.container.style.display = 'none';
+                    btnEnviar.disabled = false; 
+                    btnEnviar.style.cursor = "pointer";
+                    return;
                 }
-            });
 
-            if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
-                mostrarMensaje("⚠️ No hay datos para enviar.", "warning");
-                UIProgress.container.style.display = 'none';
-                btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
-            }
+                // 2: Preparación de observaciones finales
+                let obsFinal = obsValue;
+                if (textoOtrasObras || archivosNuevas.length > 0) {
+                    obsFinal += "\n\n=== ➕ OTRAS OBRAS ===\n";
+                    if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
+                    if(archivosNuevas.length > 0) obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
+                }
+                
+                
+                // 3: Recolección de nombres de adjuntos para el LOG
+                const todosLosAdjuntos = [];
 
-            // Preparación de observaciones finales 
-            let obsFinal = obsValue;
-            if (textoOtrasObras || archivosNuevas.length > 0) {
-                obsFinal += "\n\n=== ➕ OTRAS OBRAS ===\n";
-                if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
-                if(archivosNuevas.length > 0) obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
-            }
+                    Object.values(colaAdjuntos).forEach(files => {
+                        files.forEach(f => todosLosAdjuntos.push(f.name));
+                    });
 
-            const payload = {
-                tipo_formulario: "obras",
-                fase: window.EIEL_CONFIG.fase,
-                datos_obras_json: JSON.stringify(estados),
-                observaciones: obsFinal,
-                nombre_contacto: nombreContacto,
-                departamento_contacto: document.getElementById("contactoDepartamento").value,
-                email_contacto: emailContacto,
-                municipio_codigo: window.EIEL_CONFIG.muniCode,
-                municipio_nombre: window.EIEL_CONFIG.muniName,
-                timestamp_envio: new Date().toISOString() 
-            };
+                    archivosNuevas.forEach(f => todosLosAdjuntos.push(f.name));
+
+                const payload = {
+                    tipo_formulario: "obras",
+                    fase: window.EIEL_CONFIG.fase,
+                    datos_obras_json: JSON.stringify(estados),
+                    observaciones: obsFinal,
+                    nombre_contacto: nombreContacto,
+                    departamento_contacto: document.getElementById("contactoDepartamento").value,
+                    email_contacto: emailContacto,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    archivos_adjuntos: todosLosAdjuntos.join("\n")
+                };
                
             // F. Fetch Final
             try {
