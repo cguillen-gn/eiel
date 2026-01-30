@@ -1,6 +1,6 @@
-# ??? Portal de Formularios EIEL para ayuntamientos
+# üèõÔ∏è Portal de Formularios EIEL para ayuntamientos
 
-> **Geonet Territorial | Diputaci®Æn de Alicante**
+> **Geonet Territorial | Diputaci√≥n de Alicante**
 
 ![GitHub Pages](https://img.shields.io/badge/Deployment-GitHub_Pages-blue?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -8,50 +8,50 @@
 
 ---
 
-## ?? Visi®Æn General del Proyecto
+## üöÄ Visi√≥n General del Proyecto
 
-Este ecosistema permite a los t®¶cnicos municipales de la provincia de Alicante validar y actualizar datos cr®™ticos de servicios e infraestructuras. El proyecto destaca por su arquitectura h®™brida: **Frontend Est®¢tico** para m®¢xima velocidad y **Backend Serverless** (Google Apps Script) para la gesti®Æn segura de documentos y datos.
+Este ecosistema permite a los t√©cnicos municipales de la provincia de Alicante validar y actualizar datos cr√≠ticos de servicios e infraestructuras. El proyecto destaca por su arquitectura h√≠brida: **Frontend Est√°tico** para m√°xima velocidad y **Backend Serverless** (Google Apps Script) para la gesti√≥n segura de documentos y datos.
 
-### ?? Flujo de Datos
-* **Ingesta:** El script `gen_forms.py` extrae datos actualizados de **PostgreSQL** mediante consultas SQL espec®™ficas para servicios como agua, saneamiento, alubrado, viario, residuos, cementerios y obras.
-* **Procesado:** Jinja2 renderiza plantillas din®¢micas (`.html.j2`) inyectando configuraciones por municipio y URLs de backend cargadas desde el archivo `.env`.
-* **Despliegue:** La carpeta `docs/` se sirve v®™a **GitHub Pages**, ofreciendo una interfaz r®¢pida y sin servidores intermedios.
-* **Acci®Æn:** Los env®™os y adjuntos se canalizan a **Google Drive/Sheets** mediante peticiones POST a los endpoints de Apps Script configurados en las variables de entorno.
+### üí° Flujo de Datos
+* **Ingesta:** El script `gen_forms.py` extrae datos actualizados de **PostgreSQL** mediante consultas SQL espec√≠ficas para servicios como agua, saneamiento, alubrado, viario, residuos, cementerios y obras.
+* **Procesado:** Jinja2 renderiza plantillas din√°micas (`.html.j2`) inyectando configuraciones por municipio y URLs de backend cargadas desde el archivo `.env`.
+* **Despliegue:** La carpeta `docs/` se sirve v√≠a **GitHub Pages**, ofreciendo una interfaz r√°pida y sin servidores intermedios.
+* **Acci√≥n:** Los env√≠os y adjuntos se canalizan a **Google Drive/Sheets** mediante peticiones POST a los endpoints de Apps Script configurados en las variables de entorno.
 
 ---
 
-## ?? Arquitectura del Repositorio (Mapa del Proyecto)
+## üìÇ Arquitectura del Repositorio (Mapa del Proyecto)
 
-La separaci®Æn entre **C®Ædigo Fuente** (Ra®™z) y **Distribuci®Æn** (`docs/`) garantiza que los datos sensibles y el motor de generaci®Æn nunca se filtren a la web p®≤blica.
+La separaci√≥n entre **C√≥digo Fuente** (Ra√≠z) y **Distribuci√≥n** (`docs/`) garantiza que los datos sensibles y el motor de generaci√≥n nunca se filtren a la web p√∫blica.
 
 
 ```text
-?? raiz-del-proyecto
- ©« ?? assets             # Recursos visuales originales
- ©« ?? css                # Estilos originales (style.css fuente)
- ©« ?? data               # Base de datos local (municipios.tsv)
- ©« ?? js                 # L®Ægica de subida (upload.js fuente)
- ©« ?? templates          # Plantillas maestras Jinja2 (.html.j2)
- ©« ?? docs               # DISTRIBUCI®ÆN (Lo que ve el usuario final)
- ©ß ©« ?? assets           # Copia procesada de recursos visuales para la web final
- ©ß ©« ?? css              # Copia de estilos para la web final
- ©ß ©« ?? img              # Logos y otros recursos
- ©ß ©ª ?? *.html           # Formularios finales generados por municipio
- ©« ?? .env               # SEGURIDAD (Credenciales de DB y URLs de Google). No se sube a github.
- ©« ?? .env.example       # Archivo .env de ejemplo para ver estructura
- ©« ?? .gitignore         # Configuraci®Æn para ignorar archivos sensibles (.env)
- ©« ?? gen_forms.py       # El "Cerebro" generador basado en Python
- ©« ?? generate.bat       # Automatismo que ejecuta gen_forms.py tras limpiar los archivos existentes (Build)
- ©ª ?? README.md          # Documentaci®Æn t®¶cnica (este archivo)
+üì¶ raiz-del-proyecto
+ ‚î£ üìÇ assets             # Recursos visuales originales
+ ‚î£ üìÇ css                # Estilos originales (style.css fuente)
+ ‚î£ üìÇ data               # Base de datos local (municipios.tsv)
+ ‚î£ üìÇ js                 # L√≥gica de subida (upload.js fuente)
+ ‚î£ üìÇ templates          # Plantillas maestras Jinja2 (.html.j2)
+ ‚î£ üìÇ docs               # DISTRIBUCI√ìN (Lo que ve el usuario final)
+ ‚îÉ ‚î£ üìÇ assets           # Copia procesada de recursos visuales para la web final
+ ‚îÉ ‚î£ üìÇ css              # Copia de estilos para la web final
+ ‚îÉ ‚î£ üìÇ img              # Logos y otros recursos
+ ‚îÉ ‚îó üìú *.html           # Formularios finales generados por municipio
+ ‚î£ üìú .env               # SEGURIDAD (Credenciales de DB y URLs de Google). No se sube a github.
+ ‚î£ üìú .env.example       # Archivo .env de ejemplo para ver estructura
+ ‚î£ üìú .gitignore         # Configuraci√≥n para ignorar archivos sensibles (.env)
+ ‚î£ üìú gen_forms.py       # El "Cerebro" generador basado en Python
+ ‚î£ üìú generate.bat       # Automatismo que ejecuta gen_forms.py tras limpiar los archivos existentes (Build)
+ ‚îó üìú README.md          # Documentaci√≥n t√©cnica (este archivo)
 ```
 ---
 
 
-## ?? Panel de Mantenimiento
+## üîß Panel de Mantenimiento
 
-Para realizar cambios, **ignora la carpeta `docs/`**. Los cambios se realizan siempre en los archivos de origen de la ra®™z para que el script de generaci®Æn los propague correctamente:
+Para realizar cambios, **ignora la carpeta `docs/`**. Los cambios se realizan siempre en los archivos de origen de la ra√≠z para que el script de generaci√≥n los propague correctamente:
 
-| Tarea | Archivo Objetivo | Acci®Æn Sugerida |
+| Tarea | Archivo Objetivo | Acci√≥n Sugerida |
 | :--- | :--- | :--- |
 | **Actualizar URLs/Claves** | `.env` | Editar variables de entorno y ejecutar `generate.bat`. |
 | **Modificar Estructura Web** | `templates/*.j2` | Editar las plantillas Jinja2 y ejecutar `generate.bat`. |
@@ -61,60 +61,61 @@ Para realizar cambios, **ignora la carpeta `docs/`**. Los cambios se realizan si
 
 ---
 
-## ?? Pipeline de Despliegue (Workflow)
+## üì¶ Pipeline de Despliegue (Workflow)
 
-El proceso de actualizaci®Æn es at®Æmico para garantizar que la web p®≤blica siempre est®¶ sincronizada y no queden archivos hu®¶rfanos de municipios eliminados:
+El proceso de actualizaci√≥n es at√≥mico para garantizar que la web p√∫blica siempre est√© sincronizada y no queden archivos hu√©rfanos de municipios eliminados:
 
-1.  **Edici®Æn:** Realiza los cambios necesarios en las plantillas Jinja2, el archivo de estilos CSS o el listado de municipios en el archivo TSV.
-2.  **Construcci®Æn (Build):** Ejecuta el archivo `generate.bat`. Este script automatiza la limpieza de los archivos HTML antiguos en la carpeta `docs/` y lanza el script `gen_forms.py` para generar la nueva versi®Æn procesada.
-3.  **Sincronizaci®Æn:** Una vez verificados los cambios localmente, sube la actualizaci®Æn al repositorio.
+1.  **Edici√≥n:** Realiza los cambios necesarios en las plantillas Jinja2, el archivo de estilos CSS o el listado de municipios en el archivo TSV.
+2.  **Construcci√≥n (Build):** Ejecuta el archivo `generate.bat`. Este script automatiza la limpieza de los archivos HTML antiguos en la carpeta `docs/` y lanza el script `gen_forms.py` para generar la nueva versi√≥n procesada.
+3.  **Sincronizaci√≥n:** Una vez verificados los cambios localmente, sube la actualizaci√≥n al repositorio.
     ```bash
     git add .
-    git commit -m "feat: actualizaci®Æn de formularios para la fase actual"
+    git commit -m "feat: actualizaci√≥n de formularios para la fase actual"
     git push origin main
     ```
 
 ---
 
-## ?? Protocolos de Seguridad y Robustez
+## üîê Protocolos de Seguridad y Robustez
 
-El sistema ha sido dise?ado priorizando la integridad de los datos y la protecci®Æn de las credenciales de acceso:
+El sistema ha sido dise√±ado priorizando la integridad de los datos y la protecci√≥n de las credenciales de acceso:
 
-* **Zero Leak Policy:** El archivo `.env` est®¢ estrictamente excluido mediante `.gitignore` para evitar la exposici®Æn de credenciales de PostgreSQL y endpoints privados de Google Apps Script.
-* **Integridad en el Env®™o:** Los formularios implementan la funci®Æn `toggleFormFreeze(true)` durante el env®™o de datos. Esto bloquea la interfaz de usuario para evitar alteraciones accidentales mientras se procesa la subida a Drive y la generaci®Æn del justificante PDF.
-* **Sesi®Æn Segura y Privacidad:** Al cerrar sesi®Æn mediante la funci®Æn `logout()`, se eliminan los datos del t®¶cnico (nombre y email) almacenados en el `localStorage` del navegador para proteger la identidad del usuario.
-* **Consistencia de Producci®Æn:** La limpieza autom®¢tica de la carpeta `docs/` en cada ejecuci®Æn de `generate.bat` garantiza que no existan archivos "fantasma" y que la web p®≤blica refleje con exactitud el estado actual de la base de datos.
+* **Zero Leak Policy:** El archivo `.env` est√° estrictamente excluido mediante `.gitignore` para evitar la exposici√≥n de credenciales de PostgreSQL y endpoints privados de Google Apps Script.
+* **Integridad en el Env√≠o:** Los formularios implementan la funci√≥n `toggleFormFreeze(true)` durante el env√≠o de datos. Esto bloquea la interfaz de usuario para evitar alteraciones accidentales mientras se procesa la subida a Drive y la generaci√≥n del justificante PDF.
+* **Sesi√≥n Segura y Privacidad:** Al cerrar sesi√≥n mediante la funci√≥n `logout()`, se eliminan los datos del t√©cnico (nombre y email) almacenados en el `localStorage` del navegador para proteger la identidad del usuario.
+* **Consistencia de Producci√≥n:** La limpieza autom√°tica de la carpeta `docs/` en cada ejecuci√≥n de `generate.bat` garantiza que no existan archivos "fantasma" y que la web p√∫blica refleje con exactitud el estado actual de la base de datos.
 
 ---
 
-## ? Troubleshooting (Soluci®Æn de Problemas)
+## ‚ùì Troubleshooting (Soluci√≥n de Problemas)
 
-A continuaci®Æn se detallan los errores m®¢s comunes y c®Æmo resolverlos sistem®¢ticamente:
+A continuaci√≥n se detallan los errores m√°s comunes y c√≥mo resolverlos sistem√°ticamente:
 
-### ?? Errores de Generaci®Æn (Python/DB)
-* **?Error de conexi®Æn a la Base de Datos?**:
-    * Verifica que los par®¢metros `DB_HOST`, `DB_USER` y `DB_PASSWORD` en tu archivo `.env` local sean correctos.
-    * Aseg®≤rate de que el servidor PostgreSQL est®¶ aceptando conexiones en el puerto configurado (predeterminado: 5432).
-* **?El script de Python no encuentra las plantillas?**:
-    * Comprueba que todos los archivos `.html.j2` est®¶n dentro de la carpeta `templates/` con los nombres exactos.
-* **?Faltan municipios en el Index?**:
-    * Revisa el archivo `data/municipios.tsv`. Si hay filas mal formateadas o sin c®Ædigo INE, el script las omitir®¢.
+### üêç Errores de Generaci√≥n (Python/DB)
+* **¬øError de conexi√≥n a la Base de Datos?**:
+    * Verifica que los par√°metros `DB_HOST`, `DB_USER` y `DB_PASSWORD` en tu archivo `.env` local sean correctos.
+    * Aseg√∫rate de que el servidor PostgreSQL est√© aceptando conexiones en el puerto configurado (predeterminado: 5432).
+* **¬øEl script de Python no encuentra las plantillas?**:
+    * Comprueba que todos los archivos `.html.j2` est√©n dentro de la carpeta `templates/` con los nombres exactos.
+* **¬øFaltan municipios en el Index?**:
+    * Revisa el archivo `data/municipios.tsv`. Si hay filas mal formateadas o sin c√≥digo INE, el script las omitir√°.
 
-### ?? Errores en la Web (GitHub Pages/Assets)
-* **?Los estilos CSS o im®¢genes no se ven?**:
-    * Aseg®≤rate de haber ejecutado `generate.bat`. Este script es el responsable de copiar f®™sicamente las carpetas `css/` y `assets/` a la carpeta `docs/` para su publicaci®Æn.
-    * Verifica que las rutas en los HTML sean relativas, ya que GitHub Pages puede ser sensible a las may®≤sculas y min®≤sculas en los nombres de archivo.
-* **?Aparecen nombres de municipios mal escritos?**:
-    * El script aplica autom®¢ticamente la funci®Æn `formatear_nombre_ui`. Si un nombre nuevo no se formatea bien, revisa la expresi®Æn regular del script que gestiona los art®™culos finales (ej: "Alicante (L')").
+### üåê Errores en la Web (GitHub Pages/Assets)
+* **¬øLos estilos CSS o im√°genes no se ven?**:
+    * Aseg√∫rate de haber ejecutado `generate.bat`. Este script es el responsable de copiar f√≠sicamente las carpetas `css/` y `assets/` a la carpeta `docs/` para su publicaci√≥n.
+    * Verifica que las rutas en los HTML sean relativas, ya que GitHub Pages puede ser sensible a las may√∫sculas y min√∫sculas en los nombres de archivo.
+* **¬øAparecen nombres de municipios mal escritos?**:
+    * El script aplica autom√°ticamente la funci√≥n `formatear_nombre_ui`. Si un nombre nuevo no se formatea bien, revisa la expresi√≥n regular del script que gestiona los art√≠culos finales (ej: "Alicante (L')").
 
-### ?? Errores de Env®™o (Google Apps Script)
-* **?Error 403 o 404 al enviar el formulario?**:
-    * Comprueba que las URLs en el `.env` correspondan a la **versi®Æn desplegada** (exec) del Apps Script y no al editor.
-    * Aseg®≤rate de que los scripts de Google tengan los permisos configurados para ejecutarse como "Yo (el propietario)" y sean accesibles por "Cualquiera".
-* **?Los archivos adjuntos no llegan a Drive?**:
+### ‚òÅÔ∏è Errores de Env√≠o (Google Apps Script)
+* **¬øError 403 o 404 al enviar el formulario?**:
+    * Comprueba que las URLs en el `.env` correspondan a la **versi√≥n desplegada** (exec) del Apps Script y no al editor.
+    * Aseg√∫rate de que los scripts de Google tengan los permisos configurados para ejecutarse como "Yo (el propietario)" y sean accesibles por "Cualquiera".
+* **¬øLos archivos adjuntos no llegan a Drive?**:
     * Revisa el log de la Web App en Google para verificar si hay errores de cuota de almacenamiento o permisos de carpeta.
 
 ---
+
 
 
 
