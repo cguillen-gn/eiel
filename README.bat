@@ -1,9 +1,3 @@
-<h1>Título muy grande</h1>
-<h2>Título grande</h2>
-<h3>Título mediano</h3>
-<p>Texto normal</p>
-
-
 # 🏛️ Portal de Encuestas EIEL — Diputación de Alicante
 
 > **Sistema de gestión y actualización masiva de la Encuesta de Infraestructura y Equipamientos Locales.**
