@@ -1,17 +1,62 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>Inventario de Obras</title>
-
+    <title>Obras y Actuaciones</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        window.EIEL_CONFIG = {
+            muniCode: "118",
+            muniName: "San Fulgencio",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz3W4mZiGG13vCaVJ_DsaItogTVlS3xEsUPZfXMLIHuNQBOJZJ_0r3uSr5kjCVBzPZn/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
+            // Verifica si existen avisos personalizados para la validación de observaciones
+            hasAvisos: false
+        };
+
+        // 2. FUNCIONES GLOBALES (Accesibles desde el HTML)
+        function logout() {
+            // Limpia toda la sesión y datos del técnico por seguridad
+            localStorage.clear(); 
+            window.location.href = "index.html";
+        }
+        
+        // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
+        function toggleFormFreeze(isFrozen) {
+            // Seleccionamos todos los elementos interactivos del formulario
+            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
+            const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
+            const elements = document.querySelectorAll(selectors);
+            
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                // Efecto visual de "congelado"
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                if (isFrozen) {
+                    el.style.pointerEvents = "none"; 
+                } else {
+                    el.style.pointerEvents = "auto";
+                }
+            });
+
+            // Ajuste específico para el botón enviar para mantener el cursor de espera
+            const btnEnviar = document.getElementById('btnEnviar');
+            if (btnEnviar && isFrozen) {
+                btnEnviar.style.cursor = "wait";
+            } else if (btnEnviar) {
+                btnEnviar.style.cursor = "pointer";
+            }
+        }
+        
+    </script>
 </head>
 <body>
 
@@ -19,12 +64,16 @@
         <div class="header-content">
             <div class="logo-area">
                 <h1>EIEL</h1>
-                <span class="badge-fase">Fase 2024</span>
+                <span class="badge-fase">
+                    
+    Fase 2026
+
+                </span>
             </div>
-            
-            <div class="user-area" id="userContainer" style="display: none;">
-                <span id="userEmail" class="user-email">Cargando...</span>
-                <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
+        
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
             </div>
         </div>
     </header>
@@ -32,10 +81,8 @@
     <nav class="breadcrumb-nav">
         <div class="container">
             <a href="index.html" class="back-link">
-                ⬅ Volver al listado de municipios
+                ⭠ Volver al listado de formularios
             </a>
-            <span class="separator">/</span>
-            <span class="current-page">San Fulgencio</span>
         </div>
     </nav>
 
@@ -45,1141 +92,46 @@
                 🏗️
             </div>
             <div class="title-header">
-                <h2>Formulario de Obras</h2>
+                <h2>Obras y Actuaciones</h2>
                 <p class="subtitle">San Fulgencio (Código: 118)</p>
             </div>
         </div>
 
         
 
-<div class="card">
-    <div class="info-text" style="background-color: #fff7ed; color: #9a3412; padding: 1rem; border-radius: 8px; margin-bottom: 0; border-left: 4px solid #f97316;">
-        <strong>Instrucciones:</strong> Actualice el estado de las obras.
-        Si la obra está en ejecución o finalizada, pulse "Adjuntar" para subir certificaciones o fotos.
-    </div>
+
+<div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <h4 style="margin: 0 0 0.8rem 0; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+        ℹ️ Instrucciones
+    </h4>
+    <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #1e3a8a; font-size: 0.95rem; line-height: 1.5;">
+        <li style="margin-bottom: 0.5rem;">
+            <strong>Estado:</strong> Rellene el estado en todas las obras del listado.
+        </li>
+        <li style="margin-bottom: 0.5rem;">
+            <strong>Documentación:</strong> Adjunte proyecto de la obra (si está finalizada). En caso de no haberse redactado proyecto, adjunte memoria valorada. Si no dispone de documentación, justifíquelo en el apartado final de observaciones.
+        </li>
+    </ul>
 </div>
 
-<div class="card" style="padding: 0; overflow: hidden;">
+
+<div class="card" style="border-left: 4px solid var(--theme-obras);">
     <div class="table-wrapper" style="margin: 0;">
         <table class="data-table" style="font-size: 0.9rem; width: 100%; border-collapse: collapse;">
             
             <thead style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
                 <tr>
                     <th style="width: 8%; text-align: center; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Id</th>
-                    <th style="width: 57%; text-align: left; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Denominación y Plan</th>
+                    <th style="width: 57%; text-align: left; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Denominación</th>
                     <th style="width: 20%; text-align: center; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Estado</th>
-                    <th style="width: 15%; text-align: center; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Docs</th>
+                    <th style="width: 15%; text-align: center; padding: 15px 10px; color: var(--text-primary); font-weight: 700; text-transform: uppercase; font-size: 0.8rem;">Documentación</th>
                 </tr>
             </thead>
             
             <tbody>
                 
                 
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        001
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            CUBRICIÓN Y CERRAMIENTO LATERAL DE ESPACIO MULTIUSOS
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2016
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118001" 
-                                    data-nombre="CUBRICIÓN Y CERRAMIENTO LATERAL DE ESPACIO MULTIUSOS" 
-                                    data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2016">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118001')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118001" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        002
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            RED DE PLUVIALES Y REPARACIÓN Y REFUERZO DE FIRME EN VIALES PÚBLICOS AFECTADOS POR LOS ÚLTIMOS TEMPORALES (RDL 2/2017), ANUALIDAD 2017 EN URBANIZACIONES DE SAN FULGENCIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2017
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118002" 
-                                    data-nombre="RED DE PLUVIALES Y REPARACIÓN Y REFUERZO DE FIRME EN VIALES PÚBLICOS AFECTADOS POR LOS ÚLTIMOS TEMPORALES (RDL 2/2017), ANUALIDAD 2017 EN URBANIZACIONES DE SAN FULGENCIO" 
-                                    data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2017">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118002')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118002" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        003
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            ESPACIO MULTIUSOS COMERCIAL-CULTURAL
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            None
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118003" 
-                                    data-nombre="ESPACIO MULTIUSOS COMERCIAL-CULTURAL" 
-                                    data-plan="None">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118003')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118003" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        004
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            ACONDICIONAMIENTO INTERIOR DE LOCALES VESTÍBULO, ESCALERA E INSTALACIÓN DE ASCENSOR EN PLANTA 1ª DE CENTRO POLIVALENTE SOCIO-CULTURAL
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2015
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118004" 
-                                    data-nombre="ACONDICIONAMIENTO INTERIOR DE LOCALES VESTÍBULO, ESCALERA E INSTALACIÓN DE ASCENSOR EN PLANTA 1ª DE CENTRO POLIVALENTE SOCIO-CULTURAL" 
-                                    data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2015">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118004')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118004" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        005
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            OBRAS DE MEJORA DE CERRAMIENTO Y PISTA DEPORTIVA EN EL POLIDEPORTIVO MUNICIPAL
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN SUBVENCIONES PARA OBRAS, REPARACIONES Y EQUIPAMIENTOS DE COMPETENCIA MUNICIPAL 2015
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118005" 
-                                    data-nombre="OBRAS DE MEJORA DE CERRAMIENTO Y PISTA DEPORTIVA EN EL POLIDEPORTIVO MUNICIPAL" 
-                                    data-plan="PLAN SUBVENCIONES PARA OBRAS, REPARACIONES Y EQUIPAMIENTOS DE COMPETENCIA MUNICIPAL 2015">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118005')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118005" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        006
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            ADECUACIÓN Y SANEADO DE PARQUES INFANTILES Y CONSTRUCCIÓN DE CUBIERTA EN PARCELA DOTACIONAL
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN DE COOPERACIÓN A LAS OBRAS Y SERVICIOS DE COMPETENCIA MUNICIPAL 2017
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118006" 
-                                    data-nombre="ADECUACIÓN Y SANEADO DE PARQUES INFANTILES Y CONSTRUCCIÓN DE CUBIERTA EN PARCELA DOTACIONAL" 
-                                    data-plan="PLAN DE COOPERACIÓN A LAS OBRAS Y SERVICIOS DE COMPETENCIA MUNICIPAL 2017">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118006')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118006" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        007
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REFORMA DE EDIFICIO ADMINISTRATIVO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2018
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118007" 
-                                    data-nombre="REFORMA DE EDIFICIO ADMINISTRATIVO" 
-                                    data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2018">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118007')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118007" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        008
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REHABILITACIÓN DE LA CUBIERTA DE EDIFICIO ADMINISTRATIVO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2019
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118008" 
-                                    data-nombre="REHABILITACIÓN DE LA CUBIERTA DE EDIFICIO ADMINISTRATIVO" 
-                                    data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2019">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118008')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118008" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        009
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REPARACIÓN Y REFUERZO DE FIRME EN C/ MARIA CALLAS, AVDA SAN FULGENCIO Y C/ CAMINO CONVENIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PLANIFICA 2020-23 BOP: 20/07/2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118009" 
-                                    data-nombre="REPARACIÓN Y REFUERZO DE FIRME EN C/ MARIA CALLAS, AVDA SAN FULGENCIO Y C/ CAMINO CONVENIO" 
-                                    data-plan="PLAN PLANIFICA 2020-23 BOP: 20/07/2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118009')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118009" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        010
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REASFALTADO Y REPARACIÓN DE FIRME EN LA AVDA. EUROPA Y CALLES ANEXAS DEL T.M. DE SAN FULGENCIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PLANIFICA 2020-23 BOP: 20/07/2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118010" 
-                                    data-nombre="REASFALTADO Y REPARACIÓN DE FIRME EN LA AVDA. EUROPA Y CALLES ANEXAS DEL T.M. DE SAN FULGENCIO" 
-                                    data-plan="PLAN PLANIFICA 2020-23 BOP: 20/07/2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118010')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118010" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        012
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            INSTALACIÓN DE CÉSPED ARTIFICIAL EN EL CAMPO DE FÚTBOL 8 DE LA ZONA DEPORTIVA MUNICIPAL DEL SECTOR 6-7 URB. MARINA
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +CERCA 2020 BOP: 30/07/2021
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118012" 
-                                    data-nombre="INSTALACIÓN DE CÉSPED ARTIFICIAL EN EL CAMPO DE FÚTBOL 8 DE LA ZONA DEPORTIVA MUNICIPAL DEL SECTOR 6-7 URB. MARINA" 
-                                    data-plan="PLAN +CERCA 2020 BOP: 30/07/2021">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118012')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118012" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        013
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            INSTALACIÓN DE CÉSPED ARTIFICIAL Y SUSTITUCIÓN DE VALLADO EN PISTA DE  TENIS DE POLIDEPORTIVO MUNICIPAL
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +DEPORTE 2021 BOP: 17/08/2021
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118013" 
-                                    data-nombre="INSTALACIÓN DE CÉSPED ARTIFICIAL Y SUSTITUCIÓN DE VALLADO EN PISTA DE  TENIS DE POLIDEPORTIVO MUNICIPAL" 
-                                    data-plan="PLAN +DEPORTE 2021 BOP: 17/08/2021">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118013')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118013" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        015
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REPARACIÓN DEL COLEGIO PÚBLICO JOSE MARIA MANRESA DE SAN FULGENCIO COMO CONSECUENCIA DE LOS DAÑOS PROVOCADOS POR LA DANA QUE TUVO LUGAR ENTRE EL 11 Y EL 14 DE SEPTIEMBRE DE 2019
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118015" 
-                                    data-nombre="REPARACIÓN DEL COLEGIO PÚBLICO JOSE MARIA MANRESA DE SAN FULGENCIO COMO CONSECUENCIA DE LOS DAÑOS PROVOCADOS POR LA DANA QUE TUVO LUGAR ENTRE EL 11 Y EL 14 DE SEPTIEMBRE DE 2019" 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118015')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118015" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        016
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REPARACIÓN DE DAÑOS EN C/CONVENIO Y ZONA VERDE JUNTO A C/FRANCISCO DE QUEVEDO DEL TERMINO MUNICIPAL DE SAN FULGENCIO (ALICANTE) OCASIONADOS POR LA DANA DEL 11 AL 14 DE SEPTIEMBRE DE 2019
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118016" 
-                                    data-nombre="REPARACIÓN DE DAÑOS EN C/CONVENIO Y ZONA VERDE JUNTO A C/FRANCISCO DE QUEVEDO DEL TERMINO MUNICIPAL DE SAN FULGENCIO (ALICANTE) OCASIONADOS POR LA DANA DEL 11 AL 14 DE SEPTIEMBRE DE 2019" 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118016')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118016" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        017
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REFORMA Y DE AMPLIACIÓN DE INTERVENCIÓN EN LOCALES DESTINADOS A LA PRESTACIÓN DE ASISTENCIA SANITARIA POR ESTA CONSELLERÍA EN MUNICIPIOS DE LA COMUNITAT VALENCIANA A REALIZAR EN C/AMSTERDAM 1-B DE SAN FULGENCIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118017" 
-                                    data-nombre="REFORMA Y DE AMPLIACIÓN DE INTERVENCIÓN EN LOCALES DESTINADOS A LA PRESTACIÓN DE ASISTENCIA SANITARIA POR ESTA CONSELLERÍA EN MUNICIPIOS DE LA COMUNITAT VALENCIANA A REALIZAR EN C/AMSTERDAM 1-B DE SAN FULGENCIO" 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118017')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118017" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        018
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            OBRAS DE MEJORA DE LA EFICIENCIAENERGÉTICA DEL SISTEMA DE CLIMATIZACIÓN EN EL EDIFICIO DEL AYUNTAMIENTO, INSTALACIÓN DE VARIOS PUNTOS DE RECARGA DE VEHÍCULOS ELÉCTRICOS EN LA VÍA PÚBLICA Y OTRAS ACTUACIONES EN SAN FULGENCIO.
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PROVINCIAL DE AHORRO ENERGÉTICO PAE 2019 BOP: 03/08/2021
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118018" 
-                                    data-nombre="OBRAS DE MEJORA DE LA EFICIENCIAENERGÉTICA DEL SISTEMA DE CLIMATIZACIÓN EN EL EDIFICIO DEL AYUNTAMIENTO, INSTALACIÓN DE VARIOS PUNTOS DE RECARGA DE VEHÍCULOS ELÉCTRICOS EN LA VÍA PÚBLICA Y OTRAS ACTUACIONES EN SAN FULGENCIO." 
-                                    data-plan="PLAN PROVINCIAL DE AHORRO ENERGÉTICO PAE 2019 BOP: 03/08/2021">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118018')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118018" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        021
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            SECCIÓN IES L’ENCANTÀ (03016560). CONSTRUCCIÓ 8SO+2AULES+CAF+GIM.
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            GVA (Actuaciones centros enseñanza NO EDIFICANT)
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118021" 
-                                    data-nombre="SECCIÓN IES L’ENCANTÀ (03016560). CONSTRUCCIÓ 8SO+2AULES+CAF+GIM." 
-                                    data-plan="GVA (Actuaciones centros enseñanza NO EDIFICANT)">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118021')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118021" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        022
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            PROYECTO DE MEJORA DE INFRAESTRUCTURAS TECNOLÓGICAS EN EL POLÍGONO INDUSTRIAL LOS MORAS ¿ SAN FULGENCIO (ALICANTE) 2022
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            IVACE: PARQUES EMPRESARIALES 2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118022" 
-                                    data-nombre="PROYECTO DE MEJORA DE INFRAESTRUCTURAS TECNOLÓGICAS EN EL POLÍGONO INDUSTRIAL LOS MORAS ¿ SAN FULGENCIO (ALICANTE) 2022" 
-                                    data-plan="IVACE: PARQUES EMPRESARIALES 2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" >Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118022')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118022" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        023
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            RENOVACIÓN A LED EN EL ALUMBRADO PÚBLICO DE SAN FULGENCIO 2022
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            IVACE: ALUMBRADO PÚBLICO 2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118023" 
-                                    data-nombre="RENOVACIÓN A LED EN EL ALUMBRADO PÚBLICO DE SAN FULGENCIO 2022" 
-                                    data-plan="IVACE: ALUMBRADO PÚBLICO 2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118023')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118023" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        024
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            RENOVACIÓN A LED EN EL CAMPO DE FÚTBOL Y PISTAS DE PÁDEL DEL MUNICIPIO DE SAN FULGENCIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +DEPORTE 2022 BOP: 21/11/2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118024" 
-                                    data-nombre="RENOVACIÓN A LED EN EL CAMPO DE FÚTBOL Y PISTAS DE PÁDEL DEL MUNICIPIO DE SAN FULGENCIO" 
-                                    data-plan="PLAN +DEPORTE 2022 BOP: 21/11/2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118024')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118024" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        025
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            CONSTRUCCIÓN DEL COLECTOR CORTINA DE LA CALLE CAMINO DEL CONVENIO EN SAN FULGENCIO.
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118025" 
-                                    data-nombre="CONSTRUCCIÓN DEL COLECTOR CORTINA DE LA CALLE CAMINO DEL CONVENIO EN SAN FULGENCIO." 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118025')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118025" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        026
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REFORMA Y AMPLIACIÓN DEL CONSULTORIO MÉDICO AUXILIAR, POR PROCEDIMIENTO NEGOCIADO SIN PUBLICIDAD Y TRAMITACIÓN URGENTE.
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118026" 
-                                    data-nombre="REFORMA Y AMPLIACIÓN DEL CONSULTORIO MÉDICO AUXILIAR, POR PROCEDIMIENTO NEGOCIADO SIN PUBLICIDAD Y TRAMITACIÓN URGENTE." 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118026')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118026" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        027
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            ACONDICIONAMIENTO INTERIOR DE LOCALES EN PLANTA SEGUNDA DE CENTRO POLIVALENTE SOCIO- CULTURAL DE SAN FULGENCIO E INSTALACIÓN DE ASCENSOR
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +CERCA 2022 BOP: 14/11/2022
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118027" 
-                                    data-nombre="ACONDICIONAMIENTO INTERIOR DE LOCALES EN PLANTA SEGUNDA DE CENTRO POLIVALENTE SOCIO- CULTURAL DE SAN FULGENCIO E INSTALACIÓN DE ASCENSOR" 
-                                    data-plan="PLAN +CERCA 2022 BOP: 14/11/2022">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118027')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118027" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+                <tr class="fila-obra" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
                     
                     <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
                         028
@@ -1189,27 +141,38 @@
                         <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
                             CEIP JOSÉ MARÍA MANRESA NAVARRO. REHABILITACIÓN DE FACHADAS, ADECUACIÓN DE CUBIERTAS Y REFORMA DE ZONAS EXTERIORES
                         </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            GVA (PROGRAMA EDIFICANT)
-                        </div>
+                        
+                        
+                        
+                            
+                            
+                                <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                    <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">SUBVENCIÓN</span> 
+                                    GVA (PROGRAMA EDIFICANT)
+                                </div>
+                            
+                        
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118028" 
-                                    data-nombre="CEIP JOSÉ MARÍA MANRESA NAVARRO. REHABILITACIÓN DE FACHADAS, ADECUACIÓN DE CUBIERTAS Y REFORMA DE ZONAS EXTERIORES" 
-                                    data-plan="GVA (PROGRAMA EDIFICANT)">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" >Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1; width: 100%;"
+                                data-obra-id="OB118028" 
+                                data-clave="OB"
+                                data-orden="028"
+                                data-nombre="CEIP JOSÉ MARÍA MANRESA NAVARRO. REHABILITACIÓN DE FACHADAS, ADECUACIÓN DE CUBIERTAS Y REFORMA DE ZONAS EXTERIORES" 
+                                data-plan="GVA (PROGRAMA EDIFICANT)">
+                            
+                            <option value="" selected style="color: #94a3b8;">
+                                Seleccionar...
+                            </option>
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En ejecución">En ejecución</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Finalizada" >
+                                Finalizada
+                            </option>
+                        </select>
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
@@ -1221,109 +184,13 @@
                                 onclick="gestionarAdjuntos('OB118028')">
                                 📎 Adjuntar
                             </button>
-                            <div id="lista_adjuntos_OB118028" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
+                            <div id="lista_adjuntos_OB118028" style="margin-top: 5px; text-align: left;"></div>
                         
                     </td>
                 </tr>
                 
                 
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        030
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            REFUERZO DE FIRME EN LA CV-859, DOLORES - COSTA (POR SAN FULGENCIO), DEL PK 3+500 AL PK 5+800
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PROVINCIAL DE MEJORA DE LA RED VIARIA DE TIT. DE LA DIPUTACIÓN 2020 BOP: 28/04/2021
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118030" 
-                                    data-nombre="REFUERZO DE FIRME EN LA CV-859, DOLORES - COSTA (POR SAN FULGENCIO), DEL PK 3+500 AL PK 5+800" 
-                                    data-plan="PLAN PROVINCIAL DE MEJORA DE LA RED VIARIA DE TIT. DE LA DIPUTACIÓN 2020 BOP: 28/04/2021">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118030')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118030" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        032
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            OFICINA, ESCUELA DE FÚTBOL, MEJORA DE INSTALACIONES, REPARACIÓN ESTRUCTURAL Y CUBRICIÓN DE GRADAS EN POLIDEPORTIVO MUNICIPAL, CALLE RAFAEL NADAL DE SAN FULGENCIO (ALICANTE)
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118032" 
-                                    data-nombre="OFICINA, ESCUELA DE FÚTBOL, MEJORA DE INSTALACIONES, REPARACIÓN ESTRUCTURAL Y CUBRICIÓN DE GRADAS EN POLIDEPORTIVO MUNICIPAL, CALLE RAFAEL NADAL DE SAN FULGENCIO (ALICANTE)" 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118032')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118032" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+                <tr class="fila-obra" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
                     
                     <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
                         033
@@ -1333,189 +200,51 @@
                         <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
                             AMPLIACIÓN Y REFORMA DE OFICINA DE TURISMO C/AMSTERDAM Y AVDA. DE SAN FULGENCIO, UE-4 MARINA
                         </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +CERCA 2023 BOP: 19/12/2023
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
                         
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118033" 
-                                    data-nombre="AMPLIACIÓN Y REFORMA DE OFICINA DE TURISMO C/AMSTERDAM Y AVDA. DE SAN FULGENCIO, UE-4 MARINA" 
-                                    data-plan="PLAN +CERCA 2023 BOP: 19/12/2023">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" >Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
+                        
+                        
+                            
+                            
+                                <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                    <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">SUBVENCIÓN</span> 
+                                    PLAN +CERCA 2023 BOP: 19/12/2023
+                                </div>
+                            
                         
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1; width: 100%;"
+                                data-obra-id="OB118033" 
+                                data-clave="OB"
+                                data-orden="033"
+                                data-nombre="AMPLIACIÓN Y REFORMA DE OFICINA DE TURISMO C/AMSTERDAM Y AVDA. DE SAN FULGENCIO, UE-4 MARINA" 
+                                data-plan="PLAN +CERCA 2023 BOP: 19/12/2023">
+                            
+                            <option value="" selected style="color: #94a3b8;">
+                                Seleccionar...
+                            </option>
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En ejecución">En ejecución</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Finalizada" >
+                                Finalizada
+                            </option>
+                        </select>
+                    </td>
+
+                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
                         
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118033')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118033" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
+                            <div style="background-color: #dcfce7; color: #166534; padding: 0.5rem; border-radius: 6px; border: 1px solid #bbf7d0; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                ✅ No necesario
+                            </div>
                         
                     </td>
                 </tr>
                 
                 
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        034
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            INSTALACIÓN DE ALUMBRADO PÚBLICO ENTRE NÚCLEOS URBANOS
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN +CERCA 2023 BOP: 19/12/2023
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118034" 
-                                    data-nombre="INSTALACIÓN DE ALUMBRADO PÚBLICO ENTRE NÚCLEOS URBANOS" 
-                                    data-plan="PLAN +CERCA 2023 BOP: 19/12/2023">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118034')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118034" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        035
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            RENOVACIÓN DE LA RED DE ABASTECIMIENTO Y ACOMETIDAS EN LA C/ SAN CRISPÍN (EXPTE. 2023/062-IACH).
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2023 BOP: 24/11/2023
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118035" 
-                                    data-nombre="RENOVACIÓN DE LA RED DE ABASTECIMIENTO Y ACOMETIDAS EN LA C/ SAN CRISPÍN (EXPTE. 2023/062-IACH)." 
-                                    data-plan="REPARACIÓN (LÍNEA A) Y 1ER EST., REFORMA O GR REPARACIÓN (LÍNEA B) INFRAS DE ABAST. Y SANEAM. [LÍNEA B] 2023 BOP: 24/11/2023">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118035')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118035" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        036
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            MEJORA DE INFRAESTRUCTURAS TECNOLÓGICAS EN EL POLÍGONO INDUSTRIAL LOS MORAS SAN FULGENCIO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            IVACE: PARQUES EMPRESARIALES 2024
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118036" 
-                                    data-nombre="MEJORA DE INFRAESTRUCTURAS TECNOLÓGICAS EN EL POLÍGONO INDUSTRIAL LOS MORAS SAN FULGENCIO" 
-                                    data-plan="IVACE: PARQUES EMPRESARIALES 2024">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118036')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118036" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+                <tr class="fila-obra" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
                     
                     <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
                         037
@@ -1525,27 +254,38 @@
                         <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
                             AMPLIACIÓN Y REFORMA DE OFICINAS MUNICIPALES AVENIDA SAN FULGENCIO ESQUINA C/ ÁMSTERDAM
                         </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PLANIFICA 2024-27 BOP: 14/06/2024
-                        </div>
+                        
+                        
+                        
+                            
+                            
+                                <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                    <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">SUBVENCIÓN</span> 
+                                    PLAN PLANIFICA 2024-27 BOP: 14/06/2024
+                                </div>
+                            
+                        
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118037" 
-                                    data-nombre="AMPLIACIÓN Y REFORMA DE OFICINAS MUNICIPALES AVENIDA SAN FULGENCIO ESQUINA C/ ÁMSTERDAM" 
-                                    data-plan="PLAN PLANIFICA 2024-27 BOP: 14/06/2024">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" >Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1; width: 100%;"
+                                data-obra-id="OB118037" 
+                                data-clave="OB"
+                                data-orden="037"
+                                data-nombre="AMPLIACIÓN Y REFORMA DE OFICINAS MUNICIPALES AVENIDA SAN FULGENCIO ESQUINA C/ ÁMSTERDAM" 
+                                data-plan="PLAN PLANIFICA 2024-27 BOP: 14/06/2024">
+                            
+                            <option value="" selected style="color: #94a3b8;">
+                                Seleccionar...
+                            </option>
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En ejecución">En ejecución</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Finalizada" >
+                                Finalizada
+                            </option>
+                        </select>
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
@@ -1557,13 +297,13 @@
                                 onclick="gestionarAdjuntos('OB118037')">
                                 📎 Adjuntar
                             </button>
-                            <div id="lista_adjuntos_OB118037" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
+                            <div id="lista_adjuntos_OB118037" style="margin-top: 5px; text-align: left;"></div>
                         
                     </td>
                 </tr>
                 
                 
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+                <tr class="fila-obra" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
                     
                     <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
                         038
@@ -1573,27 +313,38 @@
                         <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
                             OBRAS DE REASFALTADO, REPOSICIÓN DE SERVICIOS, SEGURIDAD VIAL E INTEGRACIÓN PAISAJÍSTICA EN CALLES DE LA RED VIARIA PRINCIPAL DEL CASCO URBANO Y URB. "MARINA"
                         </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            PLAN PLANIFICA 2024-27 BOP: 14/06/2024
-                        </div>
+                        
+                        
+                        
+                            
+                            
+                                <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
+                                    <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">SUBVENCIÓN</span> 
+                                    PLAN PLANIFICA 2024-27 BOP: 14/06/2024
+                                </div>
+                            
+                        
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118038" 
-                                    data-nombre="OBRAS DE REASFALTADO, REPOSICIÓN DE SERVICIOS, SEGURIDAD VIAL E INTEGRACIÓN PAISAJÍSTICA EN CALLES DE LA RED VIARIA PRINCIPAL DEL CASCO URBANO Y URB. "MARINA"" 
-                                    data-plan="PLAN PLANIFICA 2024-27 BOP: 14/06/2024">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1; width: 100%;"
+                                data-obra-id="OB118038" 
+                                data-clave="OB"
+                                data-orden="038"
+                                data-nombre="OBRAS DE REASFALTADO, REPOSICIÓN DE SERVICIOS, SEGURIDAD VIAL E INTEGRACIÓN PAISAJÍSTICA EN CALLES DE LA RED VIARIA PRINCIPAL DEL CASCO URBANO Y URB. "MARINA"" 
+                                data-plan="PLAN PLANIFICA 2024-27 BOP: 14/06/2024">
+                            
+                            <option value=""  style="color: #94a3b8;">
+                                Seleccionar...
+                            </option>
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En ejecución">En ejecución</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Finalizada" selected>
+                                Finalizada
+                            </option>
+                        </select>
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
@@ -1605,61 +356,13 @@
                                 onclick="gestionarAdjuntos('OB118038')">
                                 📎 Adjuntar
                             </button>
-                            <div id="lista_adjuntos_OB118038" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
+                            <div id="lista_adjuntos_OB118038" style="margin-top: 5px; text-align: left;"></div>
                         
                     </td>
                 </tr>
                 
                 
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
-                    
-                    <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
-                        039
-                    </td>
-
-                    <td style="vertical-align: middle; padding: 12px; text-align: left;">
-                        <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
-                            RESTAURACIÓN DEL MUSEO Y NUEVO PROYECTO MUSEOGRÁFICO
-                        </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            REHAB. PATRIMONIO ARQUITECTÓNICO HISTÓRICO MUNICIPAL POB <75000 HAB 2022 2ª CONVOCATORIA BOP: 13/04/2023
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118039" 
-                                    data-nombre="RESTAURACIÓN DEL MUSEO Y NUEVO PROYECTO MUSEOGRÁFICO" 
-                                    data-plan="REHAB. PATRIMONIO ARQUITECTÓNICO HISTÓRICO MUNICIPAL POB <75000 HAB 2022 2ª CONVOCATORIA BOP: 13/04/2023">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" selected>Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
-                        
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118039')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118039" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
+                <tr class="fila-obra" style="border-bottom: 1px solid #e2e8f0; transition: background 0.2s;">
                     
                     <td style="font-weight: 700; color: var(--text-secondary); vertical-align: middle; text-align: center; padding: 12px;">
                         040
@@ -1669,39 +372,40 @@
                         <div style="font-weight: 600; color: #1e293b; margin-bottom: 6px; line-height: 1.4;">
                             OBRAS DE RED DE UTILIZACIÓN DE AGUA REGENERADA PROCEDENTE DE LA EDAR DE SAN FULGENCIO, FASE I.
                         </div>
-                        <div style="color: #64748b; font-size: 0.8rem; display: flex; align-items: center; gap: 6px;">
-                            <span style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.7rem; text-transform: uppercase; border: 1px solid #e2e8f0;">PLAN</span> 
-                            Procedente de volcado de licitaciones de contrataciondelestado.es
-                        </div>
-                    </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
                         
-                            <select class="form-select select-estado" 
-                                    style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1;"
-                                    data-obra-id="OB118040" 
-                                    data-nombre="OBRAS DE RED DE UTILIZACIÓN DE AGUA REGENERADA PROCEDENTE DE LA EDAR DE SAN FULGENCIO, FASE I." 
-                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
-                                <option value="">-- Estado --</option>
-                                <option value="No iniciada">No iniciada</option>
-                                <option value="En ejecución">En ejecución</option>
-                                <option value="Paralizada">Paralizada</option>
-                                <option value="Finalizada" >Finalizada</option>
-                                <option value="Anulada">Anulada</option>
-                            </select>
+                        
+                        
+                            
+                            
                         
                     </td>
 
                     <td style="text-align: center; vertical-align: middle; padding: 12px;">
+                        <select class="form-select select-estado" 
+                                style="padding: 8px; font-size: 0.9rem; border-color: #cbd5e1; width: 100%;"
+                                data-obra-id="OB118040" 
+                                data-clave="OB"
+                                data-orden="040"
+                                data-nombre="OBRAS DE RED DE UTILIZACIÓN DE AGUA REGENERADA PROCEDENTE DE LA EDAR DE SAN FULGENCIO, FASE I." 
+                                data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es">
+                            
+                            <option value="" selected style="color: #94a3b8;">
+                                Seleccionar...
+                            </option>
+                            <option value="No iniciada">No iniciada</option>
+                            <option value="En ejecución">En ejecución</option>
+                            <option value="Paralizada">Paralizada</option>
+                            <option value="Finalizada" >
+                                Finalizada
+                            </option>
+                        </select>
+                    </td>
+
+                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
                         
-                            <button type="button" class="btn btn-secondary" 
-                                style="font-size: 0.8rem; padding: 0.5rem 0.8rem; border: 1px solid #cbd5e1; background: white; color: #475569; transition: all 0.2s;" 
-                                onmouseover="this.style.borderColor='var(--theme-obras)'; this.style.color='var(--theme-obras)';"
-                                onmouseout="this.style.borderColor='#cbd5e1'; this.style.color='#475569';"
-                                onclick="gestionarAdjuntos('OB118040')">
-                                📎 Adjuntar
-                            </button>
-                            <div id="lista_adjuntos_OB118040" style="margin-top: 5px; text-align: center; font-size: 0.7rem; color: var(--success); font-weight: 600;"></div>
+                            <div style="background-color: #dcfce7; color: #166534; padding: 0.5rem; border-radius: 6px; border: 1px solid #bbf7d0; font-size: 0.75rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                ✅ No necesario
+                            </div>
                         
                     </td>
                 </tr>
@@ -1711,18 +415,110 @@
     </div>
 </div>
 
-<div class="card">
-    <h2 class="section-title" style="color: var(--theme-obras);">📝 Observaciones</h2>
-    <div class="form-group">
-        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
-        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia o comentario sobre las obras..."></textarea>
+
+<div class="card" style="border: 2px dashed #94a3b8; background-color: #f8fafc;">
+    
+    <h2 class="section-title" style="color: #475569; border-bottom-color: #cbd5e1; display: flex; align-items: center; gap: 10px;">
+        ➕ Otras Obras en el Municipio
+    </h2>
+
+    <div class="card-body">
+        <p style="font-size: 0.9rem; color: #64748b; margin-bottom: 1.5rem;">
+            Indique cualquier otra obra aprobada (iniciada o no) que <strong>no aparezca en el listado superior</strong>. 
+            Si no hay ninguna, déjelo en blanco.
+        </p>
+
+        <div class="form-group">
+            <label class="form-label" for="otras_obras_texto" style="font-weight: 600;">Descripción / Denominación de la Obra:</label>
+            <textarea 
+                class="form-input" 
+                id="otras_obras_texto" 
+                name="otras_obras_texto" 
+                rows="4" 
+                style="resize: vertical; min-height: 100px;"
+                placeholder="Ej: Reurbanización calle Mayor (POS 2025), Renovación alumbrado Polígono..."
+            ></textarea>
+        </div>
+
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label" style="font-weight: 600;">Adjuntar proyecto o memoria (Opcional):</label>
+            
+            <div class="file-upload-area" onclick="document.getElementById('fileInputNuevas').click()" 
+                 style="border: 2px dashed #cbd5e1; padding: 1.5rem; text-align: center; cursor: pointer; border-radius: 8px; background: white; transition: all 0.2s;">
+                <div style="font-size: 1.8rem; margin-bottom: 0.5rem; opacity: 0.7;">📎</div>
+                <div style="font-weight: 600; color: #475569;">Haga clic para adjuntar documentos</div>
+                <p style="font-size: 0.85rem; color: #94a3b8; margin: 0;">(Proyectos, memorias, planos...)</p>
+                <input type="file" id="fileInputNuevas" multiple style="display: none;">
+            </div>
+            
+            <div id="fileListNuevas" style="margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        </div>
+
     </div>
 </div>
 
-<div class="card">
-    <button id="firmarBtn" class="btn btn-primary btn-obras">
-        <span>✓</span> Firmar y enviar formulario
+
+
+
+
+
+<div class="card" style="border-left: 4px solid var(--theme-obras);">
+    <h2 class="section-title" style="color: var(--theme-obras);">📝 Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" style="font-family: inherit;" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-obras);">
+    <h2 class="section-title" style="color: var(--theme-obras);">👤 Datos de Contacto</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
+    </div>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--theme-obras);">
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: flex-start;">
+            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
+            <span style="font-size: 0.95rem; color: #334155; line-height: 1.4;">
+                <strong>Declaración de veracidad:</strong> Como responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
+            </span>
+        </label>
+    </div>
+    
+    <div id="progressContainer" style="display: none; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span id="progressText" style="font-size: 0.85rem; font-weight: 600; color: #475569;">Preparando envío...</span>
+        <span id="progressPercentage" style="font-size: 0.85rem; font-weight: 700; color: var(--theme-obras);">0%</span>
+    </div>
+    <div style="width: 100%; background-color: #e2e8f0; border-radius: 999px; height: 10px; overflow: hidden;">
+        <div id="progressBar" style="width: 0%; height: 100%; background-color: var(--theme-obras); transition: width 0.4s ease; border-radius: 999px;"></div>
+    </div>
+    </div>
+
+    <button id="btnEnviar" class="btn btn-primary btn-obras" disabled style="opacity: 0.6; cursor: not-allowed;">
+        Enviar Datos
     </button>
+    
     <div id="mensaje" class="message"></div>
 </div>
 
@@ -1731,69 +527,127 @@
 
     </main>
 
-    <footer class="site-footer">
-        <p>Diputación Provincial - Encuesta de Infraestructuras y Equipamientos Locales</p>
+    <footer class="site-footer" style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
     </footer>
 
     <script>
-        // 1. Configuración de Firebase (Inyectada desde Python)
-        // Usamos | safe para que Jinja no escape las comillas del JSON
-        const firebaseConfig = JSON.parse('{"apiKey": "AIzaSyDVjNIfmkARg3F3JSIFoMF0i-Ecv-hVzGQ", "authDomain": "eiel-autenticacion-formularios.firebaseapp.com", "projectId": "eiel-autenticacion-formularios", "storageBucket": "eiel-autenticacion-formularios.firebasestorage.app", "messagingSenderId": "293834414398", "appId": "1:293834414398:web:8102c11d2ff6e9a1d3346f", "measurementId": "G-S9C7Z70HHV"}');
-        
-        // 2. Inicializar Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        document.addEventListener("DOMContentLoaded", () => {
+            // A. VALIDACIÓN DE SESIÓN DEL MUNICIPIO
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            const muniName = localStorage.getItem("eiel_muni_name");
 
-        // 3. Control de Sesión
-        firebase.auth().onAuthStateChanged((user) => {
-            if (user) {
-                // --- USUARIO LOGUEADO ---
-                const userArea = document.getElementById("userContainer");
-                const userEmailSpan = document.getElementById("userEmail");
-                
-                if(userArea) userArea.style.display = "flex";
-                if(userEmailSpan) userEmailSpan.textContent = user.email;
-                
-                // Guardamos email para los scripts de envío
-                localStorage.setItem("userEmailActual", user.email);
-            } else {
-                // --- USUARIO NO LOGUEADO ---
-                
-                // IMPORTANTE: Evitar bucle infinito. 
-                // Solo redirigimos si NO estamos ya en el index.html
-                const path = window.location.pathname;
-                
-                // Si la URL no termina en 'index.html' ni es la raíz '/', entonces echamos al usuario
-                if (!path.endsWith("index.html") && !path.endsWith("/")) {
-                    console.warn("Usuario no identificado. Redirigiendo al index...");
-                    window.location.href = "index.html"; 
-                }
-            }
-        });
-
-        // 4. Función de Logout
-        function logout() {
-            firebase.auth().signOut().then(() => {
+            if (!muniCode) {
+                console.warn("Acceso no autorizado. Redirigiendo al login...");
                 window.location.href = "index.html";
+                return;
+            }
+
+            // Actualizamos el nombre del municipio en la cabecera
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = muniName || "Municipio";
+
+            // B. AUTOCOMPLETADO Y PERSISTENCIA PROACTIVA
+            const fieldsMap = {
+                "contactoNombre": "eiel_user_name",
+                "contactoEmail": "eiel_user_email",
+                "contactoDepartamento": "eiel_user_dept"
+            };
+
+            // 1. Rellenar campos si ya existen datos guardados
+            Object.keys(fieldsMap).forEach(id => {
+                const savedValue = localStorage.getItem(fieldsMap[id]);
+                const inputEl = document.getElementById(id);
+                
+                if (savedValue && inputEl) {
+                    inputEl.value = savedValue;
+                    // Caso especial: Sincronizar campo de confirmación de email
+                    if (id === "contactoEmail") {
+                        const confirmEl = document.getElementById("contactoEmailConfirm");
+                        if (confirmEl) confirmEl.value = savedValue;
+                    }
+                }
             });
-        }
+
+            // 2. Guardar datos en tiempo real mientras el técnico escribe (Escucha Activa)
+            Object.keys(fieldsMap).forEach(id => {
+                const inputEl = document.getElementById(id);
+                if (inputEl) {
+                    inputEl.addEventListener('input', (e) => {
+                        localStorage.setItem(fieldsMap[id], e.target.value.trim());
+                    });
+                }
+            });
+        });
     </script>
 
     
 <script>
-    // 1. CONFIGURACIÓN DEL HEADER
-    document.querySelector('.site-header').classList.add('header-obras');
+document.addEventListener("DOMContentLoaded", () => {
+    
+    // 1. SETUP DE ESTILOS
+    const header = document.querySelector('.site-header');
+    if(header) header.classList.add('header-obras');
 
-    // 2. CONFIGURACIÓN
+    // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "118",
         muniName: "San Fulgencio",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyY__a_EmgH5ASDCsC_A97DaGsENQq_wFfxZTXgIAY92Pg85ng22eCSC8EI-fbypFrgQQ/exec",
-        urlAdjuntos: "https://script.google.com/macros/s/AKfycbziIeQp8N8QdSAtq3a4kFHVS1jR_Enfs9pGh4xS5s_qeqLwQeG2FsZ08_OMZs762M6m/exec"
+        fase: "2026",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz3W4mZiGG13vCaVJ_DsaItogTVlS3xEsUPZfXMLIHuNQBOJZJ_0r3uSr5kjCVBzPZn/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycbzYBWgvMqkgOdQKWr3UmoB3ov9ETPu2KyFDwrXaDwfwb9ACM8qPZDTjyRo6LCfvcTpB/exec",
+        urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+        hasAvisos: false,
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
     };
 
-    // 3. SERVICIO DE SUBIDA
+    // 3. INICIALIZACIÓN UI
+    // 3.1 Marcado visual de obligatoriedad en observaciones
+    if (window.EIEL_CONFIG.hasAvisos) {
+        const labelObs = document.querySelector("label[for='observaciones']");
+        if (labelObs) {
+            labelObs.innerHTML += " <span style='color:#ef4444; font-weight:bold;'>(* Obligatorio por requerimiento)</span>";
+        }
+    }
+
+    // 4. SERVICIOS Y UTILIDADES DE UI
+    const UIProgress = {
+        container: document.getElementById("progressContainer"),
+        bar: document.getElementById("progressBar"),
+        text: document.getElementById("progressText"),
+        percent: document.getElementById("progressPercentage"),
+
+        show(totalTasks) {
+            if (this.container) this.container.style.display = 'block';
+            this.update(0, totalTasks, "Iniciando proceso de envío...");
+        },
+
+        update(completed, total, message) {
+            const isFinalStep = message.toLowerCase().includes("pdf");
+            let percentage = 0;
+
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                percentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                percentage = isFinalStep ? 95 : 0;
+            }
+
+            if (this.bar) this.bar.style.width = percentage + "%";
+            if (this.percent) this.percent.textContent = percentage + "%";
+            if (this.text && message) this.text.textContent = message;
+        },
+
+        complete() {
+            if (this.bar) {
+                this.bar.style.width = "100%";
+                this.bar.style.backgroundColor = "#22c55e"; // Verde éxito
+            }
+            if (this.percent) this.percent.textContent = "100%";
+            // Mensaje final dentro de la barra
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
+        }
+    };
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1805,14 +659,14 @@
         async uploadFile(file, tipoFicha, muniCode, codigoObra = null) {
             try {
                 const base64 = await this.toBase64(file);
-                const userEmail = localStorage.getItem("userEmailActual") || "anonimo";
+                const contactoEmail = document.getElementById("contactoEmail")?.value || "anonimo";
 
                 const payload = {
                     filename: file.name,
                     mimeType: file.type,
                     bytesBase64: base64, 
                     municipio: muniCode,
-                    usuario: userEmail,
+                    usuario: contactoEmail,
                     tipo: tipoFicha,
                     obra: codigoObra 
                 };
@@ -1825,145 +679,350 @@
                 });
                 return true;
             } catch (e) {
-                console.error("Error subiendo archivo:", e);
+                console.error("Error subiendo:", e);
                 return false;
             }
         }
     };
 
-    // 4. ESTADO LOCAL DE ADJUNTOS
-    const adjuntosPorObra = {};
-    let obraActualEnSubida = null;
-
-    // 5. GESTIÓN DE ADJUNTOS
+    // 5. GESTIÓN DE ARCHIVOS (TABLA)
+    let colaAdjuntos = {}; 
+    let obraActualSeleccion = null;
     const hiddenInput = document.getElementById("hiddenFileInput");
 
     window.gestionarAdjuntos = (codigoObra) => {
-        obraActualEnSubida = codigoObra;
+        obraActualSeleccion = codigoObra;
         hiddenInput.click();
     };
 
-    hiddenInput.onchange = async () => {
-        const files = Array.from(hiddenInput.files);
-        if (!files.length || !obraActualEnSubida) return;
-
-        const contenedor = document.getElementById(`lista_adjuntos_${obraActualEnSubida}`);
-        if (!adjuntosPorObra[obraActualEnSubida]) {
-            adjuntosPorObra[obraActualEnSubida] = [];
+    window.eliminarDeCola = (codigoObra, index) => {
+        if (colaAdjuntos[codigoObra]) {
+            colaAdjuntos[codigoObra].splice(index, 1);
+            renderCola(codigoObra);
         }
-
-        for (const file of files) {
-            const tempId = Date.now();
-            const loadingItem = document.createElement("div");
-            loadingItem.id = `loading_${tempId}`;
-            loadingItem.innerHTML = `⏳...`;
-            loadingItem.style.fontSize = "0.7rem";
-            contenedor.appendChild(loadingItem);
-
-            const success = await UploadService.uploadFile(
-                file, 
-                'obra', 
-                window.EIEL_CONFIG.muniCode, 
-                obraActualEnSubida
-            );
-
-            loadingItem.remove();
-
-            if (success) {
-                adjuntosPorObra[obraActualEnSubida].push(file.name);
-                const item = document.createElement("div");
-                item.style.color = "var(--success)";
-                item.style.fontSize = "0.75rem";
-                const shortName = file.name.length > 15 ? file.name.substring(0, 12) + "..." : file.name;
-                item.innerHTML = `✅ ${shortName}`;
-                contenedor.appendChild(item);
-            } else {
-                const errorItem = document.createElement("div");
-                errorItem.style.color = "var(--danger)";
-                errorItem.innerHTML = `❌ Error`;
-                contenedor.appendChild(errorItem);
-            }
-        }
-        hiddenInput.value = "";
-        obraActualEnSubida = null;
     };
 
-    // 6. ENVÍO DEL FORMULARIO
-    const btnFirmar = document.getElementById("firmarBtn");
-    const mensajeDiv = document.getElementById("mensaje");
+    if(hiddenInput) {
+        hiddenInput.onchange = () => {
+            const files = Array.from(hiddenInput.files);
+            if (!files.length || !obraActualSeleccion) return;
 
-    function mostrarMensaje(texto, tipo) {
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`;
-        mensajeDiv.style.display = 'block';
+            if (!colaAdjuntos[obraActualSeleccion]) {
+                colaAdjuntos[obraActualSeleccion] = [];
+            }
+            colaAdjuntos[obraActualSeleccion].push(...files);
+            renderCola(obraActualSeleccion);
+            
+            hiddenInput.value = "";
+            obraActualSeleccion = null;
+        };
     }
 
-    btnFirmar.addEventListener("click", async () => {
-        btnFirmar.disabled = true;
-        mostrarMensaje("⏳ Recopilando datos...", "info");
-
-        // A) Recopilar datos de la tabla
-        const filas = document.querySelectorAll(".select-estado");
-        const estados = [];
-
-        filas.forEach(select => {
-            const estado = select.value || select.getAttribute("value");
-            // Permitir enviar estados que ya están precargados (Finalizada) o nuevos seleccionados
-            if (estado && estado !== "") {
-                const obraId = select.dataset.obraId;
-                const archivosSubidos = adjuntosPorObra[obraId] || [];
-
-                estados.push({
-                    obra: obraId,
-                    nombre: select.dataset.nombre,
-                    plan: select.dataset.plan,
-                    estado: estado,
-                    archivos: archivosSubidos.join(";")
-                });
-            }
-        });
-
-        if (estados.length === 0) {
-            mostrarMensaje("⚠️ No ha actualizado el estado de ninguna obra.", "warning");
-            btnFirmar.disabled = false;
+    function renderCola(codigoObra) {
+        const contenedor = document.getElementById(`lista_adjuntos_${codigoObra}`);
+        if(!contenedor) return;
+        const archivos = colaAdjuntos[codigoObra] || [];
+        
+        if (archivos.length === 0) {
+            contenedor.innerHTML = "";
             return;
         }
 
-        // B) Preparar Payload
-        const userEmail = localStorage.getItem("userEmailActual");
-        const payload = {
-            tipo_formulario: "obras",
-            datos_obras_json: JSON.stringify(estados),
-            email_usuario: userEmail,
-            municipio_codigo: window.EIEL_CONFIG.muniCode,
-            municipio_nombre: window.EIEL_CONFIG.muniName,
-            timestamp_envio: new Date().toISOString(),
-            observaciones: document.getElementById("observaciones").value || ""
-        };
+        contenedor.innerHTML = archivos.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        background: #f1f5f9; padding: 4px 8px; border-radius: 4px; 
+                        margin-top: 4px; font-size: 0.75rem; border: 1px solid #e2e8f0;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px;" title="${f.name}">
+                    📄 ${f.name}
+                </span>
+                <button type="button" onclick="eliminarDeCola('${codigoObra}', ${i})" 
+                        style="background:none; border:none; color: #ef4444; cursor:pointer; font-weight:bold; margin-left:5px;">
+                    ✖
+                </button>
+            </div>
+        `).join("");
+    }
 
-        // C) Enviar
-        try {
-            mostrarMensaje("⏳ Enviando datos...", "info");
-            
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+    // 5.1 GESTIÓN DE ARCHIVOS (NUEVAS OBRAS)
+    let archivosNuevas = [];
+    const fileInputNuevas = document.getElementById("fileInputNuevas");
+    const fileListNuevas = document.getElementById("fileListNuevas");
 
-            mostrarMensaje(`✅ Estados actualizados. El justificante llegará a ${userEmail}`, "success");
-            // Nota: En modo no-cors no podemos abrir el PDF automáticamente
+    if (fileInputNuevas) {
+        fileInputNuevas.addEventListener('change', () => {
+            archivosNuevas.push(...Array.from(fileInputNuevas.files));
+            renderArchivosNuevas();
+            fileInputNuevas.value = '';
+        });
+    }
 
-        } catch (error) {
-            console.error(error);
-            mostrarMensaje(`❌ Error: ${error.message}`, "error");
-        } finally {
-            btnFirmar.disabled = false;
+    window.eliminarArchivoNuevas = (i) => {
+        archivosNuevas.splice(i, 1);
+        renderArchivosNuevas();
+    };
+
+    function renderArchivosNuevas() {
+        if (!fileListNuevas) return;
+        if (archivosNuevas.length === 0) {
+            fileListNuevas.innerHTML = "";
+            return;
         }
-    });
+        fileListNuevas.innerHTML = archivosNuevas.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; 
+                        background: white; padding: 0.5rem 1rem; border-radius: 6px; 
+                        border: 1px solid #e2e8f0; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                <span style="display:flex; align-items:center; gap:8px;">📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoNuevas(${i})" 
+                        style="background:none; border:none; color:#ef4444; cursor:pointer; font-weight:bold;">✕</button>
+            </div>
+        `).join("");
+    }
+
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad"); 
+    const mensajeDiv = document.getElementById("mensaje"); 
+
+    function mostrarMensaje(texto, tipo) {
+        if(!mensajeDiv) return;
+        mensajeDiv.textContent = texto; 
+        mensajeDiv.className = `message ${tipo}`; 
+        mensajeDiv.style.display = 'block';
+    }
+
+    // 6.1 Checkbox Habilitador
+    if (checkConformidad && btnEnviar) {
+        checkConformidad.addEventListener('change', function() {
+            if (this.checked) {
+                btnEnviar.disabled = false;
+                btnEnviar.style.opacity = "1";
+                btnEnviar.style.cursor = "pointer"; 
+            } else {
+                btnEnviar.disabled = true;
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed"; 
+            }
+        });
+    }
+
+    // 6.2 Listener Principal de Envío
+        if(btnEnviar) {
+            btnEnviar.addEventListener("click", async () => {
+                // A. Preparación y Bloqueo UI
+                // Usamos la función global para congelar todo el formulario durante el proceso
+                toggleFormFreeze(true);
+
+                // B. Lectura de Variables
+                const nombreContacto = document.getElementById("contactoNombre").value.trim(); 
+                const emailContacto = document.getElementById("contactoEmail").value.trim(); 
+                const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+                const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
+                const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
+                const obsField = document.getElementById("observaciones");
+                const obsValue = obsField.value.trim(); 
+                const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim();
+                const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+                // C. Validaciones
+                    // 1: Identidad (Bloqueante)
+                    if (nombreContacto.length < 2) {
+                        mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+                        toggleFormFreeze(false); // Desbloqueamos si hay error
+                        return;
+                    }
+                    if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                        mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                        toggleFormFreeze(false); 
+                        return;
+                    }
+
+                    // 2: Estados e Integridad de Obras (Bloqueante)
+                    const selects = document.querySelectorAll(".select-estado");
+                    let obrasSinEstado = [];
+                    let obrasFiSinDocs = [];
+
+                    selects.forEach(select => {
+                        const obraId = select.dataset.obraId;
+                        const clave = select.dataset.clave;
+                        if (!select.value) obrasSinEstado.push(clave);
+                        if (select.value === 'Finalizada' && !(colaAdjuntos[obraId]?.length > 0)) {
+                            obrasFiSinDocs.push(clave);
+                        }
+                    });
+
+                    // 3: Requerimiento de Observaciones
+                    const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
+                    if (requiereObs && obsValue.length < 15) {
+                        let msg = "⚠️ Debe completar las Observaciones (mín. 15 caracteres) porque: ";
+                        if (obrasSinEstado.length > 0) msg += "faltan estados en la tabla. ";
+                        if (obrasFiSinDocs.length > 0) msg += "hay obras finalizadas sin adjuntos. ";
+                        if (window.EIEL_CONFIG.hasAvisos) msg += "existen avisos pendientes. ";
+                        mostrarMensaje(msg, "error");
+                        obsField.focus(); 
+                        toggleFormFreeze(false); 
+                        return;
+                    }
+                    
+                    // 4: Persistencia de datos del técnico (Memoria proactiva)
+                    localStorage.setItem("eiel_user_name", nombreContacto);
+                    localStorage.setItem("eiel_user_email", emailContacto);
+                    localStorage.setItem("eiel_user_dept", departamentoVal);
+
+                // D. Subida de Archivos a Google Drive
+                const listaArchivosSubida = [];
+                for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
+                    archivos.forEach(file => listaArchivosSubida.push({ file, obraId }));
+                }
+                archivosNuevas.forEach(file => listaArchivosSubida.push({ file, obraId: 'OTRAS_OBRAS' }));
+                
+                const totalArchivos = listaArchivosSubida.length;
+                let completados = 0;
+
+                UIProgress.show(totalArchivos);
+
+                if (totalArchivos > 0) {
+                    const promesas = listaArchivosSubida.map(item => {
+                        return UploadService.uploadFile(item.file, 'obra', window.EIEL_CONFIG.muniCode, item.obraId)
+                            .then(res => {
+                                completados++;
+                                UIProgress.update(completados, totalArchivos, `Subido: ${item.file.name}`);
+                                return res;
+                            });
+                    });
+                    await Promise.all(promesas);
+                }
+
+                // E. Recopilación de Datos para el Registro
+                UIProgress.update(completados, totalArchivos, "Generando justificante y registro...");
+                
+                    // 1: Estados y adjuntos por obra para el PDF
+                    const estados = [];
+                    selects.forEach(select => {
+                        if (select.value && select.value !== "") {
+                            const obraId = select.dataset.obraId;
+                            estados.push({
+                                obra: obraId,
+                                clave: select.dataset.clave,
+                                orden: select.dataset.orden,
+                                nombre: select.dataset.nombre,
+                                plan: select.dataset.plan,
+                                estado: select.value,
+                                archivos: (colaAdjuntos[obraId] || []).map(f => f.name).join(";")
+                            });
+                        }
+                    });
+
+                    // 2: Verificación de contenido mínimo
+                    if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
+                        mostrarMensaje("⚠️ No hay datos para enviar.", "warning");
+                        UIProgress.container.style.display = 'none';
+                        toggleFormFreeze(false);
+                        return;
+                    }
+
+                    // 3: Preparación de observaciones finales
+                    let obsFinal = obsValue;
+                    if (textoOtrasObras || archivosNuevas.length > 0) {
+                        obsFinal += "\n\n=== ➕ OTRAS OBRAS ===\n";
+                        if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
+                        if(archivosNuevas.length > 0) obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
+                    }
+                    
+                    // 4: Recolección total de adjuntos para el Log (Fix de la columna vacía)
+                    const todosLosAdjuntos = [];
+                    Object.values(colaAdjuntos).forEach(files => {
+                        files.forEach(f => todosLosAdjuntos.push(f.name));
+                    });
+                    archivosNuevas.forEach(f => todosLosAdjuntos.push(f.name));
+
+                // F. Registro y Envío de PDF
+                const payload = {
+                    tipo_formulario: "obras",
+                    fase: window.EIEL_CONFIG.fase,
+                    datos_obras_json: JSON.stringify(estados),
+                    observaciones: obsFinal,
+                    nombre_contacto: nombreContacto,
+                    departamento_contacto: departamentoVal,
+                    email_contacto: emailContacto,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    archivos_adjuntos: todosLosAdjuntos.join("\n")
+                };
+                   
+                try {
+                    await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // G. Finalización y Limpieza
+                    UIProgress.complete();
+                    if(mensajeDiv) mensajeDiv.style.display = 'none';
+
+                    // 1. Limpieza de variables de archivos
+                    colaAdjuntos = {};
+                    archivosNuevas = [];
+
+                    // 2. Limpieza VISUAL de listas y campos
+                    document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = "");
+                    renderArchivosNuevas();
+                    
+                    document.querySelectorAll("input, select, textarea").forEach(el => { 
+                        if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                        if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                    });
+
+                    if(checkConformidad) checkConformidad.checked = false;
+                    
+                    // Nota: toggleFormFreeze(false) no se llama aquí porque el diseño 
+                    // limpia el formulario y lo deja listo para un nuevo uso o salida.
+                    // Forzamos el estado visual del botón enviar por seguridad:
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+
+                } catch (error) {
+                    console.error(error);
+                    mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                    // En caso de error técnico, re-habilitamos el formulario para permitir corrección
+                    toggleFormFreeze(false);
+                }
+            });
+        }
+});
 </script>
 
 
+    
+    <script>
+    (function() {
+        // No registrar accesos si se abre el archivo localmente
+        if (window.location.protocol === 'file:') return;
+
+        const payload = {
+            municipio: "San Fulgencio",
+            codigo: "118",
+            fase: "2026",
+            tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+            ua: navigator.userAgent,
+            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
+            contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
+            departamento: localStorage.getItem("eiel_user_dept") || "N/A",
+            email: localStorage.getItem("eiel_user_email") || "N/A" 
+        };
+
+        // Envío al Apps Script de Logs si la URL está configurada en Python
+        if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
+            fetch(window.EIEL_CONFIG.urlLogger, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(payload)
+            });
+        }
+    })();
+    </script>
 </body>
 </html>
