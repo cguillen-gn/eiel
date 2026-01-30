@@ -1,6 +1,6 @@
-# 🏛️ Portal de Formularios EIEL — Geonet Territorial | Diputación de Alicante
+# 🏛️ Portal de Formularios EIEL para ayuntamientos
 
-> **Sistema de gestión y actualización masiva de la Encuesta de Infraestructura y Equipamientos Locales.**
+> **Geonet Territorial | Diputación de Alicante**
 
 ![GitHub Pages](https://img.shields.io/badge/Deployment-GitHub_Pages-blue?style=for-the-badge&logo=github)
 ![Python](https://img.shields.io/badge/Python-3.x-3776AB?style=for-the-badge&logo=python&logoColor=white)
@@ -13,7 +13,7 @@
 Este ecosistema permite a los técnicos municipales de la provincia de Alicante validar y actualizar datos críticos de servicios e infraestructuras. El proyecto destaca por su arquitectura híbrida: **Frontend Estático** para máxima velocidad y **Backend Serverless** (Google Apps Script) para la gestión segura de documentos y datos.
 
 ### 💡 Flujo de Datos
-* **Ingesta:** El script `gen_forms.py` extrae datos actualizados de **PostgreSQL** mediante consultas SQL específicas para servicios como agua, depósitos, cementerios y obras.
+* **Ingesta:** El script `gen_forms.py` extrae datos actualizados de **PostgreSQL** mediante consultas SQL específicas para servicios como agua, saneamiento, alubrado, viario, residuos, cementerios y obras.
 * **Procesado:** Jinja2 renderiza plantillas dinámicas (`.html.j2`) inyectando configuraciones por municipio y URLs de backend cargadas desde el archivo `.env`.
 * **Despliegue:** La carpeta `docs/` se sirve vía **GitHub Pages**, ofreciendo una interfaz rápida y sin servidores intermedios.
 * **Acción:** Los envíos y adjuntos se canalizan a **Google Drive/Sheets** mediante peticiones POST a los endpoints de Apps Script configurados en las variables de entorno.
@@ -27,22 +27,22 @@ La separación entre **Código Fuente** (Raíz) y **Distribución** (`docs/`) ga
 
 ```text
 📦 raiz-del-proyecto
- ┣ 📂 assets             # 🖼️ Recursos visuales originales (logos, favicon.ico)
- ┣ 📂 css                # 🎨 Estilos originales (style.css fuente)
- ┣ 📂 data               # 📊 Base de datos local (municipios.tsv)
- ┣ 📂 js                 # ⚙️ Lógica de subida (upload.js fuente)
- ┣ 📂 templates          # 🧱 Plantillas maestras Jinja2 (.html.j2)
- ┣ 📂 docs               # 🌐 DISTRIBUCIÓN (Lo que ve el usuario final)
- ┃ ┣ 📂 assets           # Copia procesada de recursos visuales
- ┃ ┣ 📂 css              # Estilos copiados para la web final
- ┃ ┣ 📂 img              # Logos de municipios y recursos multimedia
+ ┣ 📂 assets             # Recursos visuales originales
+ ┣ 📂 css                # Estilos originales (style.css fuente)
+ ┣ 📂 data               # Base de datos local (municipios.tsv)
+ ┣ 📂 js                 # Lógica de subida (upload.js fuente)
+ ┣ 📂 templates          # Plantillas maestras Jinja2 (.html.j2)
+ ┣ 📂 docs               # DISTRIBUCIÓN (Lo que ve el usuario final)
+ ┃ ┣ 📂 assets           # Copia procesada de recursos visuales para la web final
+ ┃ ┣ 📂 css              # Copia de estilos para la web final
+ ┃ ┣ 📂 img              # Logos y otros recursos
  ┃ ┗ 📜 *.html           # Formularios finales generados por municipio
- ┣ 📜 .env               # 🔒 SEGURIDAD (Credenciales de DB y URLs de Google)
- ┣ 📜 .env.example       # 📝 Guía de configuración para nuevos técnicos
+ ┣ 📜 .env               # SEGURIDAD (Credenciales de DB y URLs de Google). No se sube a github.
+ ┣ 📜 .env.example       # Archivo .env de ejemplo para ver estructura
  ┣ 📜 .gitignore         # Configuración para ignorar archivos sensibles (.env)
- ┣ 📜 gen_forms.py       # 🧠 El "Cerebro" generador basado en Python
- ┣ 📜 generate.bat       # ⚡ Automatismo de limpieza y construcción (Build)
- ┗ 📜 README.md          # 📖 Documentación técnica (este archivo)
+ ┣ 📜 gen_forms.py       # El "Cerebro" generador basado en Python
+ ┣ 📜 generate.bat       # Automatismo que ejecuta gen_forms.py tras limpiar los archivos existentes (Build)
+ ┗ 📜 README.md          # Documentación técnica (este archivo)
 ```
 ---
 
@@ -67,7 +67,7 @@ El proceso de actualización es atómico para garantizar que la web pública sie
 
 1.  **Edición:** Realiza los cambios necesarios en las plantillas Jinja2, el archivo de estilos CSS o el listado de municipios en el archivo TSV.
 2.  **Construcción (Build):** Ejecuta el archivo `generate.bat`. Este script automatiza la limpieza de los archivos HTML antiguos en la carpeta `docs/` y lanza el script `gen_forms.py` para generar la nueva versión procesada.
-3.  **Sincronización:** Una vez verificados los cambios localmente, sube la actualización al repositorio:
+3.  **Sincronización:** Una vez verificados los cambios localmente, sube la actualización al repositorio.
     ```bash
     git add .
     git commit -m "feat: actualización de formularios para la fase actual"
