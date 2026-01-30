@@ -355,121 +355,135 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 6.2 Listener Principal
-    if (btnEnviar) {
-        btnEnviar.addEventListener("click", async () => {
-            btnEnviar.disabled = true;
-            btnEnviar.style.cursor = "wait";
+    // 6.2 Listener Principal de Envío
+        if (btnEnviar) {
+            btnEnviar.addEventListener("click", async () => {
+                // A. Preparación y Bloqueo UI
+                // Congelamos el formulario para garantizar la integridad de los datos durante el envío
+                toggleFormFreeze(true);
 
-            const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirm = document.getElementById("contactoEmailConfirm")?.value.trim() || emailContacto;
-            const obsField = document.getElementById("observaciones");
-            const obsValue = obsField.value.trim();
-            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+                // B. Lectura de Variables
+                const nombreContacto = document.getElementById("contactoNombre").value.trim();
+                const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
+                const emailContacto = document.getElementById("contactoEmail").value.trim();
+                const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+                const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
+                const obsField = document.getElementById("observaciones");
+                const obsValue = obsField.value.trim();
+                const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            const tipoGestion = document.getElementById("tipo_gestion")?.value;
-            const empresa = document.getElementById("nombre_empresa")?.value.trim();
-            
+                const tipoGestion = document.getElementById("tipo_gestion")?.value;
+                const empresa = document.getElementById("nombre_empresa")?.value.trim();
 
-            // C. Validaciones
-            // 1: Identidad 
-            if (nombreContacto.length < 2) {
-                mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
-                btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
-            }
-            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
-            }
-            // 2: Observaciones
-            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
-                obsField.focus(); btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
-            }
-            
-            // 3: Empresa obligatoria si es gestión externa
-            if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad') && !empresa) {
-                mostrarMensaje("⚠️ El nombre de la empresa es obligatorio para este tipo de gestión.", "error");
-                btnEnviar.disabled = false; 
-                btnEnviar.style.cursor = "pointer";
-                return;
-            }
-            
-            // 4: Persistencia (Solo si todo lo anterior es correcto)
-            localStorage.setItem("eiel_user_name", nombreContacto);
-            localStorage.setItem("eiel_user_email", emailContacto);
-            localStorage.setItem("eiel_user_dept", document.getElementById("contactoDepartamento").value.trim());   
-                        
-            // D. Proceso de Subida
-            const totalArchivos = archivos.length;
-            let completados = 0;
-            UIProgress.show(totalArchivos);
+                // C. Validaciones
+                    // 1: Identidad 
+                    if (nombreContacto.length < 2) {
+                        mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
+                        toggleFormFreeze(false); // Desbloqueamos para permitir corrección
+                        return;
+                    }
+                    if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                        mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                        toggleFormFreeze(false);
+                        return;
+                    }
 
-            if (totalArchivos > 0) {
-                const promesasSubida = archivos.map(file => 
-                    UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, null)
-                    .then(res => {
-                        completados++;
-                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
-                        return res;
-                    })
-                );
-                await Promise.all(promesasSubida);
-            }
+                    // 2: Requerimiento de Observaciones (Avisos pendientes)
+                    if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                        mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                        obsField.focus(); 
+                        toggleFormFreeze(false);
+                        return;
+                    }
 
-            // E. Recopilación de Datos para el PDF
-            UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
-    
-            const payload = {
-                tipo_formulario: "saneamiento",
-                fase: window.EIEL_CONFIG.fase,
-                gestion_tipo: tipoGestion || "",
-                gestion_empresa: empresa || "",
-                gestion_tecnico_nombre: document.getElementById("tecnicoNombre")?.value || "",
-                gestion_tecnico_tel: document.getElementById("tecnicoTel")?.value || "",
-                gestion_tecnico_email: document.getElementById("tecnicoEmail")?.value || "",
-                observaciones: obsValue,
-                nombre_contacto: nombreContacto,
-                departamento_contacto: document.getElementById("contactoDepartamento").value,
-                email_contacto: emailContacto,
-                municipio_codigo: window.EIEL_CONFIG.muniCode,
-                municipio_nombre: window.EIEL_CONFIG.muniName,
-                timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: archivos.map(a => a.name).join("\n")
-            };
+                    // 3: Gestión y Empresa (Empresa obligatoria si es gestión externa)
+                    if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad') && !empresa) {
+                        mostrarMensaje("⚠️ El nombre de la empresa es obligatorio para este tipo de gestión.", "error");
+                        toggleFormFreeze(false);
+                        return;
+                    }
+                    
+                    // 4: Persistencia de datos del técnico (Memoria proactiva)
+                    localStorage.setItem("eiel_user_name", nombreContacto);
+                    localStorage.setItem("eiel_user_email", emailContacto);
+                    localStorage.setItem("eiel_user_dept", departamentoVal);
 
-            // F. Fetch Final
-            try {
-                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST", mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                
-            // G. Finalización y Limpieza total
-            UIProgress.complete();
-                if(mensajeDiv) mensajeDiv.style.display = 'none';
-                archivos = []; renderArchivos();
-                document.querySelectorAll("input, select, textarea").forEach(el => {
-                   if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                   if(el.tagName === 'SELECT') el.selectedIndex = 0;
-                });
-                if(checkConformidad) checkConformidad.checked = false;
-                btnEnviar.disabled = true; btnEnviar.style.opacity = "0.6";
-            } catch (error) {
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-                btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
-            }
-        });
-    }
+                // D. Subida de Archivos a Google Drive
+                const totalArchivos = archivos.length;
+                let completados = 0;
+                UIProgress.show(totalArchivos);
+
+                if (totalArchivos > 0) {
+                    const promesasSubida = archivos.map(file => 
+                        UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, null)
+                        .then(res => {
+                            completados++;
+                            UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
+                            return res;
+                        })
+                    );
+                    await Promise.all(promesasSubida);
+                }
+
+                // E. Recopilación de Datos para el Registro
+                UIProgress.update(completados, totalArchivos, "Generando justificante y registro...");
+
+                    // Preparación del Payload para el PDF y el Log
+                    const payload = {
+                        tipo_formulario: "saneamiento",
+                        fase: window.EIEL_CONFIG.fase,
+                        gestion_tipo: tipoGestion || "",
+                        gestion_empresa: empresa || "",
+                        gestion_tecnico_nombre: document.getElementById("tecnicoNombre")?.value || "",
+                        gestion_tecnico_tel: document.getElementById("tecnicoTel")?.value || "",
+                        gestion_tecnico_email: document.getElementById("tecnicoEmail")?.value || "",
+                        observaciones: obsValue,
+                        nombre_contacto: nombreContacto,
+                        departamento_contacto: departamentoVal,
+                        email_contacto: emailContacto,
+                        municipio_codigo: window.EIEL_CONFIG.muniCode,
+                        municipio_nombre: window.EIEL_CONFIG.muniName,
+                        timestamp_envio: new Date().toISOString(),
+                        archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                    };
+
+                // F. Registro y Envío de PDF
+                try {
+                    await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // G. Finalización y Limpieza
+                    UIProgress.complete();
+                    if(mensajeDiv) mensajeDiv.style.display = 'none';
+
+                    // Reset de variables y UI visual
+                    archivos = [];
+                    renderArchivos(); 
+
+                    document.querySelectorAll("input, select, textarea").forEach(el => {
+                       if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                       if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                    });
+
+                    if(checkConformidad) checkConformidad.checked = false;
+                    
+                    // Deshabilitar botón tras envío exitoso para evitar duplicados
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+
+                } catch (error) {
+                    console.error(error);
+                    mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                    // Liberamos el formulario en caso de error para permitir reintento
+                    toggleFormFreeze(false);
+                }
+            });
+        }
 });
 </script>
 {% endblock %}

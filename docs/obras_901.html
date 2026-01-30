@@ -28,6 +28,34 @@
             localStorage.clear(); 
             window.location.href = "index.html";
         }
+        
+        // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
+        function toggleFormFreeze(isFrozen) {
+            // Seleccionamos todos los elementos interactivos del formulario
+            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
+            const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
+            const elements = document.querySelectorAll(selectors);
+            
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                // Efecto visual de "congelado"
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                if (isFrozen) {
+                    el.style.pointerEvents = "none"; 
+                } else {
+                    el.style.pointerEvents = "auto";
+                }
+            });
+
+            // Ajuste específico para el botón enviar para mantener el cursor de espera
+            const btnEnviar = document.getElementById('btnEnviar');
+            if (btnEnviar && isFrozen) {
+                btnEnviar.style.cursor = "wait";
+            } else if (btnEnviar) {
+                btnEnviar.style.cursor = "pointer";
+            }
+        }
+        
     </script>
 </head>
 <body>
@@ -885,193 +913,193 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 6.2 Listener Principal
-    if(btnEnviar) {
-        btnEnviar.addEventListener("click", async () => {
-            // A. Preparación y Bloqueo UI
-            btnEnviar.disabled = true;
-            btnEnviar.style.cursor = "wait";
+    // 6.2 Listener Principal de Envío
+        if(btnEnviar) {
+            btnEnviar.addEventListener("click", async () => {
+                // A. Preparación y Bloqueo UI
+                // Usamos la función global para congelar todo el formulario durante el proceso
+                toggleFormFreeze(true);
 
-            // B. Lectura de Variables
-            const nombreContacto = document.getElementById("contactoNombre").value.trim(); 
-            const emailContacto = document.getElementById("contactoEmail").value.trim(); 
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-            const obsField = document.getElementById("observaciones");
-            const obsValue = obsField.value.trim(); 
-            const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim();
-            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+                // B. Lectura de Variables
+                const nombreContacto = document.getElementById("contactoNombre").value.trim(); 
+                const emailContacto = document.getElementById("contactoEmail").value.trim(); 
+                const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+                const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
+                const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
+                const obsField = document.getElementById("observaciones");
+                const obsValue = obsField.value.trim(); 
+                const textoOtrasObras = document.getElementById("otras_obras_texto").value.trim();
+                const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // C. Validaciones
-                // 1: Identidad (Bloqueante)
-                if (nombreContacto.length < 2) {
-                    mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
-                    btnEnviar.disabled = false; 
-                    btnEnviar.style.cursor = "pointer";
-                    return;
-                }
-                if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                    mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                    btnEnviar.disabled = false; 
-                    btnEnviar.style.cursor = "pointer";
-                    return;
-                }
-
-                // 2: Estados e Integridad de Obras (Bloqueante)
-                const selects = document.querySelectorAll(".select-estado");
-                let obrasSinEstado = [];
-                let obrasFiSinDocs = [];
-
-                selects.forEach(select => {
-                    const obraId = select.dataset.obraId;
-                    const clave = select.dataset.clave;
-                    if (!select.value) obrasSinEstado.push(clave);
-                    if (select.value === 'Finalizada' && !(colaAdjuntos[obraId]?.length > 0)) {
-                        obrasFiSinDocs.push(clave);
+                // C. Validaciones
+                    // 1: Identidad (Bloqueante)
+                    if (nombreContacto.length < 2) {
+                        mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+                        toggleFormFreeze(false); // Desbloqueamos si hay error
+                        return;
                     }
-                });
+                    if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                        mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                        toggleFormFreeze(false); 
+                        return;
+                    }
 
-                // 3: Observaciones
-                const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
-                if (requiereObs && obsValue.length < 15) {
-                    let msg = "⚠️ Debe completar las Observaciones (mín. 15 caracteres) porque: ";
-                    if (obrasSinEstado.length > 0) msg += "faltan estados en la tabla. ";
-                    if (obrasFiSinDocs.length > 0) msg += "hay obras finalizadas sin adjuntos. ";
-                    if (window.EIEL_CONFIG.hasAvisos) msg += "existen avisos pendientes. ";
-                    mostrarMensaje(msg, "error");
-                    obsField.focus(); btnEnviar.disabled = false; 
-                    btnEnviar.style.cursor = "pointer";
-                    return;
-                }
-                
-                // 4: Persistencia (Solo si todo lo anterior es correcto)
-                localStorage.setItem("eiel_user_name", nombreContacto);
-                localStorage.setItem("eiel_user_email", emailContacto);
-                localStorage.setItem("eiel_user_dept", document.getElementById("contactoDepartamento").value.trim());    
+                    // 2: Estados e Integridad de Obras (Bloqueante)
+                    const selects = document.querySelectorAll(".select-estado");
+                    let obrasSinEstado = [];
+                    let obrasFiSinDocs = [];
 
-            // D. Proceso de subida con barra de progreso
-            const listaArchivosSubida = [];
-            for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
-                archivos.forEach(file => listaArchivosSubida.push({ file, obraId }));
-            }
-            archivosNuevas.forEach(file => listaArchivosSubida.push({ file, obraId: 'OTRAS_OBRAS' }));
-            
-            const totalArchivos = listaArchivosSubida.length;
-            let completados = 0;
-
-            UIProgress.show(totalArchivos);
-
-            if (totalArchivos > 0) {
-                const promesas = listaArchivosSubida.map(item => {
-                    return UploadService.uploadFile(item.file, 'obra', window.EIEL_CONFIG.muniCode, item.obraId)
-                        .then(res => {
-                            completados++;
-                            UIProgress.update(completados, totalArchivos, `Subido: ${item.file.name}`);
-                            return res;
-                        });
-                });
-                await Promise.all(promesas);
-            }
-
-            // E. Generación de PDF
-            UIProgress.update(completados, totalArchivos, "Generando justificante PDF...");
-            
-                // 1: Recopilación de estados para el PDF
-                const estados = [];
-                selects.forEach(select => {
-                    if (select.value && select.value !== "") {
+                    selects.forEach(select => {
                         const obraId = select.dataset.obraId;
-                        estados.push({
-                            obra: obraId,
-                            clave: select.dataset.clave,
-                            orden: select.dataset.orden,
-                            nombre: select.dataset.nombre,
-                            plan: select.dataset.plan,
-                            estado: select.value,
-                            archivos: (colaAdjuntos[obraId] || []).map(f => f.name).join(";")
-                        });
+                        const clave = select.dataset.clave;
+                        if (!select.value) obrasSinEstado.push(clave);
+                        if (select.value === 'Finalizada' && !(colaAdjuntos[obraId]?.length > 0)) {
+                            obrasFiSinDocs.push(clave);
+                        }
+                    });
+
+                    // 3: Requerimiento de Observaciones
+                    const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
+                    if (requiereObs && obsValue.length < 15) {
+                        let msg = "⚠️ Debe completar las Observaciones (mín. 15 caracteres) porque: ";
+                        if (obrasSinEstado.length > 0) msg += "faltan estados en la tabla. ";
+                        if (obrasFiSinDocs.length > 0) msg += "hay obras finalizadas sin adjuntos. ";
+                        if (window.EIEL_CONFIG.hasAvisos) msg += "existen avisos pendientes. ";
+                        mostrarMensaje(msg, "error");
+                        obsField.focus(); 
+                        toggleFormFreeze(false); 
+                        return;
                     }
-                });
+                    
+                    // 4: Persistencia de datos del técnico (Memoria proactiva)
+                    localStorage.setItem("eiel_user_name", nombreContacto);
+                    localStorage.setItem("eiel_user_email", emailContacto);
+                    localStorage.setItem("eiel_user_dept", departamentoVal);
 
-                if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
-                    mostrarMensaje("⚠️ No hay datos para enviar.", "warning");
-                    UIProgress.container.style.display = 'none';
-                    btnEnviar.disabled = false; 
-                    btnEnviar.style.cursor = "pointer";
-                    return;
+                // D. Subida de Archivos a Google Drive
+                const listaArchivosSubida = [];
+                for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
+                    archivos.forEach(file => listaArchivosSubida.push({ file, obraId }));
+                }
+                archivosNuevas.forEach(file => listaArchivosSubida.push({ file, obraId: 'OTRAS_OBRAS' }));
+                
+                const totalArchivos = listaArchivosSubida.length;
+                let completados = 0;
+
+                UIProgress.show(totalArchivos);
+
+                if (totalArchivos > 0) {
+                    const promesas = listaArchivosSubida.map(item => {
+                        return UploadService.uploadFile(item.file, 'obra', window.EIEL_CONFIG.muniCode, item.obraId)
+                            .then(res => {
+                                completados++;
+                                UIProgress.update(completados, totalArchivos, `Subido: ${item.file.name}`);
+                                return res;
+                            });
+                    });
+                    await Promise.all(promesas);
                 }
 
-                // 2: Preparación de observaciones finales
-                let obsFinal = obsValue;
-                if (textoOtrasObras || archivosNuevas.length > 0) {
-                    obsFinal += "\n\n=== ➕ OTRAS OBRAS ===\n";
-                    if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
-                    if(archivosNuevas.length > 0) obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
-                }
+                // E. Recopilación de Datos para el Registro
+                UIProgress.update(completados, totalArchivos, "Generando justificante y registro...");
                 
-                
-                // 3: Recolección de nombres de adjuntos para el LOG
-                const todosLosAdjuntos = [];
+                    // 1: Estados y adjuntos por obra para el PDF
+                    const estados = [];
+                    selects.forEach(select => {
+                        if (select.value && select.value !== "") {
+                            const obraId = select.dataset.obraId;
+                            estados.push({
+                                obra: obraId,
+                                clave: select.dataset.clave,
+                                orden: select.dataset.orden,
+                                nombre: select.dataset.nombre,
+                                plan: select.dataset.plan,
+                                estado: select.value,
+                                archivos: (colaAdjuntos[obraId] || []).map(f => f.name).join(";")
+                            });
+                        }
+                    });
 
+                    // 2: Verificación de contenido mínimo
+                    if (estados.length === 0 && !textoOtrasObras && archivosNuevas.length === 0) {
+                        mostrarMensaje("⚠️ No hay datos para enviar.", "warning");
+                        UIProgress.container.style.display = 'none';
+                        toggleFormFreeze(false);
+                        return;
+                    }
+
+                    // 3: Preparación de observaciones finales
+                    let obsFinal = obsValue;
+                    if (textoOtrasObras || archivosNuevas.length > 0) {
+                        obsFinal += "\n\n=== ➕ OTRAS OBRAS ===\n";
+                        if(textoOtrasObras) obsFinal += "Descripción: " + textoOtrasObras + "\n";
+                        if(archivosNuevas.length > 0) obsFinal += "Adjuntos: " + archivosNuevas.map(f => f.name).join(", ");
+                    }
+                    
+                    // 4: Recolección total de adjuntos para el Log (Fix de la columna vacía)
+                    const todosLosAdjuntos = [];
                     Object.values(colaAdjuntos).forEach(files => {
                         files.forEach(f => todosLosAdjuntos.push(f.name));
                     });
-
                     archivosNuevas.forEach(f => todosLosAdjuntos.push(f.name));
 
+                // F. Registro y Envío de PDF
                 const payload = {
                     tipo_formulario: "obras",
                     fase: window.EIEL_CONFIG.fase,
                     datos_obras_json: JSON.stringify(estados),
                     observaciones: obsFinal,
                     nombre_contacto: nombreContacto,
-                    departamento_contacto: document.getElementById("contactoDepartamento").value,
+                    departamento_contacto: departamentoVal,
                     email_contacto: emailContacto,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
                     archivos_adjuntos: todosLosAdjuntos.join("\n")
                 };
-               
-            // F. Fetch Final
-            try {
-                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
+                   
+                try {
+                    await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
 
-            // G. Finalización y limpieza
-            UIProgress.complete();
-            if(mensajeDiv) mensajeDiv.style.display = 'none';
+                    // G. Finalización y Limpieza
+                    UIProgress.complete();
+                    if(mensajeDiv) mensajeDiv.style.display = 'none';
 
-                // 1. Limpieza de variables de archivos
-                colaAdjuntos = {};
-                archivosNuevas = [];
+                    // 1. Limpieza de variables de archivos
+                    colaAdjuntos = {};
+                    archivosNuevas = [];
 
-                // 2. Limpieza VISUAL de listas de archivos en la tabla
-                document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = "");
-                renderArchivosNuevas();
-                
-                // 3. Limpieza de inputs y reseteo
-                document.querySelectorAll("input, select, textarea").forEach(el => { 
-                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                    if(el.tagName === 'SELECT') el.selectedIndex = 0;
-                });
-                if(checkConformidad) checkConformidad.checked = false;
-                btnEnviar.disabled = true;
-                btnEnviar.style.opacity = "0.6";
-                btnEnviar.style.cursor = "not-allowed";
+                    // 2. Limpieza VISUAL de listas y campos
+                    document.querySelectorAll("[id^='lista_adjuntos_']").forEach(div => div.innerHTML = "");
+                    renderArchivosNuevas();
+                    
+                    document.querySelectorAll("input, select, textarea").forEach(el => { 
+                        if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                        if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                    });
 
-            } catch (error) {
-                console.error(error);
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-                btnEnviar.disabled = false;
-                btnEnviar.style.cursor = "pointer";
-            }
-        });
-    }
+                    if(checkConformidad) checkConformidad.checked = false;
+                    
+                    // Nota: toggleFormFreeze(false) no se llama aquí porque el diseño 
+                    // limpia el formulario y lo deja listo para un nuevo uso o salida.
+                    // Forzamos el estado visual del botón enviar por seguridad:
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+
+                } catch (error) {
+                    console.error(error);
+                    mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                    // En caso de error técnico, re-habilitamos el formulario para permitir corrección
+                    toggleFormFreeze(false);
+                }
+            });
+        }
 });
 </script>
 
