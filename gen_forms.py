@@ -187,7 +187,7 @@ def obtener_avisos_personalizados(conn, codigo_ine, fase, tipo_form):
     Recupera los avisos específicos para un municipio y formulario.
     """
     sql = """
-        SELECT mensaje, prioridad 
+        SELECT mensaje, prioridad, url
         FROM coordinador.solicitud_datos_formularios
         WHERE mun = %s AND fase = %s AND tipo_formulario = %s
         ORDER BY prioridad DESC, id ASC
@@ -195,6 +195,7 @@ def obtener_avisos_personalizados(conn, codigo_ine, fase, tipo_form):
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
             cursor.execute(sql, (codigo_ine, fase, tipo_form))
+            # Al ser DictCursor, cada aviso ya llevará la clave 'url'
             return [dict(row) for row in cursor.fetchall()]
     except Exception as e:
         print(f"Error obteniendo avisos para {codigo_ine} ({tipo_form}): {e}")
