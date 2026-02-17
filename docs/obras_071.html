@@ -766,7 +766,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio: muniCode,
                     usuario: contactoEmail,
                     tipo: tipoFicha,
-                    obra: codigoObra 
+                    obra: codigoObra,
+                    id_envio: idEnvio
                 };
 
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
@@ -907,6 +908,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if(btnEnviar) {
             btnEnviar.addEventListener("click", async () => {
                 // A. Preparación y Bloqueo UI
+                // Generamos el ID único del expediente al principio
+                const idBatch = "ENVIO_" + new Date().getTime();
+                
                 // Usamos la función global para congelar todo el formulario durante el proceso
                 toggleFormFreeze(true);
 
@@ -980,7 +984,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (totalArchivos > 0) {
                     const promesas = listaArchivosSubida.map(item => {
-                        return UploadService.uploadFile(item.file, 'obra', window.EIEL_CONFIG.muniCode, item.obraId)
+                        return UploadService.uploadFile(item.file, 'obra', window.EIEL_CONFIG.muniCode, item.obraId, idBatch)
                             .then(res => {
                                 completados++;
                                 UIProgress.update(completados, totalArchivos, `Subido: ${item.file.name}`);
@@ -1037,6 +1041,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const payload = {
                     tipo_formulario: "obras",
                     fase: window.EIEL_CONFIG.fase,
+                    id_envio: idBatch,
                     datos_obras_json: JSON.stringify(estados),
                     observaciones: obsFinal,
                     nombre_contacto: nombreContacto,
