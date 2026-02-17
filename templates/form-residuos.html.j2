@@ -31,11 +31,11 @@
         <table class="data-table">
             <thead>
                 <tr>
-                    <th style="width: 25%;">Tipo de residuo</th>
-                    <th style="width: 15%;">Producción (t/año)</th>
-                    <th style="width: 15%;">Nº contenedores</th>
-                    <th style="width: 20%;">Periodicidad</th>
-                    <th style="width: 25%;">Destino</th>
+                    <th style="width: 25%;">TIPO DE RESIDUO</th>
+                    <th style="width: 15%;">PRODUCCION (T/AÑO)</th>
+                    <th style="width: 15%;">Nº CONTENEDORES</th>
+                    <th style="width: 20%;">PERIODICIDAD</th>
+                    <th style="width: 25%;">DESTINO</th>
                 </tr>
             </thead>
             <tbody>
@@ -44,7 +44,7 @@
                     <td><input type="number" id="prod_plastico" class="form-input" placeholder="t/año" step="any"></td>
                     <td><input type="number" id="cont_plastico" class="form-input" placeholder="0"></td>
                     <td>
-                        <select id="period_plastico" class="form-select">
+                        <select id="period_plastico" class="form-select select-periodicidad">
                             <option value="">Seleccionar...</option>
                             <option value="diaria">Diaria</option>
                             <option value="dias alternos">Días alternos</option>
@@ -62,7 +62,7 @@
                     <td><input type="number" id="prod_papel" class="form-input" placeholder="t/año" step="any"></td>
                     <td><input type="number" id="cont_papel" class="form-input" placeholder="0"></td>
                     <td>
-                        <select id="period_papel" class="form-select">
+                        <select id="period_papel" class="form-select select-periodicidad">
                             <option value="">Seleccionar...</option>
                             <option value="diaria">Diaria</option>
                             <option value="dias alternos">Días alternos</option>
@@ -80,7 +80,7 @@
                     <td><input type="number" id="prod_vidrio" class="form-input" placeholder="t/año" step="any"></td>
                     <td><input type="number" id="cont_vidrio" class="form-input" placeholder="0"></td>
                     <td>
-                        <select id="period_vidrio" class="form-select">
+                        <select id="period_vidrio" class="form-select select-periodicidad">
                             <option value="">Seleccionar...</option>
                             <option value="diaria">Diaria</option>
                             <option value="dias alternos">Días alternos</option>
@@ -98,7 +98,7 @@
                     <td><input type="number" id="prod_organico" class="form-input" placeholder="t/año" step="any"></td>
                     <td><input type="number" id="cont_organico" class="form-input" placeholder="0"></td>
                     <td>
-                        <select id="period_organico" class="form-select">
+                        <select id="period_organico" class="form-select select-periodicidad">
                             <option value="">Seleccionar...</option>
                             <option value="diaria">Diaria</option>
                             <option value="dias alternos">Días alternos</option>
@@ -116,7 +116,7 @@
                     <td><input type="number" id="prod_resto" class="form-input" placeholder="t/año" step="any"></td>
                     <td><input type="number" id="cont_resto" class="form-input" placeholder="0"></td>
                     <td>
-                        <select id="period_resto" class="form-select">
+                        <select id="period_resto" class="form-select select-periodicidad">
                             <option value="">Seleccionar...</option>
                             <option value="diaria">Diaria</option>
                             <option value="dias alternos">Días alternos</option>
@@ -271,6 +271,18 @@
 
 {% endblock %}
 
+
+<style>
+    /* Estilo para los combos de periodicidad en Residuos */
+    .select-periodicidad { 
+        color: #94a3b8 !important; /* Gris suave para "Seleccionar..." */
+    }
+    .select-periodicidad.has-value { 
+        color: #1e293b !important; /* Negro/Azul oscuro para valores seleccionados */
+        font-weight: 600;
+    }
+</style>
+
 {% block scripts %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -278,6 +290,22 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. SETUP DE ESTILOS
     const header = document.querySelector('.site-header');
     if(header) header.classList.add('header-residuos');
+    
+    // Lógica para cambiar el color de la periodicidad al seleccionar
+    document.querySelectorAll('.select-periodicidad').forEach(select => {
+        // Aplicar color si ya viene con valor (por si el formulario se recarga)
+        if (select.value !== "") select.classList.add('has-value');
+
+        select.addEventListener('change', function() {
+            if (this.value !== "") {
+                this.classList.add('has-value');
+            } else {
+                this.classList.remove('has-value');
+            }
+        });
+    });
+        
+    
 
     // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
@@ -311,40 +339,53 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 4. SERVICIOS Y UTILIDADES DE UI
     const UIProgress = {
-        container: document.getElementById("progressContainer"),
-        bar: document.getElementById("progressBar"),
-        text: document.getElementById("progressText"),
-        percent: document.getElementById("progressPercentage"),
+    container: document.getElementById("progressContainer"),
+    bar: document.getElementById("progressBar"),
+    text: document.getElementById("progressText"),
+    percent: document.getElementById("progressPercentage"),
+    //Variable para recordar el punto más alto alcanzado
+    maxReached: 0, 
 
-        show(totalTasks) {
-            if (this.container) this.container.style.display = 'block';
-            this.update(0, totalTasks, "Iniciando proceso de envío...");
-        },
+    show(totalTasks) {
+        this.maxReached = 0; // Reiniciamos al empezar
+        if (this.container) this.container.style.display = 'block';
+        this.update(0, totalTasks, "Iniciando envío...");
+    },
 
-        update(completed, total, message) {
-            const isFinalStep = message.toLowerCase().includes("pdf");
-            let percentage = 0;
-
-            if (total > 0) {
-                const fileWeight = 90 / total;
-                percentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
-            } else {
-                percentage = isFinalStep ? 95 : 0;
-            }
-
-            if (this.bar) this.bar.style.width = percentage + "%";
-            if (this.percent) this.percent.textContent = percentage + "%";
-            if (this.text && message) this.text.textContent = message;
-        },
-
-        complete() {
-            if (this.bar) {
-                this.bar.style.width = "100%";
-                this.bar.style.backgroundColor = "#22c55e"; 
-            }
-            if (this.percent) this.percent.textContent = "100%";
-            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
+    update(completed, total, message) {
+        const msg = message.toLowerCase();
+        // Detectamos si es el paso del registro o PDF
+        const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
+        
+        let targetPercentage = 0;
+        if (total > 0) {
+            const fileWeight = 90 / total;
+            targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+        } else {
+            targetPercentage = isFinalStep ? 95 : 0;
         }
+
+        // --- EL BLOQUEO DE SEGURIDAD ---
+        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
+        if (targetPercentage > this.maxReached) {
+            this.maxReached = targetPercentage;
+            if (this.bar) this.bar.style.width = this.maxReached + "%";
+            if (this.percent) this.percent.textContent = this.maxReached + "%";
+        }
+        
+        // El texto sí lo actualizamos siempre para dar feedback constante
+        if (this.text && message) this.text.textContent = message;
+    },
+
+    complete() {
+        this.maxReached = 100;
+        if (this.bar) {
+            this.bar.style.width = "100%";
+            this.bar.style.backgroundColor = "#22c55e"; // Color de éxito
+        }
+        if (this.percent) this.percent.textContent = "100%";
+        if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito!";
+    }
     };
 
     const UploadService = {
@@ -512,7 +553,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // E. Recopilación de Datos para el Registro
-                UIProgress.update(completados, totalArchivos, "Generando justificante y registro...");
+                UIProgress.update(completados, totalArchivos, "Enviando datos y generando justificante PDF...");
 
                     // 1: Procesamiento de la tabla de residuos
                     const residuosData = RESIDUO_FIELDS.map(r => {
