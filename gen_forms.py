@@ -140,7 +140,15 @@ def obtener_fase_actual(conn):
 
 def obtener_depositos(conn, mun):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
-        cur.execute("SELECT d.nombre, de.limpieza FROM deposito d LEFT JOIN deposito_enc de USING (fase, mun, orden_depo) WHERE d.fase = (SELECT max(fase) FROM geonet_fase) AND d.mun = %s ORDER BY d.orden_depo;", (mun,))
+        sql = """
+        SELECT d.nombre, de.limpieza 
+        FROM deposito d LEFT JOIN deposito_enc de USING (fase, mun, orden_depo) 
+        WHERE d.fase = (SELECT max(fase) FROM geonet_fase) 
+            AND d.mun = %s 
+            AND de.titular  = 'MU'
+        ORDER BY d.orden_depo;
+        """
+        cur.execute(sql, (mun,))
         return [{"nombre": r["nombre"] or "", "limpieza": str(r["limpieza"]) if r["limpieza"] else ""} for r in cur.fetchall()]
 
 def obtener_obras(conn, mun):
