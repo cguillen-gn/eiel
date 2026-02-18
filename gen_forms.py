@@ -158,9 +158,13 @@ def obtener_obras(conn, mun):
                 (abastecimiento IS NULL OR abastecimiento = 'SI') OR
                 (saneamiento IS NULL OR saneamiento = 'SI')
             )
-            AND (estado IS NULL OR estado <> 'AN')
-            AND (ejecucion IS NULL OR ejecucion NOT IN ('DIIN'))
+            -- Se descartan las anuladas
+            AND (estado IS NULL OR estado <> 'AN') 
+            -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
+            AND (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
+            -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
             AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
+            -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
             AND (subvencion IS NULL OR subvencion <> 'DICH')
             ORDER BY orden;
         """
