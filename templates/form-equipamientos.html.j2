@@ -43,6 +43,12 @@
         transition: transform 0.3s ease;
     }
     
+    /* Bloquea el redimensionado manual de todos los campos de texto */
+    textarea.form-input {
+        resize: none;
+        overflow-y: auto; /* Permite scroll interno si el texto es largo */
+    }
+    
 </style>
 
 {# --- INSTRUCCIONES --- #}
@@ -88,7 +94,14 @@
                     <td class="text-center">
                         <img src="{{ eq.url_foto }}" 
                              style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'transparent'})">
+                             onclick="Swal.fire({
+                                imageUrl: this.src, 
+                                imageWidth: 'auto',
+                                imageHeight: 'auto',
+                                showConfirmButton: false, 
+                                background: 'rgba(0,0,0,0.8)',
+                                backdrop: true
+                             })">
                         <br><a href="{{ eq.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -128,21 +141,33 @@
 
     {% for su in equipamientos_agrupados.sin_uso %}
     <div class="fila-sin-uso card" style="padding: 15px; margin-bottom: 10px; border: 1px solid #fecaca; background: white;" data-id="{{ su.cod }}">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <strong style="color: #1e293b;">{{ su.nombre }}</strong>
-            <span class="acc-badge">Cód: {{ su.cod }}</span>
-        </div>
-        
-        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-            <label style="font-size: 0.9rem; font-weight: 600;">¿Sigue sin uso?</label>
-            <select class="form-select select-sin-uso" data-id="{{ su.cod }}" style="width: auto; padding: 4px 10px;" 
-                    onchange="this.value === 'NO' ? document.getElementById('box_uso_{{su.cod}}').classList.remove('hidden') : document.getElementById('box_uso_{{su.cod}}').classList.add('hidden')">
-                <option value="SI">SÍ, continúa sin uso</option>
-                <option value="NO">NO, ya tiene un uso</option>
-            </select>
-            
-            <div id="box_uso_{{su.cod}}" class="hidden" style="flex: 1; min-width: 250px;">
-                <input type="text" class="form-input txt-nuevo-uso" placeholder="¿Qué uso tiene actualmente? (Ej: Biblioteca, Almacén...)" style="font-size: 0.85rem;">
+        <div style="display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;">
+            <div style="text-align: center; flex-shrink: 0;">
+                <img src="{{ su.url_foto }}" 
+                     style="width: 60px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #eee;"
+                     onclick="Swal.fire({imageUrl: this.src, showConfirmButton: false, background: 'transparent'})">
+                <br>
+                <a href="{{ su.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none; font-weight: bold;">🗺️ Mapa</a>
+            </div>
+
+            <div style="flex-grow: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <strong style="color: #1e293b; font-size: 1rem;">{{ su.nombre }}</strong>
+                    <span class="acc-badge">Cód: {{ su.cod }}</span>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                    <label style="font-size: 0.9rem; font-weight: 600; color: #475569;">¿Sigue sin uso?</label>
+                    <select class="form-select select-sin-uso" data-id="{{ su.cod }}" style="width: auto; padding: 4px 10px;" 
+                            onchange="this.value === 'NO' ? document.getElementById('box_uso_{{su.cod}}').classList.remove('hidden') : document.getElementById('box_uso_{{su.cod}}').classList.add('hidden')">
+                        <option value="SI">SÍ, continúa sin uso</option>
+                        <option value="NO">NO, ya tiene un uso</option>
+                    </select>
+                    
+                    <div id="box_uso_{{su.cod}}" class="hidden" style="flex: 1; min-width: 200px;">
+                        <input type="text" class="form-input txt-nuevo-uso" placeholder="Indique el nuevo uso..." style="font-size: 0.85rem;">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -168,43 +193,59 @@
 </div>
 {% endif %}
 
-{# --- OBSERVACIONES GENERALES Y ADJUNTOS --- #}
-<div class="card" style="border-left: 4px solid #10b981;">
-    <h2 class="section-title">📝 Observaciones Generales y Adjuntos</h2>
+{# --- OBSERVACIONES --- #}
+<div class="card" style="border-left: 4px solid var(--theme-equipamientos);">
+    <h2 class="section-title" style="color: var(--theme-equipamientos);">📝 Observaciones</h2>
     <div class="form-group">
-        <label for="observaciones" class="form-label">Comentarios adicionales para todo el envío:</label>
-        <textarea id="observaciones" class="form-input" rows="3" placeholder="Aclare cualquier detalle sobre el inventario de equipamientos..."></textarea>
-    </div>
-    
-    <div class="form-group" style="margin-top: 1.5rem;">
-        <label class="form-label">Adjuntar documentos o fotos nuevas (Opcional):</label>
-        <div class="file-upload-area" onclick="document.getElementById('fileInputEquip').click()" style="border: 2px dashed #cbd5e1; padding: 1rem; text-align: center; cursor: pointer; border-radius: 8px;">
-            <div style="font-size: 1.5rem; margin-bottom: 5px;">📎</div>
-            <div style="font-weight: 600; color: #475569;">Haga clic para adjuntar archivos</div>
-            <input type="file" id="fileInputEquip" multiple style="display: none;">
-        </div>
-        <div id="fileListEquip" style="margin-top: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
     </div>
 </div>
 
-{# --- CONTACTO Y ENVÍO --- #}
-<div class="card" style="border-left: 4px solid #10b981;">
-    <h2 class="section-title">👤 Datos de Contacto</h2>
+{# --- ADJUNTOS --- #}
+<div class="card" style="border-left: 4px solid var(--theme-equipamientos);">
+    <h2 class="section-title" style="color: var(--theme-equipamientos);">🗂️ Documentación Adjunta (Opcional)</h2>
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed #94a3b8; padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px; transition: background 0.2s;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
+        <div style="font-weight: 600;">Haga clic para adjuntar archivos</div>
+        <p style="font-size: 0.9rem; color: #666;">(Planos, fotos, informes, análisis...)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+</div>
+
+{# --- DATOS DE CONTACTO --- #}
+<div class="card" style="border-left: 4px solid var(--theme-equipamientos);">
+    <h2 class="section-title" style="color: var(--theme-equipamientos);">👤 Datos de Contacto</h2>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-        <div class="form-group"><label class="form-label">Nombre y apellidos *</label><input type="text" id="contactoNombre" class="form-input" required></div>
-        <div class="form-group"><label class="form-label">Departamento</label><input type="text" id="contactoDepartamento" class="form-input" required></div>
-        <div class="form-group"><label class="form-label">Email *</label><input type="email" id="contactoEmail" class="form-input" required></div>
-        <div class="form-group"><label class="form-label">Confirme Email *</label><input type="email" id="contactoEmailConfirm" class="form-input" required onpaste="return false;"></div>
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+       <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
     </div>
 </div>
 
 {# --- DECLARACIÓN RESPONSABLE --- #}
-<div class="card" style="border-left: 4px solid #10b981;">
+<div class="card" style="border-left: 4px solid var(--theme-equipamientos);">
     <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <label style="display: flex; gap: 10px; cursor: pointer; align-items: center;">
-            <input type="checkbox" id="checkConformidad" style="width: 18px; height: 18px;">
-            <span style="font-size: 0.95rem; color: #334155;">
-                <strong>Declaración de veracidad:</strong> Confirmo que los datos revisados son correctos.
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: flex-start;">
+            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
+            <span style="font-size: 0.95rem; color: #334155; line-height: 1.4;">
+                <strong>Declaración de veracidad:</strong> Como responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
             </span>
         </label>
     </div>
@@ -220,7 +261,7 @@
     </div>
 
     <button id="btnEnviar" class="btn btn-primary" onclick="enviarEquipamientos()" disabled>
-    Enviar Datos de Equipamientos
+    Enviar Datos
     </button>
     <div id="mensaje" class="message"></div>
 </div>
@@ -256,8 +297,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 3. GESTIÓN DE ADJUNTOS
     let archivosAdjuntos = [];
-    const fileInput = document.getElementById('fileInputEquip');
-    const fileList = document.getElementById('fileListEquip');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    
+    if (fileInput) {
+    fileInput.addEventListener('change', () => {
+        archivosAdjuntos.push(...Array.from(fileInput.files));
+        renderFiles();
+        fileInput.value = '';
+    });
+}
 
     fileInput.addEventListener('change', () => {
         archivosAdjuntos.push(...Array.from(fileInput.files));
