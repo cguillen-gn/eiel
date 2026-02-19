@@ -13,10 +13,10 @@
 <style>
     /* Estilos para el estado (Status Dots) */
     .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
-    .dot-Bueno { background-color: #22c55e; } /* Verde */
-    .dot-Regular { background-color: #f59e0b; } /* Naranja */
-    .dot-Malo { background-color: #ef4444; } /* Rojo */
-    .dot-ejecucion { background-color: #d946ef; } /* Magenta */
+    .dot-bueno { background-color: #22c55e; }
+    .dot-regular { background-color: #f59e0b; }
+    .dot-malo { background-color: #ef4444; }
+    .dot-enejecucion { background-color: #d946ef; }
 
     /* Estilos para el Acordeón compacto */
     .card-accordion { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; transition: all 0.2s; }
@@ -34,6 +34,15 @@
     .acc-badge { background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; color: #475569; }
 
     .hidden { display: none !important; }
+    
+    /* Rotación del icono al abrir el acordeón */
+    details[open] .acc-chevron {
+        transform: rotate(180deg);
+    }
+    .acc-chevron {
+        transition: transform 0.3s ease;
+    }
+    
 </style>
 
 {# --- INSTRUCCIONES --- #}
@@ -42,9 +51,6 @@
         ℹ️ Instrucciones de Revisión
     </h4>
     <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #14532d; font-size: 0.95rem; line-height: 1.5;">
-        <li style="margin-bottom: 0.5rem;">
-            <strong>Validación:</strong> Si el equipamiento no ha sufrido cambios, marque <strong>"Todo OK"</strong> para confirmar su estado actual.
-        </li>
         <li style="margin-bottom: 0.5rem;">
             <strong>Cambios:</strong> Si el estado de conservación ha variado, seleccione la nueva opción en el desplegable.
         </li>
@@ -63,7 +69,7 @@
             <span>{{ categoria }}</span>
             <span class="acc-badge">{{ lista|length }} registros</span>
         </div>
-        <i data-lucide="chevron-down" style="width: 18px; opacity: 0.5;"></i>
+        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
     </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
@@ -80,8 +86,9 @@
                 {% for eq in lista %}
                 <tr class="fila-equip" data-id="{{ eq.cod }}">
                     <td class="text-center">
-                        <img src="{{ eq.url_foto }}" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({imageUrl: this.src, imageWidth: 600, showConfirmButton: false})">
+                        <img src="{{ eq.url_foto }}" 
+                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
+                             onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'transparent'})">
                         <br><a href="{{ eq.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -90,7 +97,7 @@
                     </td>
                     <td>
                         <div style="display: flex; align-items: center;">
-                            <span class="status-dot dot-{{ eq.estado_txt.replace(' ', '') }}"></span>
+                            <span class="status-dot dot-{{ eq.estado_txt.lower().replace(' ', '').replace('ó', 'o') }}"></span>
                             <select class="form-select select-estado-eq" data-id="{{ eq.cod }}" style="font-size: 0.8rem; padding: 2px 4px; border-color: #e2e8f0;">
                                 <option value="Bueno" {% if eq.estado_txt == 'Bueno' %}selected{% endif %}>Bueno</option>
                                 <option value="Regular" {% if eq.estado_txt == 'Regular' %}selected{% endif %}>Regular</option>
@@ -191,10 +198,14 @@
     </div>
 </div>
 
+{# --- DECLARACIÓN RESPONSABLE --- #}
 <div class="card" style="border-left: 4px solid #10b981;">
     <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <label style="display: flex; gap: 10px; cursor: pointer;">
-            <span style="font-size: 0.95rem; color: #334155;"><strong>Declaración de veracidad:</strong> Confirmo que los datos revisados son correctos.</span>
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: center;">
+            <input type="checkbox" id="checkConformidad" style="width: 18px; height: 18px;">
+            <span style="font-size: 0.95rem; color: #334155;">
+                <strong>Declaración de veracidad:</strong> Confirmo que los datos revisados son correctos.
+            </span>
         </label>
     </div>
     
@@ -230,33 +241,20 @@ document.addEventListener("DOMContentLoaded", () => {
         urlLogger: "{{ url_logger }}"
     };
 
-    // 2. LÓGICA DE EXCLUSIÓN MUTUA (TODO OK vs COMBO)
-    document.querySelectorAll('.chk-ok').forEach(chk => {
-        chk.addEventListener('change', function() {
-            const id = this.dataset.id;
-            const select = document.querySelector(`.select-estado-eq[data-id="${id}"]`);
-            if (this.checked) {
-                select.value = select.dataset.original;
-                select.disabled = true;
-                select.style.backgroundColor = "#f0fdf4";
-            } else {
-                select.disabled = false;
-                select.style.backgroundColor = "#ffffff";
-            }
-        });
-    });
-
+    // 2. SELECTOR ESTADOS
     document.querySelectorAll('.select-estado-eq').forEach(sel => {
         sel.addEventListener('change', function() {
-            const id = this.dataset.id;
-            const check = document.querySelector(`.chk-ok[data-id="${id}"]`);
-            if (this.value !== this.dataset.original) {
-                check.checked = false;
+            const dot = this.parentNode.querySelector('.status-dot');
+            if (dot) {
+                dot.className = 'status-dot';
+                // Normalizamos: "En ejecución" -> "ejecucion"
+                const classValue = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, "");
+                dot.classList.add('dot-' + classValue);
             }
         });
     });
 
-    // 3. GESTIÓN DE ADJUNTOS (SIMPLIFICADA)
+    // 3. GESTIÓN DE ADJUNTOS
     let archivosAdjuntos = [];
     const fileInput = document.getElementById('fileInputEquip');
     const fileList = document.getElementById('fileListEquip');
@@ -329,14 +327,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Registros de las tablas de los acordeones
             document.querySelectorAll('.fila-equip').forEach(fila => {
-                const categoria = fila.closest('details').querySelector('.acc-header span').textContent;
+                const categoria = fila.closest('details').querySelector('.acc-header span').textContent.trim();
                 datosEquipamientos.push({
                     categoria: categoria,
                     id: fila.dataset.id,
                     nombre: fila.querySelector('.nombre-eq').textContent,
                     estado: fila.querySelector('.select-estado-eq').value,
                     obs: fila.querySelector('.txt-obs-eq').value.trim(),
-                    validado_ok: false // Siempre falso porque ya no hay check de "Todo OK"
+                    validado_ok: false
                 });
             });
 
