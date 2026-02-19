@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 import psycopg2
 import psycopg2.extras
 import re
+import base64
+from io import BytesIO
+from PIL import Image
 
 load_dotenv()
 
@@ -29,7 +32,26 @@ def formatear_nombre_ui(nombre_original):
     partes = nombre_original.split('/')
     return " / ".join([arreglar_fragmento(p) for p in partes])
 
+# --- HELPER PARA MINIATURAS (No sobrecarga la RAM) ---
+def get_thumbnail_base64(cursor, id_binario, size=(300, 300)):
+    if not id_binario: return ""
+    
+    # Consulta quirúrgica solo cuando se necesita la foto
+    cursor.execute("SELECT binario FROM geonet_apl_binario WHERE id = %s", (id_binario,))
+    record = cursor.fetchone()
+    if not record or not record[0]: return ""
 
+    try:
+        img = Image.open(BytesIO(record[0]))
+        img.thumbnail(size) # Redimensiona manteniendo proporción
+        
+        buffered = BytesIO()
+        img.convert("RGB").save(buffered, format="JPEG", quality=75) # Comprime para la web
+        return f"data:image/jpeg;base64,{base64.b64encode(buffered.getvalue()).decode()}"
+    except Exception:
+        return ""
+    
+    
 # --- CONSTANTES DE RUTAS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, 'docs')
@@ -48,6 +70,7 @@ TEMPLATE_AGUA = "form-agua.html.j2"
 TEMPLATE_OBRAS = "form-obras.html.j2"
 TEMPLATE_RESIDUOS = "form-residuos.html.j2"
 TEMPLATE_CEMENTERIOS = "form-cementerios.html.j2"
+TEMPLATE_EQUIPAMIENTOS = "form-equipamientos.html.j2"
 TEMPLATE_VIARIO = "form-viario.html.j2"
 TEMPLATE_ALUMBRADO = "form-alumbrado.html.j2"
 TEMPLATE_SANEAMIENTO = "form-saneamiento.html.j2"
@@ -121,6 +144,7 @@ template_agua = env.get_template(TEMPLATE_AGUA)
 template_obras = env.get_template(TEMPLATE_OBRAS)
 template_residuos = env.get_template(TEMPLATE_RESIDUOS)
 template_cementerios = env.get_template(TEMPLATE_CEMENTERIOS)
+template_equipamientos = env.get_template(TEMPLATE_EQUIPAMIENTOS)
 template_viario = env.get_template(TEMPLATE_VIARIO)
 template_alumbrado = env.get_template(TEMPLATE_ALUMBRADO)
 template_saneamiento = env.get_template(TEMPLATE_SANEAMIENTO)
@@ -225,6 +249,43 @@ def copiar_assets():
     if os.path.exists(ASSETS_DIR):
         shutil.copytree(ASSETS_DIR, os.path.join(OUTPUT_DIR, 'assets'), dirs_exist_ok=True)
 
+# --- OBTENCION DE EQUIPAMIENTOS ---
+def obtener_equipamientos(conn, mun):
+    # SQL simplificado: Eliminamos el JOIN con la tabla de binarios y el campo 'binario'
+    sql = """
+    with t as (
+        select 'CASA CONSISTORIAL' as tabla, cc.clave || cc.mun || cc.orden_casa as cod, cc.nombre, cc.estado, '316' capa, cc.geom from casa_consistorial cc where cc.fase = (select max(fase) from geonet_fase) and cc.mun = %s
+        UNION select 'CENTRO CULTURAL', cu.clave || cu.mun || cu.orden_centro, cu.nombre, cu.estado, '321', cu.geom from cent_cultural cu where cu.fase = (select max(fase) from geonet_fase) and cu.mun = %s
+        UNION select 'CENTRO ASISTENCIAL', ca.clave || ca.mun || ca.orden_casis, ca.nombre, ca.estado, '319', ca.geom from centro_asistencial ca where ca.fase = (select max(fase) from geonet_fase) and ca.mun = %s
+        UNION select 'CENTRO ENSEÑANZA', en.clave || en.mun || en.orden_cent, en.nombre, en.estado, '322', en.geom from centro_ensenanza en where en.fase = (select max(fase) from geonet_fase) and en.mun = %s
+        UNION select 'CENTRO SANITARIO', sa.clave || sa.mun || sa.orden_csan, sa.nombre, sa.estado, '327', sa.geom from centro_sanitario sa where sa.fase = (select max(fase) from geonet_fase) and sa.mun = %s
+        UNION select 'EDIFICIO SIN USO', su.clave || su.mun || su.orden_edific, su.nombre, su.estado, '328', su.geom from edific_pub_sin_uso su where su.fase = (select max(fase) from geonet_fase) and su.mun = %s
+        UNION select 'INSTALACIÓN DEPORTIVA', id.clave || id.mun || id.orden_instal, id.nombre, id.estado, '323', id.geom from instal_deportiva id where id.fase = (select max(fase) from geonet_fase) and id.mun = %s
+        UNION select 'MERCADO/LONJA', lm.clave || lm.mun || lm.orden_lmf, lm.nombre, lm.estado, '324', lm.geom from lonja_merc_feria lm where lm.fase = (select max(fase) from geonet_fase) and lm.mun = %s
+        UNION select 'PARQUE', pj.clave || pj.mun || pj.orden_parq, pj.nombre, pj.estado, '331', pj.geom from parque pj where pj.fase = (select max(fase) from geonet_fase) and pj.mun = %s
+        UNION select 'PROTECCIÓN CIVIL', ip.clave || ip.mun || ip.orden_prot, ip.nombre, ip.estado, '325', ip.geom from proteccion_civil ip where ip.fase = (select max(fase) from geonet_fase) and ip.mun = %s
+        UNION select 'TANATORIO', ta.clave || ta.mun || ta.orden_tanat, ta.nombre, ta.estado, '326', ta.geom from tanatorio ta where ta.fase = (select max(fase) from geonet_fase) and ta.mun = %s
+    )
+    select t.*, 
+        case when estado='B' then 'Bueno' when estado='R' then 'Regular' when estado='M' then 'Malo' when estado='E' then 'En ejecución' else 'Desconocido' end as estado_txt,
+        concat('https://visoreiel.geonet.es?srs=4326&x_lon=', st_x(st_centroid(st_transform(geom, 4326))), '&y_lat=', st_y(st_centroid(st_transform(geom, 4326))), '&zoom=19&w=initlayer&layerIds=', capa) as url
+    from t;
+    """
+    with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        cur.execute(sql, (mun,) * 11)
+        res = cur.fetchall()
+        
+        agrupados = {}
+        for r in res:
+            cat = r['tabla']
+            if cat not in agrupados: agrupados[cat] = []
+            
+            # YA NO LLAMAMOS A get_thumbnail_base64
+            r_dict = dict(r)
+            r_dict['foto_b64'] = "" # Dejamos la variable vacía
+            agrupados[cat].append(r_dict)
+        return agrupados
+        
 def main():
     print("--- INICIO GENERACIÓN ---")
     if not os.path.exists(OUTPUT_DIR): os.makedirs(OUTPUT_DIR)
@@ -303,6 +364,17 @@ def main():
                     cementerios_json=json.dumps(cementerios, ensure_ascii=False),
                     avisos_personalizados=avisos_cementerios
                 ))
+                
+            # 5. EQUIPAMIENTOS (Nuevo bloque)
+            equip_data = obtener_equipamientos(conn, code_bd)
+            avisos_equip = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'equipamientos')
+
+            with open(os.path.join(OUTPUT_DIR, f'equipamientos_{code}.html'), "w", encoding="utf-8") as f:
+                f.write(template_equipamientos.render(
+                    **common_ctx,
+                    equipamientos_agrupados=equip_data,
+                    avisos_personalizados=avisos_equip
+                ))
             
             # --- B) FORMULARIOS BAJO DEMANDA (Condicionales) ---
             # Banderas por defecto para este municipio
@@ -310,7 +382,7 @@ def main():
             flag_viario = False
             flag_saneamiento = False
 
-            # 5. ALUMBRADO
+            # 6. ALUMBRADO
             avisos_alumbrado = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'alumbrado')
             if len(avisos_alumbrado) > 0:
                 flag_alumbrado = True
@@ -320,7 +392,7 @@ def main():
                         avisos_personalizados=avisos_alumbrado
                     ))
 
-            # 6. VIARIO
+            # 7. VIARIO
             avisos_viario = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'viario')
             if len(avisos_viario) > 0:
                 flag_viario = True
@@ -330,7 +402,7 @@ def main():
                         avisos_personalizados=avisos_viario
                     ))
 
-            # 7. SANEAMIENTO
+            # 8. SANEAMIENTO
             avisos_saneamiento = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'saneamiento')
             if len(avisos_saneamiento) > 0:
                 flag_saneamiento = True
