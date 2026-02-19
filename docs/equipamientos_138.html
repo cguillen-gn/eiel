@@ -8,6 +8,9 @@
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
         // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
@@ -100,50 +103,82 @@
         
 
 <style>
-    /* Estilos para el estado (Status Dots) */
-    .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
-    .dot-bueno { background-color: #22c55e; }
-    .dot-regular { background-color: #f59e0b; }
-    .dot-malo { background-color: #ef4444; }
-    .dot-enejecucion { background-color: #d946ef; }
+    /* 1. Estilos para los Puntos de Estado (Status Dots) */
+    /* Coinciden con la normalización del JS: minúsculas y sin acentos */
+    .status-dot { 
+        height: 10px; width: 10px; border-radius: 50%; 
+        display: inline-block; margin-right: 8px; 
+        border: 1px solid rgba(0,0,0,0.1); 
+    }
+    .dot-bueno { background-color: #22c55e; }       /* Verde */
+    .dot-regular { background-color: #f59e0b; }     /* Naranja */
+    .dot-malo { background-color: #ef4444; }        /* Rojo */
+    .dot-enejecucion { background-color: #d946ef; }  /* Magenta */
 
-    /* Estilos para el Acordeón compacto */
-    .card-accordion { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; transition: all 0.2s; }
-    .card-accordion[open] { border-color: #10b981; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    /* 2. Estilos para el Acordeón */
+    .card-accordion { 
+        margin-bottom: 8px; border: 1px solid #e2e8f0; 
+        border-radius: 8px; overflow: hidden; transition: all 0.2s; 
+    }
+    .card-accordion[open] { 
+        border-color: #10b981; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); 
+    }
     
     .acc-header { 
         cursor: pointer; display: flex; align-items: center; justify-content: space-between;
-        padding: 12px 16px; background: #f8fafc; font-weight: 700; color: #1e293b; list-style: none;
+        padding: 12px 16px; background: #f8fafc; font-weight: 700; color: #1e293b; 
+        list-style: none; position: relative; padding-right: 45px !important;
     }
-    .acc-header::-webkit-details-marker { display: none; } /* Quita flecha nativa */
+    .acc-header::-webkit-details-marker { display: none; } /* Ocultar flecha nativa */
+    
+    /* Efecto visual al pasar el ratón */
+    .card-accordion:hover {
+        border-color: #10b981;
+        background-color: #f0fdf4;
+    }
     .acc-header:hover { background: #f1f5f9; }
     
+    /* 3. Iconos y Badges internos */
     .acc-title-box { display: flex; align-items: center; gap: 12px; }
     .acc-icon { color: #10b981; width: 20px; }
-    .acc-badge { background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; color: #475569; }
-
-    .hidden { display: none !important; }
-    
-    /* Rotación del icono al abrir el acordeón */
-    details[open] .acc-chevron {
-        transform: rotate(180deg);
+    .acc-badge { 
+        background: #e2e8f0; padding: 2px 8px; border-radius: 12px; 
+        font-size: 0.75rem; color: #475569; 
     }
-    .acc-chevron {
+
+    /* 4. Símbolos Indicadores (⊕ / ⊖) */
+    .acc-header::after {
+        content: '⊕'; /* Símbolo de expandir */
+        position: absolute;
+        right: 16px;
+        font-size: 1.4rem;
+        color: #10b981;
         transition: transform 0.3s ease;
     }
+    .card-accordion[open] .acc-header::after {
+        content: '⊖'; /* Símbolo de contraer */
+    }
+
+    /* 5. Utilidades y Campos de Formulario */
+    .hidden { display: none !important; }
     
-    /* Bloquea el redimensionado manual de todos los campos de texto */
+    /* Bloquea el redimensionado manual de los textarea */
     textarea.form-input {
         resize: none;
-        overflow-y: auto; /* Permite scroll interno si el texto es largo */
+        overflow-y: auto;
     }
+
+    /* Animación opcional para el chevron si decides usarlo en el HTML */
+    .acc-chevron { transition: transform 0.3s ease; }
+    details[open] .acc-chevron { transform: rotate(180deg); }
     
 </style>
 
 
-<div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-    <h4 style="margin: 0 0 0.8rem 0; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 8px;">
-        ℹ️ Instrucciones de Revisión
+<div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <h4 style="margin: 0 0 0.5rem 0; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+        ℹ️ Instrucciones
     </h4>
     <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #14532d; font-size: 0.95rem; line-height: 1.5;">
         <li style="margin-bottom: 0.5rem;">
@@ -164,8 +199,7 @@
             <span>PARQUE</span>
             <span class="acc-badge">25 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -181,16 +215,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138024">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140035" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140035" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.012002488099656542&y_lat=38.84485481067349&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -215,16 +240,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138003">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139860" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139860" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.010804829377804819&y_lat=38.847461907241886&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -249,16 +265,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138013">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140095" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140095" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.0027428451961770475&y_lat=38.86231595156993&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -283,16 +290,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138019">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139257" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139257" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.0005939584703221213&y_lat=38.85777209025091&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -317,16 +315,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138010">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139252" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139252" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.008943972967840283&y_lat=38.86495010060314&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -351,16 +340,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138008">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137689" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137689" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.003242695501444911&y_lat=38.85714452382364&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -385,16 +365,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138021">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138164" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138164" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.007280109428993532&y_lat=38.84753157642002&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -419,16 +390,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138014">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139258" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139258" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.006087615298837063&y_lat=38.862634663162034&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -453,16 +415,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138018">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137563" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137563" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.000722659564222055&y_lat=38.858492438817386&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -487,16 +440,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138005">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139242" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139242" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.0059090620094811525&y_lat=38.85089954060213&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -521,16 +465,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138007">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139250" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139250" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.010154560050695677&y_lat=38.86536724753034&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -555,16 +490,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138006">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139983" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139983" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.008211570091683693&y_lat=38.84049635395014&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -589,16 +515,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138025">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140003" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140003" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.012683420060784767&y_lat=38.86671515303741&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -623,16 +540,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138015">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137571" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137571" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.0053908944447392075&y_lat=38.86167209893092&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -657,16 +565,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138023">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139317" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139317" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.011277615971728385&y_lat=38.845888997923204&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -691,16 +590,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138011">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139253" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139253" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.004168976484906325&y_lat=38.86469370692316&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -725,16 +615,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138004">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137464" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137464" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01120255382270564&y_lat=38.84399946192177&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -759,16 +640,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138002">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139248" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139248" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.008788420556109943&y_lat=38.845444580449836&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -793,16 +665,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138022">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139336" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139336" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.007940827124022559&y_lat=38.847903362174556&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -827,16 +690,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138012">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140078" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140078" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.003107285523304152&y_lat=38.86431347596477&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -861,16 +715,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138009">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137597" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137597" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.003399465446102096&y_lat=38.85785474629467&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -895,16 +740,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138026">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140152" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140152" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.0007686785869991533&y_lat=38.86240724693035&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -929,16 +765,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138020">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140151" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69140151" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.0007033515609114212&y_lat=38.86163933123882&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -963,16 +790,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138017">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139249" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139249" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.003907003533970929&y_lat=38.859905645320616&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -997,16 +815,7 @@
                 
                 <tr class="fila-equip" data-id="PJ138016">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139109" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139109" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.004414079577382303&y_lat=38.860709851322895&zoom=19&w=initlayer&layerIds=331" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1041,8 +850,7 @@
             <span>INSTALACIÓN DEPORTIVA</span>
             <span class="acc-badge">6 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1058,16 +866,7 @@
                 
                 <tr class="fila-equip" data-id="ID138005">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131670" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131670" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.005521054074581707&y_lat=38.858254129723186&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1092,16 +891,7 @@
                 
                 <tr class="fila-equip" data-id="ID138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131451" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131451" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01640740257914739&y_lat=38.84262641654953&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1126,16 +916,7 @@
                 
                 <tr class="fila-equip" data-id="ID138003">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132222" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132222" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.016225875731874093&y_lat=38.84188452417795&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1160,16 +941,7 @@
                 
                 <tr class="fila-equip" data-id="ID138002">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132084" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132084" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.015806788165026165&y_lat=38.84112218711948&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1194,16 +966,7 @@
                 
                 <tr class="fila-equip" data-id="ID138007">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132269" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132269" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01138522324745906&y_lat=38.84621557827656&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1228,16 +991,7 @@
                 
                 <tr class="fila-equip" data-id="ID138006">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131019" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131019" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.005194766908131608&y_lat=38.862893854031874&zoom=19&w=initlayer&layerIds=323" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1272,8 +1026,7 @@
             <span>CENTRO CULTURAL</span>
             <span class="acc-badge">6 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1289,16 +1042,7 @@
                 
                 <tr class="fila-equip" data-id="CU138010">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894912" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894912" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01019897836752303&y_lat=38.84283037263136&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1323,16 +1067,7 @@
                 
                 <tr class="fila-equip" data-id="CU138008">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894027" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894027" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.011169082612362734&y_lat=38.8463630518003&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1357,16 +1092,7 @@
                 
                 <tr class="fila-equip" data-id="CU138004">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894965" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894965" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.012272806578250988&y_lat=38.84492223103369&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1391,16 +1117,7 @@
                 
                 <tr class="fila-equip" data-id="CU138009">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894712" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894712" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.0085183226341983&y_lat=38.84103452768608&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1425,16 +1142,7 @@
                 
                 <tr class="fila-equip" data-id="CU138006">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894713" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894713" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.00984339409425663&y_lat=38.8416495095961&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1459,16 +1167,7 @@
                 
                 <tr class="fila-equip" data-id="CU138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894715" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67894715" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.009621054169043033&y_lat=38.84820165854646&zoom=19&w=initlayer&layerIds=321" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1503,8 +1202,7 @@
             <span>TANATORIO</span>
             <span class="acc-badge">3 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1520,16 +1218,7 @@
                 
                 <tr class="fila-equip" data-id="TA138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147862" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147862" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.007721224383150343&y_lat=38.845763803465275&zoom=19&w=initlayer&layerIds=326" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1554,16 +1243,7 @@
                 
                 <tr class="fila-equip" data-id="TA138002">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147861" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147861" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.00912934036842729&y_lat=38.84227335402316&zoom=19&w=initlayer&layerIds=326" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1588,16 +1268,7 @@
                 
                 <tr class="fila-equip" data-id="TA138003">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147839" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=326&atributo=foto&tipo=image/jpeg;jpg&identificador=69147839" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.008354754911454203&y_lat=38.8486554184992&zoom=19&w=initlayer&layerIds=326" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1632,8 +1303,7 @@
             <span>CENTRO ENSEÑANZA</span>
             <span class="acc-badge">5 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1649,16 +1319,7 @@
                 
                 <tr class="fila-equip" data-id="EN138002">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897544" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897544" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.015000289732776888&y_lat=38.841550480838464&zoom=19&w=initlayer&layerIds=322" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1683,16 +1344,7 @@
                 
                 <tr class="fila-equip" data-id="EN138003">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897662" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897662" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.0085183226341983&y_lat=38.84103452768608&zoom=19&w=initlayer&layerIds=322" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1717,16 +1369,7 @@
                 
                 <tr class="fila-equip" data-id="EN138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67898442" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67898442" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.015582654363756625&y_lat=38.84163920345346&zoom=19&w=initlayer&layerIds=322" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1751,16 +1394,7 @@
                 
                 <tr class="fila-equip" data-id="EN138004">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897545" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897545" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.009621054169043032&y_lat=38.84820165854645&zoom=19&w=initlayer&layerIds=322" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1785,16 +1419,7 @@
                 
                 <tr class="fila-equip" data-id="EN138005">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897550" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67897550" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01513010509121806&y_lat=38.84147168320166&zoom=19&w=initlayer&layerIds=322" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1829,8 +1454,7 @@
             <span>CENTRO SANITARIO</span>
             <span class="acc-badge">1 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1846,16 +1470,7 @@
                 
                 <tr class="fila-equip" data-id="SA138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=327&atributo=foto&tipo=image/jpeg;jpg&identificador=67901400" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=327&atributo=foto&tipo=image/jpeg;jpg&identificador=67901400" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.010075924390264255&y_lat=38.84793379504411&zoom=19&w=initlayer&layerIds=327" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1890,8 +1505,7 @@
             <span>CENTRO ASISTENCIAL</span>
             <span class="acc-badge">1 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1907,16 +1521,7 @@
                 
                 <tr class="fila-equip" data-id="AS138002">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=319&atributo=foto&tipo=image/jpeg;jpg&identificador=67897173" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=319&atributo=foto&tipo=image/jpeg;jpg&identificador=67897173" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.00985080233096569&y_lat=38.84070669541211&zoom=19&w=initlayer&layerIds=319" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -1951,8 +1556,7 @@
             <span>CASA CONSISTORIAL</span>
             <span class="acc-badge">8 registros</span>
         </div>
-        <i data-lucide="chevron-down" class="acc-chevron" style="width: 18px; opacity: 0.5;"></i>
-    </summary>
+        </summary>
     
     <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
         <table class="data-table" style="font-size: 0.85rem;">
@@ -1968,16 +1572,7 @@
                 
                 <tr class="fila-equip" data-id="CC138009">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891973" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891973" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.007621502842463794&y_lat=38.859684935044896&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2002,16 +1597,7 @@
                 
                 <tr class="fila-equip" data-id="CC138012">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892259" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892259" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.00274691912419581&y_lat=38.86140026830509&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2036,16 +1622,7 @@
                 
                 <tr class="fila-equip" data-id="CC138008">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891994" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891994" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.009132009030116881&y_lat=38.84394038735105&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2070,16 +1647,7 @@
                 
                 <tr class="fila-equip" data-id="CC138001">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892246" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892246" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.010566430851997316&y_lat=38.847269040779715&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2104,16 +1672,7 @@
                 
                 <tr class="fila-equip" data-id="CC138006">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891423" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891423" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.009838552667253439&y_lat=38.84181033800928&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2138,16 +1697,7 @@
                 
                 <tr class="fila-equip" data-id="CC138010">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892214" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892214" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.01204322310289509&y_lat=38.8450282347225&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2172,16 +1722,7 @@
                 
                 <tr class="fila-equip" data-id="CC138011">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892017" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892017" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.0015868080101960214&y_lat=38.85832440057116&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2206,16 +1747,7 @@
                 
                 <tr class="fila-equip" data-id="CC138007">
                     <td class="text-center">
-                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891983" 
-                             style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
-                             onclick="Swal.fire({
-                                imageUrl: this.src, 
-                                imageWidth: 'auto',
-                                imageHeight: 'auto',
-                                showConfirmButton: false, 
-                                background: 'rgba(0,0,0,0.8)',
-                                backdrop: true
-                             })">
+                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891983" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                         <br><a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.010441491506805707&y_lat=38.84766188238908&zoom=19&w=initlayer&layerIds=316" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
                     <td>
@@ -2257,9 +1789,7 @@
     <div class="fila-sin-uso card" style="padding: 15px; margin-bottom: 10px; border: 1px solid #fecaca; background: white;" data-id="SU138002">
         <div style="display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;">
             <div style="text-align: center; flex-shrink: 0;">
-                <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=328&atributo=foto&tipo=image/jpeg;jpg&identificador=67918974" 
-                     style="width: 60px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #eee;"
-                     onclick="Swal.fire({imageUrl: this.src, showConfirmButton: false, background: 'transparent'})">
+                <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=328&atributo=foto&tipo=image/jpeg;jpg&identificador=67918974" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                 <br>
                 <a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.0095694116925518&y_lat=38.84322200996786&zoom=19&w=initlayer&layerIds=328" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none; font-weight: bold;">🗺️ Mapa</a>
             </div>
@@ -2289,9 +1819,7 @@
     <div class="fila-sin-uso card" style="padding: 15px; margin-bottom: 10px; border: 1px solid #fecaca; background: white;" data-id="SU138001">
         <div style="display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;">
             <div style="text-align: center; flex-shrink: 0;">
-                <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=328&atributo=foto&tipo=image/jpeg;jpg&identificador=67919166" 
-                     style="width: 60px; height: 50px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #eee;"
-                     onclick="Swal.fire({imageUrl: this.src, showConfirmButton: false, background: 'transparent'})">
+                <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=328&atributo=foto&tipo=image/jpeg;jpg&identificador=67919166" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
                 <br>
                 <a href="https://visoreiel.geonet.es?srs=4326&x_lon=0.009309153702271887&y_lat=38.843617670499015&zoom=19&w=initlayer&layerIds=328" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none; font-weight: bold;">🗺️ Mapa</a>
             </div>
@@ -2482,24 +2010,18 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // 3. GESTIÓN DE ADJUNTOS
+    // 3. GESTIÓN DE ADJUNTOS (Limpio y Único)
     let archivosAdjuntos = [];
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
-    
-    if (fileInput) {
-    fileInput.addEventListener('change', () => {
-        archivosAdjuntos.push(...Array.from(fileInput.files));
-        renderFiles();
-        fileInput.value = '';
-    });
-}
 
-    fileInput.addEventListener('change', () => {
-        archivosAdjuntos.push(...Array.from(fileInput.files));
-        renderFiles();
-        fileInput.value = '';
-    });
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            archivosAdjuntos.push(...Array.from(fileInput.files));
+            renderFiles();
+            fileInput.value = '';
+        });
+    }
 
     window.removeFile = (i) => { 
         archivosAdjuntos.splice(i, 1); 
