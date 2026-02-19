@@ -10,6 +10,32 @@
 
 {% block content %}
 
+<style>
+    /* Estilos para el estado (Status Dots) */
+    .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; border: 1px solid rgba(0,0,0,0.1); }
+    .dot-Bueno { background-color: #22c55e; } /* Verde */
+    .dot-Regular { background-color: #f59e0b; } /* Naranja */
+    .dot-Malo { background-color: #ef4444; } /* Rojo */
+    .dot-ejecucion { background-color: #d946ef; } /* Magenta */
+
+    /* Estilos para el Acordeón compacto */
+    .card-accordion { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; transition: all 0.2s; }
+    .card-accordion[open] { border-color: #10b981; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    
+    .acc-header { 
+        cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 16px; background: #f8fafc; font-weight: 700; color: #1e293b; list-style: none;
+    }
+    .acc-header::-webkit-details-marker { display: none; } /* Quita flecha nativa */
+    .acc-header:hover { background: #f1f5f9; }
+    
+    .acc-title-box { display: flex; align-items: center; gap: 12px; }
+    .acc-icon { color: #10b981; width: 20px; }
+    .acc-badge { background: #e2e8f0; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; color: #475569; }
+
+    .hidden { display: none !important; }
+</style>
+
 {# --- INSTRUCCIONES --- #}
 <div style="background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
     <h4 style="margin: 0 0 0.8rem 0; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 8px;">
@@ -17,7 +43,7 @@
     </h4>
     <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #14532d; font-size: 0.95rem; line-height: 1.5;">
         <li style="margin-bottom: 0.5rem;">
-            <strong>Validación:</strong> Si el equipamiento no ha sufrido cambios, marque <strong>"Todo OK"</strong> para confirmar su estado actual[cite: 157].
+            <strong>Validación:</strong> Si el equipamiento no ha sufrido cambios, marque <strong>"Todo OK"</strong> para confirmar su estado actual.
         </li>
         <li style="margin-bottom: 0.5rem;">
             <strong>Cambios:</strong> Si el estado de conservación ha variado, seleccione la nueva opción en el desplegable.
@@ -28,51 +54,44 @@
     </ul>
 </div>
 
-{# --- TABLAS DE EQUIPAMIENTOS POR CATEGORÍA --- #}
-{% for categoria, lista in equipamientos_agrupados.items() %}
-<div class="card" style="border-left: 4px solid #10b981; margin-bottom: 30px;">
-    <h3 style="padding: 10px 15px; margin: 0; background: #f8fafc; border-bottom: 1px solid #e2e8f0; color: #064e3b; font-size: 1.1rem;">
-        📂 {{ categoria }} ({{ lista|length }})
-    </h3>
-    <div class="table-wrapper" style="margin: 0;">
-        <table class="data-table" style="font-size: 0.9rem; width: 100%; border-collapse: collapse;">
-            <thead style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+{# --- ACORDEONES DE EQUIPAMIENTOS GENERALES --- #}
+{% for categoria, lista in equipamientos_agrupados.general.items() %}
+<details class="card-accordion">
+    <summary class="acc-header">
+        <div class="acc-title-box">
+            <i data-lucide="{{ lista[0].icono }}" class="acc-icon"></i>
+            <span>{{ categoria }}</span>
+            <span class="acc-badge">{{ lista|length }} registros</span>
+        </div>
+        <i data-lucide="chevron-down" style="width: 18px; opacity: 0.5;"></i>
+    </summary>
+    
+    <div class="table-wrapper" style="margin: 0; border: none; border-top: 1px solid #e2e8f0;">
+        <table class="data-table" style="font-size: 0.85rem;">
+            <thead>
                 <tr>
-                    <th style="width: 15%; text-align: center; padding: 12px; font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Identificación</th>
-                    <th style="width: 35%; text-align: left; padding: 12px; font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Denominación</th>
-                    <th style="width: 25%; text-align: center; padding: 12px; font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Estado de Conservación</th>
-                    <th style="width: 25%; text-align: left; padding: 12px; font-weight: 700; text-transform: uppercase; font-size: 0.75rem;">Observaciones</th>
+                    <th width="12%">Foto</th>
+                    <th width="48%">Denominación</th>
+                    <th width="20%">Estado</th>
+                    <th width="20%">Notas</th>
                 </tr>
             </thead>
             <tbody>
                 {% for eq in lista %}
-                <tr class="fila-equip" data-id="{{ eq.cod }}" style="border-bottom: 1px solid #e2e8f0;">
-                    <td style="text-align: center; vertical-align: middle; padding: 10px;">
-                        {% if eq.foto_b64 %}
-                            <img src="{{ eq.foto_b64 }}" style="width: 80px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #e2e8f0; cursor: pointer;" 
-                                 onclick="Swal.fire({imageUrl: this.src, imageWidth: 600, showConfirmButton: false})">
-                        {% else %}
-                            <div style="width: 80px; height: 60px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 0.7rem; margin: 0 auto; border-radius: 4px;">Sin foto</div>
-                        {% endif %}
-                        <div style="margin-top: 5px;">
-                            <a href="{{ eq.url }}" target="_blank" style="font-size: 0.75rem; color: #3b82f6; text-decoration: none; font-weight: 600;">🔗 Ver en Mapa</a>
-                        </div>
+                <tr class="fila-equip" data-id="{{ eq.cod }}">
+                    <td class="text-center">
+                        <img src="{{ eq.url_foto }}" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
+                             onclick="Swal.fire({imageUrl: this.src, imageWidth: 600, showConfirmButton: false})">
+                        <br><a href="{{ eq.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
                     </td>
-
-                    <td style="vertical-align: middle; padding: 12px;">
-                        <div style="font-weight: 600; color: #1e293b;">{{ eq.nombre }}</div>
-                        <small style="color: #64748b;">Código: {{ eq.cod }}</small>
+                    <td>
+                        <div class="nombre-eq" style="font-weight: 600; color: #1e293b;">{{ eq.nombre }}</div>
+                        <small style="color: #94a3b8;">Cód: {{ eq.cod }}</small>
                     </td>
-
-                    <td style="text-align: center; vertical-align: middle; padding: 12px;">
-                        <div style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
-                            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; color: #15803d; font-weight: 600;">
-                                <input type="checkbox" class="chk-ok" data-id="{{ eq.cod }}"> Todo OK
-                            </label>
-                            <select class="form-select select-estado-eq" 
-                                    style="padding: 6px; font-size: 0.85rem; width: 100%; border-radius: 4px; border-color: #cbd5e1;"
-                                    data-id="{{ eq.cod }}" 
-                                    data-original="{{ eq.estado_txt }}">
+                    <td>
+                        <div style="display: flex; align-items: center;">
+                            <span class="status-dot dot-{{ eq.estado_txt.replace(' ', '') }}"></span>
+                            <select class="form-select select-estado-eq" data-id="{{ eq.cod }}" style="font-size: 0.8rem; padding: 2px 4px; border-color: #e2e8f0;">
                                 <option value="Bueno" {% if eq.estado_txt == 'Bueno' %}selected{% endif %}>Bueno</option>
                                 <option value="Regular" {% if eq.estado_txt == 'Regular' %}selected{% endif %}>Regular</option>
                                 <option value="Malo" {% if eq.estado_txt == 'Malo' %}selected{% endif %}>Malo</option>
@@ -80,17 +99,50 @@
                             </select>
                         </div>
                     </td>
-
-                    <td style="vertical-align: middle; padding: 10px;">
-                        <textarea class="form-input txt-obs-eq" data-id="{{ eq.cod }}" rows="2" style="font-size: 0.8rem; min-height: 50px;" placeholder="Notas..."></textarea>
+                    <td>
+                        <textarea class="form-input txt-obs-eq" rows="1" style="font-size: 0.75rem; min-height: 32px;" placeholder="..."></textarea>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-</div>
+</details>
 {% endfor %}
+
+{# --- SECCIÓN ESPECIAL: EDIFICIOS PÚBLICOS SIN USO --- #}
+<div class="card" style="border-left: 4px solid #f43f5e; margin-top: 25px; background: #fff1f2;">
+    <h3 style="color: #9f1239; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
+        <i data-lucide="ghost"></i> Edificios Públicos Sin Uso
+    </h3>
+    <p style="font-size: 0.85rem; color: #be123c; margin-bottom: 15px; font-style: italic;">
+        Indique si estos edificios siguen sin actividad o si han pasado a tener un uso concreto.
+    </p>
+
+    {% for su in equipamientos_agrupados.sin_uso %}
+    <div class="fila-sin-uso card" style="padding: 15px; margin-bottom: 10px; border: 1px solid #fecaca; background: white;" data-id="{{ su.cod }}">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <strong style="color: #1e293b;">{{ su.nombre }}</strong>
+            <span class="acc-badge">Cód: {{ su.cod }}</span>
+        </div>
+        
+        <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+            <label style="font-size: 0.9rem; font-weight: 600;">¿Sigue sin uso?</label>
+            <select class="form-select select-sin-uso" data-id="{{ su.cod }}" style="width: auto; padding: 4px 10px;" 
+                    onchange="this.value === 'NO' ? document.getElementById('box_uso_{{su.cod}}').classList.remove('hidden') : document.getElementById('box_uso_{{su.cod}}').classList.add('hidden')">
+                <option value="SI">SÍ, continúa sin uso</option>
+                <option value="NO">NO, ya tiene un uso</option>
+            </select>
+            
+            <div id="box_uso_{{su.cod}}" class="hidden" style="flex: 1; min-width: 250px;">
+                <input type="text" class="form-input txt-nuevo-uso" placeholder="¿Qué uso tiene actualmente? (Ej: Biblioteca, Almacén...)" style="font-size: 0.85rem;">
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+
 
 {# --- REQUERIMIENTOS --- #}
 {% if avisos_personalizados and avisos_personalizados|length > 0 %}
@@ -128,7 +180,7 @@
     </div>
 </div>
 
-{# --- CONTACTO Y ENVÍO (CALCADO DE OBRAS) --- #}
+{# --- CONTACTO Y ENVÍO --- #}
 <div class="card" style="border-left: 4px solid #10b981;">
     <h2 class="section-title">👤 Datos de Contacto</h2>
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -142,7 +194,6 @@
 <div class="card" style="border-left: 4px solid #10b981;">
     <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
         <label style="display: flex; gap: 10px; cursor: pointer;">
-            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px;">
             <span style="font-size: 0.95rem; color: #334155;"><strong>Declaración de veracidad:</strong> Confirmo que los datos revisados son correctos.</span>
         </label>
     </div>
@@ -157,7 +208,7 @@
         </div>
     </div>
 
-    <button id="btnEnviar" class="btn btn-primary" onclick="enviarEquipamientos()" disabled ...>
+    <button id="btnEnviar" class="btn btn-primary" onclick="enviarEquipamientos()" disabled>
     Enviar Datos de Equipamientos
     </button>
     <div id="mensaje" class="message"></div>
@@ -251,18 +302,18 @@ document.addEventListener("DOMContentLoaded", () => {
         const depto = document.getElementById("contactoDepartamento").value.trim();
         const obsGenerales = document.getElementById("observaciones").value.trim();
 
-        // Validaciones básicas de contacto [cite: 136-141]
+        // Validaciones básicas de contacto 
         if (!nombre || !email || email !== emailConfirm) {
             Swal.fire("Error", "Verifique los datos de contacto y que el email coincida.", "error");
             return;
         }
 
         const idEnvio = "EXP_E_" + new Date().getTime(); 
-        toggleFormFreeze(true); // Congelamos el formulario como en Obras [cite: 135]
+        toggleFormFreeze(true); // Congelamos el formulario como en Obras
         UIProgress.show(archivosAdjuntos.length);
 
         try {
-            // Subida de archivos [cite: 153-158]
+            // Subida de archivos 
             let nombresArchivos = [];
             for (let i = 0; i < archivosAdjuntos.length; i++) {
                 const file = archivosAdjuntos[i];
@@ -271,22 +322,41 @@ document.addEventListener("DOMContentLoaded", () => {
                 nombresArchivos.push(file.name);
             }
 
-            // Recopilación de datos de la tabla para el PDF [cite: 159-163]
+            // Recopilación de datos de la tabla para el PDF 
             UIProgress.update(archivosAdjuntos.length, archivosAdjuntos.length, "Generando PDF...");
-            const datosEquipamientos = [];
+        
+        const datosEquipamientos = [];
+
+            // Registros de las tablas de los acordeones
             document.querySelectorAll('.fila-equip').forEach(fila => {
-                const id = fila.dataset.id;
+                const categoria = fila.closest('details').querySelector('.acc-header span').textContent;
                 datosEquipamientos.push({
-                    categoria: fila.closest('.card').querySelector('h3').textContent.split('(')[0].replace('📂', '').trim(),
-                    id: id,
+                    categoria: categoria,
+                    id: fila.dataset.id,
                     nombre: fila.querySelector('.nombre-eq').textContent,
                     estado: fila.querySelector('.select-estado-eq').value,
                     obs: fila.querySelector('.txt-obs-eq').value.trim(),
-                    validado_ok: fila.querySelector('.chk-ok').checked
+                    validado_ok: false // Siempre falso porque ya no hay check de "Todo OK"
                 });
             });
 
-            // Envío final al Apps Script del PDF [cite: 170-174]
+            // Registros de la sección "Sin Uso"
+            document.querySelectorAll('.fila-sin-uso').forEach(fila => {
+                const sigueSinUso = fila.querySelector('.select-sin-uso').value;
+                const nuevoUso = fila.querySelector('.txt-nuevo-uso').value.trim();
+                const cod = fila.dataset.id;
+
+                datosEquipamientos.push({
+                    categoria: "EDIFICIO PÚBLICO SIN USO",
+                    id: cod,
+                    nombre: fila.querySelector('strong').textContent,
+                    estado: sigueSinUso === 'SI' ? 'SIN USO' : 'CON USO',
+                    obs: sigueSinUso === 'NO' ? "NUEVO USO: " + nuevoUso : "Confirmado sigue sin uso",
+                    validado_ok: true
+                });
+            });
+
+            // Envío final al Apps Script del PDF 
             const payload = {
                 tipo_formulario: "equipamientos",
                 fase: window.EIEL_CONFIG.fase,
@@ -307,7 +377,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify(payload)
             });
 
-            UIProgress.complete(); // [cite: 100-103]
+            UIProgress.complete(); 
             Swal.fire("¡Éxito!", "Justificante enviado a su email.", "success").then(() => {
                 window.location.href = "index.html";
             });
@@ -318,6 +388,7 @@ document.addEventListener("DOMContentLoaded", () => {
             toggleFormFreeze(false);
         }
     };
+    lucide.createIcons();
 });
 </script>
 {% endblock %}
