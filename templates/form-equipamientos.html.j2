@@ -39,24 +39,41 @@
 
     .hidden { display: none !important; }
     textarea.form-input { resize: none; overflow-y: auto; }
+    
+    .btn-mapa-mini {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        text-decoration: none;
+        color: #3b82f6;
+        transition: color 0.2s;
+    }
+    .btn-mapa-mini:hover { color: #1d4ed8; }
+    
+    
 </style>
 
+
 {# --- INSTRUCCIONES --- #}
-<div style="background-color: #eff6ff; ...">
-    <h4 style="..."> ℹ️ Instrucciones </h4>
-    <ul style="margin-top: 0.5rem; padding-left: 1.5rem;"> 
-        <li style="margin-bottom: 0.5rem;"> Si el estado de conservación ha variado, seleccione la nueva opción en el desplegable. </li>
-        <li style="margin-bottom: 0.5rem;"> Use la miniatura para identificar el edificio y el enlace para consultar la ficha oficial en el Geoportal. </li>
+<div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <h4 style="margin: 0 0 0.8rem 0; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+        ℹ️ Instrucciones
+    </h4>
+    <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #1e3a8a; font-size: 0.95rem; line-height: 1.5;">
+        <li style="margin-bottom: 0.5rem;">
+            <strong>Estado:</strong> Si el estado de conservación ha variado, seleccione la nueva opción en el desplegable.
+        </li>
+        <li style="margin-bottom: 0.5rem;">
+            <strong>Documentación:</strong> Use la miniatura para identificar el edificio y el enlace para consultar la ficha oficial en el Geoportal.
+        </li>
     </ul>
 </div>
-
 
 {# --- ACORDEONES DE EQUIPAMIENTOS GENERALES --- #}
 {% for categoria, lista in equipamientos_agrupados.general.items() %}
 <details class="card-accordion">
     <summary class="acc-header">
         <i data-lucide="chevron-right" class="acc-chevron"></i>
-        
         <div class="acc-title-box">
             <i data-lucide="{{ lista[0].icono }}" class="acc-icon"></i>
             <span>{{ categoria }}</span>
@@ -68,18 +85,25 @@
         <table class="data-table" style="font-size: 0.85rem;">
             <thead>
                 <tr>
-                    <th width="12%">Foto</th>
-                    <th width="48%">Denominación</th>
+                    <th width="8%">Foto</th>
+                    <th width="10%">Ubicación</th>
+                    <th width="42%">Denominación</th>
                     <th width="20%">Estado</th>
-                    <th width="20%">Notas</th>
+                    <th width="20%">Observaciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for eq in lista %}
                 <tr class="fila-equip" data-id="{{ eq.cod }}">
                     <td class="text-center">
-                        <img src="{{ eq.url_foto }}" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
-                        <br><a href="{{ eq.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none;">🗺️ Mapa</a>
+                        <img src="{{ eq.url_foto }}" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" 
+                             onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
+                    </td>
+                    <td class="text-center">
+                        <a href="{{ eq.url_visor }}" target="_blank" class="btn-mapa-mini" title="Ver en visor">
+                            <i data-lucide="map-pin" style="width: 16px; margin: 0 auto;"></i>
+                            <span style="font-size: 0.65rem; display: block; font-weight: bold;">Mapa</span>
+                        </a>
                     </td>
                     <td>
                         <div class="nombre-eq" style="font-weight: 600; color: #1e293b;">{{ eq.nombre }}</div>
@@ -88,7 +112,7 @@
                     <td>
                         <div style="display: flex; align-items: center;">
                             <span class="status-dot dot-{{ eq.estado_txt.lower().replace(' ', '').replace('ó', 'o') }}"></span>
-                            <select class="form-select select-estado-eq" data-id="{{ eq.cod }}" style="font-size: 0.8rem; padding: 2px 4px; border-color: #e2e8f0;">
+                            <select class="form-select select-estado-eq" data-id="{{ eq.cod }}" style="font-size: 0.8rem; padding: 2px 4px;">
                                 <option value="Bueno" {% if eq.estado_txt == 'Bueno' %}selected{% endif %}>Bueno</option>
                                 <option value="Regular" {% if eq.estado_txt == 'Regular' %}selected{% endif %}>Regular</option>
                                 <option value="Malo" {% if eq.estado_txt == 'Malo' %}selected{% endif %}>Malo</option>
@@ -112,35 +136,31 @@
     <h3 style="color: #9f1239; display: flex; align-items: center; gap: 10px; margin-bottom: 15px;">
         <i data-lucide="door-closed"></i> Edificios Públicos Sin Uso
     </h3>
-    <p style="font-size: 0.85rem; color: #be123c; margin-bottom: 15px; font-style: italic;">
-        Indique si estos edificios siguen sin actividad o si han pasado a tener un uso concreto.
-    </p>
 
     {% for su in equipamientos_agrupados.sin_uso %}
     <div class="fila-sin-uso card" style="padding: 15px; margin-bottom: 10px; border: 1px solid #fecaca; background: white;" data-id="{{ su.cod }}">
-        <div style="display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;">
-            <div style="text-align: center; flex-shrink: 0;">
-                <img src="{{ su.url_foto }}" style="width: 45px; height: 35px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #ddd;" onclick="Swal.fire({imageUrl: this.src, imageWidth: 800, showConfirmButton: false, background: 'rgba(0,0,0,0.9)', backdrop: true})">
-                <br>
-                <a href="{{ su.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none; font-weight: bold;">🗺️ Mapa</a>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <div style="text-align: center; flex-shrink: 0; width: 60px;">
+                <img src="{{ su.url_foto }}" style="width: 50px; height: 40px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid #eee;"
+                     onclick="Swal.fire({imageUrl: this.src, showConfirmButton: false, background: 'rgba(0,0,0,0.9)'})">
+                <a href="{{ su.url_visor }}" target="_blank" style="font-size: 0.65rem; color: #3b82f6; text-decoration: none; font-weight: bold; display: block; margin-top: 4px;">🗺️ Mapa</a>
             </div>
 
             <div style="flex-grow: 1;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                    <strong style="color: #1e293b; font-size: 1rem;">{{ su.nombre }}</strong>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #1e293b; font-size: 0.95rem;">{{ su.nombre }}</strong>
                     <span class="acc-badge">Cód: {{ su.cod }}</span>
                 </div>
                 
-                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
-                    <label style="font-size: 0.9rem; font-weight: 600; color: #475569;">¿Sigue sin uso?</label>
-                    <select class="form-select select-sin-uso" data-id="{{ su.cod }}" style="width: auto; padding: 4px 10px;" 
+                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap; margin-top: 8px;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: #475569;">¿Sigue sin uso?</label>
+                    <select class="form-select select-sin-uso" data-id="{{ su.cod }}" style="width: auto; padding: 2px 8px; font-size: 0.85rem;" 
                             onchange="this.value === 'NO' ? document.getElementById('box_uso_{{su.cod}}').classList.remove('hidden') : document.getElementById('box_uso_{{su.cod}}').classList.add('hidden')">
-                        <option value="SI">SÍ, continúa sin uso</option>
-                        <option value="NO">NO, ya tiene un uso</option>
+                        <option value="SI">SÍ</option>
+                        <option value="NO">NO (Ya tiene uso)</option>
                     </select>
-                    
                     <div id="box_uso_{{su.cod}}" class="hidden" style="flex: 1; min-width: 200px;">
-                        <input type="text" class="form-input txt-nuevo-uso" placeholder="Indique el nuevo uso..." style="font-size: 0.85rem;">
+                        <input type="text" class="form-input txt-nuevo-uso" placeholder="¿Qué uso tiene actualmente?" style="font-size: 0.85rem; padding: 4px 8px;">
                     </div>
                 </div>
             </div>
