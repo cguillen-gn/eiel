@@ -255,7 +255,7 @@ def obtener_equipamientos(conn, mun):
     # Mapeo de iconos de Lucide para cada categoría
     iconos = {
         'CASA CONSISTORIAL': 'landmark', 'CENTRO CULTURAL': 'library', 'CENTRO ASISTENCIAL': 'heart-pulse',
-        'CENTRO ENSEÑANZA': 'graduation-cap', 'CENTRO SANITARIO': 'hospital', 'EDIFICIO SIN USO': 'ghost',
+        'CENTRO ENSEÑANZA': 'graduation-cap', 'CENTRO SANITARIO': 'hospital', 'EDIFICIO SIN USO': 'door-closed',
         'INSTALACIÓN DEPORTIVA': 'volleyball', 'MERCADO/LONJA': 'shopping-cart', 'PARQUE': 'tree-pine',
         'PROTECCIÓN CIVIL': 'shield-alert', 'TANATORIO': 'flower-2'
     }
