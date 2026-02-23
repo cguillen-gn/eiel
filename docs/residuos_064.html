@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Recogida de residuos</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        window.EIEL_CONFIG = {
+            muniCode: "064",
+            muniName: "Dolores",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwzQa0hgd1voKn0NvgVWASHqjtpiRhLylnX2wLxGG1ijPk_0pDpW_uSygO_Y4nkJkac/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+            // Verifica si existen avisos personalizados para la validación de observaciones
+            hasAvisos: false
+        };
+
+        // 2. FUNCIONES GLOBALES (Accesibles desde el HTML)
+        function logout() {
+            // Limpia toda la sesión y datos del técnico por seguridad
+            localStorage.clear(); 
+            window.location.href = "index.html";
+        }
+        
+        // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
+        function toggleFormFreeze(isFrozen) {
+            // Seleccionamos todos los elementos interactivos del formulario
+            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
+            const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
+            const elements = document.querySelectorAll(selectors);
+            
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                // Efecto visual de "congelado"
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                if (isFrozen) {
+                    el.style.pointerEvents = "none"; 
+                } else {
+                    el.style.pointerEvents = "auto";
+                }
+            });
+
+            // Ajuste específico para el botón enviar para mantener el cursor de espera
+            const btnEnviar = document.getElementById('btnEnviar');
+            if (btnEnviar && isFrozen) {
+                btnEnviar.style.cursor = "wait";
+            } else if (btnEnviar) {
+                btnEnviar.style.cursor = "pointer";
+            }
+        }
+        
+    </script>
+   
+    
+</head>
+<body>
+
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">
+                    
+    Fase 2026
+
+                </span>
+            </div>
+        
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">
+                ⭠ Volver al listado de formularios
+            </a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header">
+                ♻️
+            </div>
+            <div class="title-header">
+                <h2>Recogida de residuos</h2>
+                <p class="subtitle">Dolores (Código: 064)</p>
+            </div>
+        </div>
+
+        
+
+
+
+<div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 1.2rem; border-radius: 4px; margin-bottom: 20px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <h4 style="margin: 0 0 0.8rem 0; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+        ℹ️ Instrucciones
+    </h4>
+    <ul style="margin: 0 0 0 1.5rem; padding: 0; list-style-type: disc; color: #1e3a8a; font-size: 0.95rem; line-height: 1.5;">
+        <li style="margin-bottom: 0.5rem;">
+            Rellene los datos requeridos acerca de recogida de residuos y limpieza viaria. Si no dispone de algún dato, indíquelo en en apartado de <strong>Observaciones</strong>.
+        </li>
+    </ul>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <h2 class="section-title" style="color: var(--theme-residuos);">🗑️ Recogida de Residuos - Año 2025</h2>
+    
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">TIPO DE RESIDUO</th>
+                    <th style="width: 15%;">PRODUCCIÓN (T/AÑO)</th>
+                    <th style="width: 15%;">Nº CONTENEDORES</th>
+                    <th style="width: 20%;">PERIODICIDAD</th>
+                    <th style="width: 25%;">DESTINO</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="label-caps">🟡 Plásticos y Envases</td>
+                    <td><input type="number" id="prod_plastico" class="form-input" placeholder="t/año" step="any"></td>
+                    <td><input type="number" id="cont_plastico" class="form-input" placeholder="0"></td>
+                    <td>
+                        <select id="period_plastico" class="form-select select-periodicidad">
+                            <option value="">Seleccionar...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="dias alternos">Días alternos</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="otros">Otros</option>
+                            <option value="sin periodicidad">Sin periodicidad</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="dest_plastico" class="form-input" placeholder="Vertedero/Planta"></td>
+                </tr>
+
+                <tr>
+                    <td class="label-caps">🔵 Papel y Cartón</td>
+                    <td><input type="number" id="prod_papel" class="form-input" placeholder="t/año" step="any"></td>
+                    <td><input type="number" id="cont_papel" class="form-input" placeholder="0"></td>
+                    <td>
+                        <select id="period_papel" class="form-select select-periodicidad">
+                            <option value="">Seleccionar...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="dias alternos">Días alternos</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="otros">Otros</option>
+                            <option value="sin periodicidad">Sin periodicidad</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="dest_papel" class="form-input" placeholder="Vertedero/Planta"></td>
+                </tr>
+
+                <tr>
+                    <td class="label-caps">🟢 Vidrio</td>
+                    <td><input type="number" id="prod_vidrio" class="form-input" placeholder="t/año" step="any"></td>
+                    <td><input type="number" id="cont_vidrio" class="form-input" placeholder="0"></td>
+                    <td>
+                        <select id="period_vidrio" class="form-select select-periodicidad">
+                            <option value="">Seleccionar...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="dias alternos">Días alternos</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="otros">Otros</option>
+                            <option value="sin periodicidad">Sin periodicidad</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="dest_vidrio" class="form-input" placeholder="Vertedero/Planta"></td>
+                </tr>
+
+                <tr>
+                    <td class="label-caps">🟤 Orgánico</td>
+                    <td><input type="number" id="prod_organico" class="form-input" placeholder="t/año" step="any"></td>
+                    <td><input type="number" id="cont_organico" class="form-input" placeholder="0"></td>
+                    <td>
+                        <select id="period_organico" class="form-select select-periodicidad">
+                            <option value="">Seleccionar...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="dias alternos">Días alternos</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="otros">Otros</option>
+                            <option value="sin periodicidad">Sin periodicidad</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="dest_organico" class="form-input" placeholder="Vertedero/Planta"></td>
+                </tr>
+
+                <tr>
+                    <td class="label-caps">⚫ No selectiva/resto</td>
+                    <td><input type="number" id="prod_resto" class="form-input" placeholder="t/año" step="any"></td>
+                    <td><input type="number" id="cont_resto" class="form-input" placeholder="0"></td>
+                    <td>
+                        <select id="period_resto" class="form-select select-periodicidad">
+                            <option value="">Seleccionar...</option>
+                            <option value="diaria">Diaria</option>
+                            <option value="dias alternos">Días alternos</option>
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal">Quincenal</option>
+                            <option value="otros">Otros</option>
+                            <option value="sin periodicidad">Sin periodicidad</option>
+                        </select>
+                    </td>
+                    <td><input type="text" id="dest_resto" class="form-input" placeholder="Vertedero/Planta"></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <h2 class="section-title" style="color: var(--theme-residuos);">🧹 Limpieza Viaria</h2>
+    <div class="form-group">
+        <label for="personasLimpieza" class="form-label">
+            Número de personas dedicadas a la limpieza viaria
+        </label>
+        <input type="number" id="personasLimpieza" class="form-input" placeholder="Ej: 5" min="0" style="max-width: 300px;">
+    </div>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <h2 class="section-title" style="color: var(--theme-residuos);">📝 Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+
+
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <h2 class="section-title" style="color: var(--theme-residuos);">🗂️ Documentación Adjunta (Opcional)</h2>
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()" style="border: 2px dashed #94a3b8; padding: 2rem; text-align: center; cursor: pointer; border-radius: 8px;">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📎</div>
+        <div style="font-weight: 600;">Haga clic para adjuntar archivos</div>
+        <p style="font-size: 0.9rem; color: #666;">(Tablas, informes,...)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <h2 class="section-title" style="color: var(--theme-residuos);">👤 Datos de Contacto</h2>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
+    </div>
+</div>
+
+
+<div class="card" style="border-left: 4px solid var(--theme-residuos);">
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <label style="display: flex; gap: 10px; cursor: pointer; align-items: flex-start;">
+            <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 2px; cursor: pointer;">
+            <span style="font-size: 0.95rem; color: #334155; line-height: 1.4;">
+                <strong>Declaración de veracidad:</strong> Como responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
+            </span>
+        </label>
+    </div>
+
+<div id="progressContainer" style="display: none; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+        <span id="progressText" style="font-size: 0.85rem; font-weight: 600; color: #475569;">Preparando envío...</span>
+        <span id="progressPercentage" style="font-size: 0.85rem; font-weight: 700; color: var(--theme-residuos);">0%</span>
+    </div>
+    <div style="width: 100%; background-color: #e2e8f0; border-radius: 999px; height: 10px; overflow: hidden;">
+        <div id="progressBar" style="width: 0%; height: 100%; background-color: var(--theme-residuos); transition: width 0.4s ease; border-radius: 999px;"></div>
+    </div>
+</div>
+    
+<button id="btnEnviar" class="btn btn-primary btn-residuos" disabled style="opacity: 0.6; cursor: not-allowed;">
+        Enviar Datos
+</button>
+    
+    <div id="mensaje" class="message"></div>
+</div>
+
+<style>
+
+    .select-periodicidad { 
+        color: #94a3b8 !important; /* Solo la palabra en gris por defecto */
+        border: 1px solid #cbd5e1 !important; /* Borde con color normal constante */
+        background-color: #ffffff !important;
+        
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23334155' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+        background-repeat: no-repeat !important;
+        background-position: right 0.75rem center !important;
+        background-size: 16px 12px !important;
+        appearance: none !important; /* Quitamos la flecha del sistema */
+        padding-right: 2.5rem !important;
+    }
+    
+    .select-periodicidad option {
+        color: #1e293b !important;
+        font-weight: normal !important;
+    }
+
+    .select-periodicidad.has-value { 
+        color: #1e293b !important; /* Texto pasa a negro/azul oscuro */
+        font-weight: normal !important;
+        border-color: #cbd5e1 !important;
+    }
+    
+    .select-periodicidad:focus {
+        border-color: var(--theme-residuos) !important;
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+    }
+    
+    .residuo-label {
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    vertical-align: middle;
+}
+    
+
+</style>
+
+
+    </main>
+
+    <footer class="site-footer" style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // A. VALIDACIÓN DE SESIÓN DEL MUNICIPIO
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            const muniName = localStorage.getItem("eiel_muni_name");
+
+            if (!muniCode) {
+                console.warn("Acceso no autorizado. Redirigiendo al login...");
+                window.location.href = "index.html";
+                return;
+            }
+
+            // Actualizamos el nombre del municipio en la cabecera
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = muniName || "Municipio";
+
+            // B. AUTOCOMPLETADO Y PERSISTENCIA PROACTIVA
+            const fieldsMap = {
+                "contactoNombre": "eiel_user_name",
+                "contactoEmail": "eiel_user_email",
+                "contactoDepartamento": "eiel_user_dept"
+            };
+
+            // 1. Rellenar campos si ya existen datos guardados
+            Object.keys(fieldsMap).forEach(id => {
+                const savedValue = localStorage.getItem(fieldsMap[id]);
+                const inputEl = document.getElementById(id);
+                
+                if (savedValue && inputEl) {
+                    inputEl.value = savedValue;
+                    // Caso especial: Sincronizar campo de confirmación de email
+                    if (id === "contactoEmail") {
+                        const confirmEl = document.getElementById("contactoEmailConfirm");
+                        if (confirmEl) confirmEl.value = savedValue;
+                    }
+                }
+            });
+
+            // 2. Guardar datos en tiempo real mientras el técnico escribe (Escucha Activa)
+            Object.keys(fieldsMap).forEach(id => {
+                const inputEl = document.getElementById(id);
+                if (inputEl) {
+                    inputEl.addEventListener('input', (e) => {
+                        localStorage.setItem(fieldsMap[id], e.target.value.trim());
+                    });
+                }
+            });
+        });
+    </script>
+
+    
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    
+    // 1. SETUP DE ESTILOS
+    const header = document.querySelector('.site-header');
+    if(header) header.classList.add('header-residuos');
+    
+    // Lógica para cambiar el color de la periodicidad al seleccionar
+    document.querySelectorAll('.select-periodicidad').forEach(select => {
+        // Aplicar color si ya viene con valor (por si el formulario se recarga)
+        if (select.value !== "") select.classList.add('has-value');
+
+        select.addEventListener('change', function() {
+            if (this.value !== "") {
+                this.classList.add('has-value');
+            } else {
+                this.classList.remove('has-value');
+            }
+        });
+    });
+        
+    
+
+    // 2. CONFIGURACIÓN GLOBAL
+    window.EIEL_CONFIG = {
+        muniCode: "064",
+        muniName: "Dolores",
+        fase: "2026",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwzQa0hgd1voKn0NvgVWASHqjtpiRhLylnX2wLxGG1ijPk_0pDpW_uSygO_Y4nkJkac/exec",
+        urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+        urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+        hasAvisos: false,
+        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+    };
+
+    // 3. INICIALIZACIÓN UI
+    // 3.1 Marcado visual de obligatoriedad en observaciones
+    if (window.EIEL_CONFIG.hasAvisos) {
+        const labelObs = document.querySelector("label[for='observaciones']");
+        if (labelObs) {
+            labelObs.innerHTML += " <span style='color:#ef4444; font-weight:bold;'>(* Obligatorio por requerimiento)</span>";
+        }
+    }
+
+    // 3.2 Mapeo de campos Residuos
+    const RESIDUO_FIELDS = [
+      { type: "Plásticos y Envases (amarillo)", prod: "prod_plastico", cont: "cont_plastico", period: "period_plastico", dest: "dest_plastico" },
+      { type: "Papel y Cartón (azul)", prod: "prod_papel", cont: "cont_papel", period: "period_papel", dest: "dest_papel" },
+      { type: "Vidrio (verde)", prod: "prod_vidrio", cont: "cont_vidrio", period: "period_vidrio", dest: "dest_vidrio" },
+      { type: "Orgánico (marrón)", prod: "prod_organico", cont: "cont_organico", period: "period_organico", dest: "dest_organico" },
+      { type: "No selectiva/resto", prod: "prod_resto", cont: "cont_resto", period: "period_resto", dest: "dest_resto" },
+    ];
+
+    // 4. SERVICIOS Y UTILIDADES DE UI
+    const UIProgress = {
+    container: document.getElementById("progressContainer"),
+    bar: document.getElementById("progressBar"),
+    text: document.getElementById("progressText"),
+    percent: document.getElementById("progressPercentage"),
+    //Variable para recordar el punto más alto alcanzado
+    maxReached: 0, 
+
+    show(totalTasks) {
+        this.maxReached = 0; // Reiniciamos al empezar
+        if (this.container) this.container.style.display = 'block';
+        this.update(0, totalTasks, "Iniciando envío...");
+    },
+
+    update(completed, total, message) {
+        const msg = message.toLowerCase();
+        // Detectamos si es el paso del registro o PDF
+        const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
+        
+        let targetPercentage = 0;
+        if (total > 0) {
+            const fileWeight = 90 / total;
+            targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+        } else {
+            targetPercentage = isFinalStep ? 95 : 0;
+        }
+
+        // --- EL BLOQUEO DE SEGURIDAD ---
+        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
+        if (targetPercentage > this.maxReached) {
+            this.maxReached = targetPercentage;
+            if (this.bar) this.bar.style.width = this.maxReached + "%";
+            if (this.percent) this.percent.textContent = this.maxReached + "%";
+        }
+        
+        // El texto sí lo actualizamos siempre para dar feedback constante
+        if (this.text && message) this.text.textContent = message;
+    },
+
+    complete() {
+        this.maxReached = 100;
+        if (this.bar) {
+            this.bar.style.width = "100%";
+            this.bar.style.backgroundColor = "#22c55e"; // Color de éxito
+        }
+        if (this.percent) this.percent.textContent = "100%";
+        if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito!";
+    }
+    };
+
+    const UploadService = {
+        toBase64: file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        }),
+
+        async uploadFile(file, tipoFicha, muniCode, seccion = "DOCUMENTACION", idEnvio) {
+            try {
+                const base64 = await this.toBase64(file);
+                const userEmail = document.getElementById("contactoEmail").value || "anonimo";
+                const payload = {
+                    filename: file.name,
+                    mimeType: file.type,
+                    bytesBase64: base64, 
+                    municipio: muniCode,
+                    usuario: userEmail,
+                    tipo: tipoFicha,
+                    seccion: seccion,
+                    id_envio: idEnvio
+                };
+                await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                return true;
+            } catch (e) { return false; }
+        }
+    };
+
+    // 5. GESTIÓN DE ARCHIVOS (UI)
+    let archivos = [];
+    const fileInput = document.getElementById("fileInput");
+    const fileList = document.getElementById("fileList");
+
+    if (fileInput) {
+        fileInput.onchange = () => {
+            archivos.push(...Array.from(fileInput.files));
+            renderArchivos();
+            fileInput.value = '';
+        };
+    }
+
+    window.eliminarArchivo = (i) => {
+        archivos.splice(i, 1);
+        renderArchivos();
+    };
+
+    function renderArchivos() {
+        if (!fileList) return;
+        if (archivos.length === 0) {
+            fileList.innerHTML = '';
+            return;
+        }
+        fileList.innerHTML = archivos.map((f, i) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border);">
+                <span>📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger" style="background:none; border:none; color:red; cursor:pointer;">✖</button>
+            </div>
+        `).join("");
+    }
+
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
+    const mensajeDiv = document.getElementById("mensaje");
+
+    function mostrarMensaje(texto, tipo) {
+        if(!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`;
+        mensajeDiv.style.display = 'block';
+    }
+
+    // 6.1 Checkbox Habilitador
+    if (checkConformidad && btnEnviar) {
+        checkConformidad.addEventListener('change', function() {
+            if (this.checked) {
+                btnEnviar.disabled = false;
+                btnEnviar.style.opacity = "1";
+                btnEnviar.style.cursor = "pointer";
+            } else {
+                btnEnviar.disabled = true;
+                btnEnviar.style.opacity = "0.6";
+                btnEnviar.style.cursor = "not-allowed";
+            }
+        });
+    }
+
+    // 6.2 Listener Principal de Envío
+        if (btnEnviar) {
+            btnEnviar.addEventListener("click", async () => {
+                // A. Preparación y Bloqueo UI
+                // Generamos el ID único del expediente al principio
+                const idBatch = "ENVIO_" + new Date().getTime();
+                
+                // Congelamos el formulario para garantizar la integridad de los datos durante el envío
+                toggleFormFreeze(true);
+
+                // B. Lectura de Variables
+                const nombreContacto = document.getElementById("contactoNombre").value.trim();
+                const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
+                const emailContacto = document.getElementById("contactoEmail").value.trim();
+                const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+                const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto; 
+                const obsField = document.getElementById("observaciones");
+                const obsValue = obsField.value.trim();
+                const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+                // C. Validaciones
+                    // 1: Identidad 
+                    if (nombreContacto.length < 2) {
+                        mostrarMensaje("⚠️ El nombre es demasiado corto (mín. 2 caracteres).", "warning");
+                        toggleFormFreeze(false); // Desbloqueamos para permitir corrección
+                        return;
+                    }
+                    if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                        mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                        toggleFormFreeze(false);
+                        return;
+                    }
+
+                    // 2: Requerimiento de Observaciones (Avisos pendientes)
+                    if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                        mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 caracteres) por requerimientos pendientes.", "error");
+                        obsField.focus(); 
+                        toggleFormFreeze(false);
+                        return;
+                    }
+
+                    // 3: Verificación de Contenedores (Aviso no bloqueante)
+                    let hayCeros = false;
+                    document.querySelectorAll('input[id^="cont_"]').forEach(input => {
+                        if (parseInt(input.value) === 0) hayCeros = true;
+                    });
+                    if (hayCeros) {
+                        // Nota: Es un aviso, no bloquea el envío, por lo que no hacemos return
+                        mostrarMensaje("ℹ️ Ha indicado 0 en algún campo de contenedores. Si es correcto (ej: recogida puerta a puerta), recuerde mencionarlo en Observaciones.", "warning");
+                    }
+                    
+                    // 4: Persistencia de datos del técnico (Memoria proactiva)
+                    localStorage.setItem("eiel_user_name", nombreContacto);
+                    localStorage.setItem("eiel_user_email", emailContacto);
+                    localStorage.setItem("eiel_user_dept", departamentoVal);
+
+                // D. Subida de Archivos a Google Drive
+                const totalArchivos = archivos.length;
+                let completados = 0;
+                UIProgress.show(totalArchivos);
+
+                if (totalArchivos > 0) {
+                    const promesasSubida = archivos.map(file => 
+                        UploadService.uploadFile(file, 'residuos', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch)
+                        .then(res => {
+                            completados++;
+                            UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
+                            return res;
+                        })
+                    );
+                    await Promise.all(promesasSubida);
+                }
+
+                // E. Recopilación de Datos para el Registro
+                UIProgress.update(completados, totalArchivos, "Enviando datos y generando justificante PDF...");
+
+                    // 1: Procesamiento de la tabla de residuos
+                    const residuosData = RESIDUO_FIELDS.map(r => {
+                        let prodVal = document.getElementById(r.prod).value.replace(',', '.'); 
+                        return {
+                            tipo: r.type,
+                            produccion: parseFloat(prodVal) || 0,
+                            contenedores: document.getElementById(r.cont).value || "0",
+                            periodicidad: document.getElementById(r.period).value || "N/A",
+                            destino: document.getElementById(r.dest).value || "N/A"
+                        };
+                    });
+
+                    // 2: Preparación del Payload
+                    const payload = {
+                        tipo_formulario: "residuos",
+                        fase: window.EIEL_CONFIG.fase,
+                        id_envio: idBatch,
+                        residuos_data: JSON.stringify(residuosData),
+                        personas_limpieza: document.getElementById("personasLimpieza").value || "N/A",
+                        observaciones: obsValue,
+                        nombre_contacto: nombreContacto,
+                        departamento_contacto: departamentoVal,
+                        email_contacto: emailContacto,
+                        municipio_codigo: window.EIEL_CONFIG.muniCode,
+                        municipio_nombre: window.EIEL_CONFIG.muniName,
+                        timestamp_envio: new Date().toISOString(),
+                        archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                    };
+
+                // F. Registro y Envío de PDF
+                try {
+                    await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                        method: "POST",
+                        mode: "no-cors",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // G. Finalización y Limpieza
+                    UIProgress.complete();
+                    if(mensajeDiv) mensajeDiv.style.display = 'none';
+
+                    // Reset de variables y UI
+                    archivos = [];
+                    renderArchivos(); 
+
+                    document.querySelectorAll("input, select, textarea").forEach(el => {
+                       if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                       if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                    });
+
+                    if(checkConformidad) checkConformidad.checked = false;
+                    
+                    // Deshabilitar botón tras envío exitoso
+                    btnEnviar.disabled = true;
+                    btnEnviar.style.opacity = "0.6";
+                    btnEnviar.style.cursor = "not-allowed";
+
+                } catch (error) {
+                    console.error(error);
+                    mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                    // En caso de error, liberamos el formulario para permitir reintento
+                    toggleFormFreeze(false);
+                }
+            });
+        }
+});
+</script>
+
+
+    
+    <script>
+    (function() {
+        // No registrar accesos si se abre el archivo localmente
+        if (window.location.protocol === 'file:') return;
+
+        const payload = {
+            municipio: "Dolores",
+            codigo: "064",
+            fase: "2026",
+            tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+            ua: navigator.userAgent,
+            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
+            contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
+            departamento: localStorage.getItem("eiel_user_dept") || "N/A",
+            email: localStorage.getItem("eiel_user_email") || "N/A" 
+        };
+
+        // Envío al Apps Script de Logs si la URL está configurada en Python
+        if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
+            fetch(window.EIEL_CONFIG.urlLogger, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(payload)
+            });
+        }
+    })();
+    </script>
+</body>
+</html>
