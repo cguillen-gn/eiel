@@ -26513,7 +26513,7 @@
         </div>
     </div>
 
-    <button id="btnEnviar" class="btn btn-primary" onclick="enviarEquipamientos()" disabled>
+    <button id="btnEnviar" class="btn btn-primary" disabled>
         Enviar Datos
     </button>
 </div>
@@ -26736,22 +26736,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 6. LA FUNCIÓN DE ENVÍO (MÁXIMA PRIORIDAD) ---
     // La definimos como una función global (window) para que el 'onclick' del HTML la encuentre
-    window.enviarEquipamientos = async function() {
-        const nombre = document.getElementById("contactoNombre").value.trim();
-        const email = document.getElementById("contactoEmail").value.trim();
-        const emailConfirm = document.getElementById("contactoEmailConfirm").value.trim();
-        const depto = document.getElementById("contactoDepartamento").value.trim();
-        const obsGenerales = document.getElementById("observaciones").value.trim();
+    if (btnEnviar) {
+        btnEnviar.addEventListener("click", async () => {
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConfirm = document.getElementById("contactoEmailConfirm").value.trim();
+            const depto = document.getElementById("contactoDepartamento").value.trim();
+            const obsGenerales = document.getElementById("observaciones").value.trim();
 
-        // Validaciones básicas de contacto 
-        if (!nombre || !email || email !== emailConfirm) {
-            Swal.fire("Error", "Verifique los datos de contacto y que el email coincida.", "error");
-            return;
-        }
+            if (!nombre || !email || email !== emailConfirm) {
+                mostrarMensaje("⚠️ Verifique los datos de contacto y que el email coincida.", "error");
+                return;
+            }
 
-        const idEnvio = "EXP_E_" + new Date().getTime(); 
-        toggleFormFreeze(true); // Congelamos el formulario como en Obras
-        UIProgress.show(archivosAdjuntos.length);
+            const idEnvio = "EXP_E_" + new Date().getTime(); 
+            toggleFormFreeze(true);
+            UIProgress.show(archivosAdjuntos.length);
 
         try {
             // Subida de archivos 
@@ -26812,6 +26812,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 archivos_adjuntos: nombresArchivos.join("\n")
             };
 
+            // F. Registro y Envío de PDF
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
                 mode: "no-cors",
@@ -26819,34 +26820,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify(payload)
             });
 
-            // G. Finalización y Limpieza
+            // G. Finalización y Limpieza (SIN VOLVER AL INDEX)
             UIProgress.complete();
 
-            // 1. Limpieza de memoria y UI de archivos
             archivosAdjuntos = [];
             renderFiles(); 
 
-            // 2. Limpieza de todos los campos de texto y selectores
             document.querySelectorAll("input, select, textarea").forEach(el => {
                 if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                 if(el.tagName === 'SELECT') el.selectedIndex = 0;
             });
 
-            // 3. Reset de conformidad y botón
-            if(checkConf) checkConf.checked = false;
+            if(checkConformidad) checkConformidad.checked = false;
             btnEnviar.disabled = true;
 
-            // Redirección opcional tras unos segundos para que vean el mensaje de éxito
-            setTimeout(() => {
-                window.location.href = "index.html";
-            }, 4000);
+
 
         } catch (error) {
-            console.error(error);
-            Swal.fire("Error", "Error en el proceso: " + error.message, "error");
-            toggleFormFreeze(false);
-        }
-    };
+                console.error(error);
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                toggleFormFreeze(false);
+            }
+        });
+    }
+    
     lucide.createIcons();
     
     // Función para ampliar imágenes
