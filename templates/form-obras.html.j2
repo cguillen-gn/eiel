@@ -137,18 +137,29 @@
 {% if avisos_personalizados and avisos_personalizados|length > 0 %}
 <div class="card card-requerimientos">
     <div class="requerimientos-content">
-        <h4 class="requerimientos-title">⚠️ Otra información solicitada</h4>
-        <p class="requerimientos-intro">
-            Se ha detectado falta de información o incidencias en las <strong>Obras</strong>. Por favor, responda en <strong>Observaciones</strong>.
+        {# Título con formato estándar y nuevo icono Lucide [cite: 2, 27] #}
+        <h2 class="section-title">
+            <i data-lucide="square-plus"></i> Otra información solicitada
+        </h2>
+        
+        {# Introducción con formato de ayuda estándar [cite: 18, 23] #}
+        <p class="form-help" style="margin-bottom: 1.5rem;">
+            Se ha detectado falta de información o incidencias en las <strong>Obras</strong> que requieren su atención en el apartado de observaciones. 
         </p>
-        <ul class="requerimientos-list">
+
+        <ul class="requerimientos-list" style="list-style: none; padding: 0;">
             {% for aviso in avisos_personalizados %}
-                <li class="requerimiento-item-box prioridad-{{ 'alta' if aviso.prioridad == 'alta' else 'media' }}">
-                    <span class="requerimiento-icon">{{ '🔴' if aviso.prioridad == 'alta' else '🔸' }}</span>
+                <li class="requerimiento-item-box">
+                    {# Icono de prioridad con color dinámico  #}
+                    <span class="requerimiento-icon">
+                        <i data-lucide="minus" 
+                           class="{{ 'icon-alta' if aviso.prioridad == 'alta' else 'icon-normal' }}"
+                           style="width: 20px; height: 20px;"></i>
+                    </span>
                     <div class="requerimiento-content-text">
-                        <span class="requerimiento-msg">{{ aviso.mensaje }}</span>
+                        <span class="form-text">{{ aviso.mensaje }}</span>
                         {% if aviso.url %}
-                            <a href="{{ aviso.url }}" target="_blank" class="btn-geoportal">
+                            <a href="{{ aviso.url }}" target="_blank" class="btn-geoportal" style="margin-top: 5px; display: inline-flex;">
                                 <i data-lucide="globe"></i> Ver en Geoportal
                             </a>
                         {% endif %}
@@ -215,11 +226,14 @@
         </div>
     </div>
 
+    
+    <div id="mensaje" class="message"></div>
+    
     <button id="btnEnviar" class="btn btn-primary btn-obras" disabled>
         Enviar Datos
     </button>
     
-    <div id="mensaje" class="message"></div>
+    
 </div>
 
 <input type="file" id="hiddenFileInput" multiple style="display: none;">
@@ -482,9 +496,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function mostrarMensaje(texto, tipo) {
         if(!mensajeDiv) return;
-        mensajeDiv.textContent = texto; 
+        mensajeDiv.textContent = texto;
+        // Limpiamos clases previas y aplicamos las nuevas
         mensajeDiv.className = `message ${tipo}`; 
         mensajeDiv.classList.remove('hidden');
+        // Scroll automático al mensaje para que el usuario lo vea
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     // 6.1 Checkbox Habilitador
@@ -525,23 +542,28 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // 2: Estados e Integridad de Obras Oficiales
-            const selects = document.querySelectorAll(".select-estado");
-            let obrasSinEstado = [];
-            let obrasFiSinDocs = [];
-
+            let errores = [];
             selects.forEach(select => {
-                const obraId = select.dataset.obraId;
                 const clave = select.dataset.clave;
+                const obraId = select.dataset.obraId;
                 const requiereDoc = select.dataset.requiereDoc === "true";
 
                 if (!select.value) {
-                    obrasSinEstado.push(clave);
+                    errores.push(`Falta seleccionar el estado en la obra ${clave}`);
                 }
                 if (select.value === 'Finalizada' && requiereDoc && !(colaAdjuntos[obraId]?.length > 0)) {
-                    obrasFiSinDocs.push(clave);
+                    // Si no hay documentos en una finalizada, obligamos a explicar en observaciones
+                    if (obsValue.length < 15) {
+                        errores.push(`La obra ${clave} está finalizada sin documentos. Debe justificarlo en Observaciones (mín. 15 car.)`);
+                    }
                 }
             });
 
+            if (errores.length > 0) {
+                mostrarMensaje("⚠️ " + errores[0], "error"); // Mostramos el primer error detectado
+                toggleFormFreeze(false);
+                return;
+            }
             // 3: Requerimiento de Observaciones (Incluye avisos y validaciones de tabla)
             const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
             if (requiereObs && obsValue.length < 15) {

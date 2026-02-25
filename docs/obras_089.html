@@ -3037,11 +3037,14 @@
         </div>
     </div>
 
+    
+    <div id="mensaje" class="message"></div>
+    
     <button id="btnEnviar" class="btn btn-primary btn-obras" disabled>
         Enviar Datos
     </button>
     
-    <div id="mensaje" class="message"></div>
+    
 </div>
 
 <input type="file" id="hiddenFileInput" multiple style="display: none;">
@@ -3359,9 +3362,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function mostrarMensaje(texto, tipo) {
         if(!mensajeDiv) return;
-        mensajeDiv.textContent = texto; 
+        mensajeDiv.textContent = texto;
+        // Limpiamos clases previas y aplicamos las nuevas
         mensajeDiv.className = `message ${tipo}`; 
         mensajeDiv.classList.remove('hidden');
+        // Scroll automático al mensaje para que el usuario lo vea
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     // 6.1 Checkbox Habilitador
@@ -3402,23 +3408,28 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // 2: Estados e Integridad de Obras Oficiales
-            const selects = document.querySelectorAll(".select-estado");
-            let obrasSinEstado = [];
-            let obrasFiSinDocs = [];
-
+            let errores = [];
             selects.forEach(select => {
-                const obraId = select.dataset.obraId;
                 const clave = select.dataset.clave;
+                const obraId = select.dataset.obraId;
                 const requiereDoc = select.dataset.requiereDoc === "true";
 
                 if (!select.value) {
-                    obrasSinEstado.push(clave);
+                    errores.push(`Falta seleccionar el estado en la obra ${clave}`);
                 }
                 if (select.value === 'Finalizada' && requiereDoc && !(colaAdjuntos[obraId]?.length > 0)) {
-                    obrasFiSinDocs.push(clave);
+                    // Si no hay documentos en una finalizada, obligamos a explicar en observaciones
+                    if (obsValue.length < 15) {
+                        errores.push(`La obra ${clave} está finalizada sin documentos. Debe justificarlo en Observaciones (mín. 15 car.)`);
+                    }
                 }
             });
 
+            if (errores.length > 0) {
+                mostrarMensaje("⚠️ " + errores[0], "error"); // Mostramos el primer error detectado
+                toggleFormFreeze(false);
+                return;
+            }
             // 3: Requerimiento de Observaciones (Incluye avisos y validaciones de tabla)
             const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
             if (requiereObs && obsValue.length < 15) {

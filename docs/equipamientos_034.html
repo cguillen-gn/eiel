@@ -2697,6 +2697,8 @@
         </div>
     </div>
 
+    <div id="mensaje" class="message"></div>
+    
     <button id="btnEnviar" class="btn btn-primary" disabled>
         Enviar Datos
     </button>
@@ -2782,7 +2784,9 @@ document.addEventListener("DOMContentLoaded", () => {
         fase: "2026",
         urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyKQeYTPaZYZ-6lLSm2zocnjTAzNGwDuuOMA4NNJx7TncmvII8p6Y_ylVEmvDUCa07C/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
-        urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec"
+        urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+        hasAvisos: false,
+        yearActual: new Date().getFullYear()
     };
 
     // 3. SELECTOR ESTADOS
@@ -2830,24 +2834,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- 5. ACTIVACIÓN DEL BOTÓN DE ENVÍO ---
     const btnEnviar = document.getElementById("btnEnviar");
-    const checkConf = document.getElementById("checkConformidad");
+    const checkConformidad = document.getElementById("checkConformidad");
 
-    if (checkConf && btnEnviar) {
-        checkConf.addEventListener('change', function() {
+    if (checkConformidad && btnEnviar) {
+        checkConformidad.addEventListener('change', function() {
             btnEnviar.disabled = !this.checked;
         });
     }
     
-    // Bloqueo del formulario para evitar múltiples clics
-    const toggleFormFreeze = (freeze) => {
-        const btn = document.getElementById("btnEnviar");
-        if (btn) btn.disabled = freeze;
-        document.querySelectorAll('input, select, textarea, button').forEach(el => {
-            el.style.pointerEvents = freeze ? 'none' : 'auto';
-            if(freeze) el.style.opacity = "0.7";
-            else el.style.opacity = "1";
-        });
-    };
 
     // Control visual de la barra de progreso
     const UIProgress = {
@@ -2901,17 +2895,34 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Servicio de subida de archivos (Ajustar según tu backend)
     const UploadService = {
-        uploadFile: async (file, tipo, muni, cat, id) => {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('muni', muni);
-            formData.append('id_envio', id);
-            
-            return fetch(window.EIEL_CONFIG.urlAdjuntos, {
-                method: 'POST',
-                mode: 'no-cors', // Ajustar según configuración de CORS
-                body: formData
-            });
+        toBase64: file => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = error => reject(error);
+        }),
+
+        async uploadFile(file, tipoFicha, muniCode, seccion = "GENERAL", idEnvio) {
+            try {
+                const base64 = await this.toBase64(file);
+                const userEmail = document.getElementById("contactoEmail").value || "anonimo";
+                const payload = {
+                    filename: file.name,
+                    mimeType: file.type,
+                    bytesBase64: base64, 
+                    municipio: muniCode,
+                    usuario: userEmail,
+                    tipo: tipoFicha,
+                    seccion: seccion,
+                    id_envio: idEnvio
+                };
+                await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                return true;
+            } catch (e) { return false; }
         }
     };
     
