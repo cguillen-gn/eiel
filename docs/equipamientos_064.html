@@ -2628,33 +2628,7 @@
 
 
 
-<details class="card-accordion">
-    <summary class="acc-header">
-        <i data-lucide="chevron-right" class="acc-chevron"></i>
-        <div class="acc-title-box">
-            <i data-lucide="door-closed" class="acc-icon"></i>
-            <span>EDIFICIOS PÚBLICOS SIN USO</span>
-            <span class="acc-badge">(0 registros)</span>
-        </div>
-    </summary>
 
-    <div class="table-wrapper">
-        <p class="sin-uso-intro">Indique si estos edificios han pasado a tener un uso concreto o si continúan cerrados.</p>
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th class="col-foto">Foto</th>
-                    <th class="col-mapa">Ubicación</th>
-                    <th class="col-deno">Denominación</th>
-                    <th class="col-obs">¿Tiene uso?</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-            </tbody>
-        </table>
-    </div>
-</details>
 
 
 
@@ -2718,7 +2692,7 @@
         </label>
     </div>
     
-    <div id="progressContainer" class="progress-container">
+    <div id="progressContainer" class="progress-container hidden">
         <div class="progress-labels">
             <span id="progressText">Preparando envío...</span>
             <span id="progressPercentage">0%</span>
@@ -2849,11 +2823,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function renderFiles() {
         fileList.innerHTML = archivosAdjuntos.map((f, i) => `
-            <div style="display:flex; justify-content:space-between; background:#f1f5f9; padding:8px; border-radius:6px; font-size:0.85rem;">
+            <div class="file-item">
                 <span>📄 ${f.name}</span>
-                <button onclick="removeFile(${i})" style="color:red; border:none; background:none; cursor:pointer;">✕</button>
+                <button type="button" onclick="removeFile(${i})" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:18px;"></i>
+                </button>
             </div>
         `).join("");
+        if (window.lucide) lucide.createIcons();
     }
 
     // --- 5. ACTIVACIÓN DEL BOTÓN DE ENVÍO ---
@@ -2881,25 +2858,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Control visual de la barra de progreso
     const UIProgress = {
-        show: (totalArchivos) => {
-            const container = document.getElementById('progressContainer');
-            if (container) container.style.display = 'block'; // Muestra el contenedor oculto
-            UIProgress.update(0, totalArchivos, "Iniciando envío...");
+        container: document.getElementById("progressContainer"),
+        bar: document.getElementById("progressBar"),
+        text: document.getElementById("progressText"),
+        percent: document.getElementById("progressPercentage"),
+        maxReached: 0,
+
+        show(totalTasks) {
+            this.maxReached = 0;
+            if (this.container) this.container.classList.remove('hidden');
+            this.update(0, totalTasks, "Iniciando envío...");
         },
-        update: (current, total, message) => {
-            const percent = total > 0 ? Math.round((current / total) * 100) : 50;
-            const bar = document.getElementById('progressBar');
-            const txt = document.getElementById('progressText');
-            const pctTxt = document.getElementById('progressPercentage');
+
+        update(completed, total, message) {
+            const msg = message.toLowerCase();
+            // Detectamos si es el paso del registro o PDF
+            const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
             
-            if (bar) bar.style.width = percent + '%';
-            if (txt) txt.innerText = message;
-            if (pctTxt) pctTxt.innerText = percent + '%';
-        },
-        complete: () => {
-            UIProgress.update(1, 1, "¡Envío completado!");
-            const bar = document.getElementById('progressBar');
-            if (bar) bar.classList.add("progress-success");
+            let targetPercentage = 0;
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                targetPercentage = isFinalStep ? 95 : 0;
+            }
+
+            // --- EL BLOQUEO DE SEGURIDAD ---
+            // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
+            if (targetPercentage > this.maxReached) {
+                this.maxReached = targetPercentage;
+                if (this.bar) this.bar.style.width = this.maxReached + "%";
+                if (this.percent) this.percent.textContent = this.maxReached + "%";
+            }
+            
+            // El texto sí lo actualizamos siempre para dar feedback constante
+            if (this.text && message) this.text.textContent = message;
+    },
+
+        complete() {
+            if (this.bar) {
+                this.bar.style.width = "100%";
+                this.bar.classList.add("progress-success");
+            }
+            if (this.percent) this.percent.textContent = "100%";
+            // Mensaje de éxito unificado en la barra
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email facilitado";
         }
     };
 
@@ -3001,13 +3004,31 @@ document.addEventListener("DOMContentLoaded", () => {
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
                 mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
 
-            UIProgress.complete(); 
-            Swal.fire("¡Éxito!", "Justificante enviado a su email.", "success").then(() => {
-                window.location.href = "index.html";
+            // G. Finalización y Limpieza
+            UIProgress.complete();
+
+            // 1. Limpieza de memoria y UI de archivos
+            archivosAdjuntos = [];
+            renderFiles(); 
+
+            // 2. Limpieza de todos los campos de texto y selectores
+            document.querySelectorAll("input, select, textarea").forEach(el => {
+                if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                if(el.tagName === 'SELECT') el.selectedIndex = 0;
             });
+
+            // 3. Reset de conformidad y botón
+            if(checkConf) checkConf.checked = false;
+            btnEnviar.disabled = true;
+
+            // Redirección opcional tras unos segundos para que vean el mensaje de éxito
+            setTimeout(() => {
+                window.location.href = "index.html";
+            }, 4000);
 
         } catch (error) {
             console.error(error);
