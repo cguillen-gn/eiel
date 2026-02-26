@@ -1304,10 +1304,8 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim(); 
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // C. Validaciones
-            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-            // 1: Identidad y Email
+            // C. Validaciones [cite: 313-325]
+            // 1: Identidad
             if (nombreContacto.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); 
@@ -1319,49 +1317,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2: Estados e Integridad de la Tabla (Oficiales)
-            // Capturamos los selectores aquí para evitar errores de referencia 
-            const selects = document.querySelectorAll('.select-estado'); 
+            // 2: Estados e Integridad de Obras Oficiales
+            
+            // Buscamos solo dentro de las filas de la tabla de seguimiento de obras:
+            const selects = document.querySelectorAll('.fila-obra .select-estado');
             let erroresTabla = [];
-            let requiereJustificacionDocs = false;
+            let requiereJustificacion = false;
 
             selects.forEach(select => {
                 const clave = select.dataset.clave;
                 const obraId = select.dataset.obraId;
                 const requiereDoc = select.dataset.requiereDoc === "true";
 
-                // Error A: No se ha seleccionado estado en una obra del listado [cite: 788]
                 if (!select.value) {
-                    erroresTabla.push(`Falta seleccionar el estado en la obra ${clave}`);
+                    erroresTabla.push(`Falta seleccionar el estado en alguna obra`);
                 }
-                
-                // Error B: Obra finalizada que requiere proyecto pero no tiene archivos adjuntos [cite: 789]
+                // Si está finalizada y requiere doc pero no hay nada en la cola de adjuntos
                 if (select.value === 'Finalizada' && requiereDoc && !(colaAdjuntos[obraId]?.length > 0)) {
-                    requiereJustificacionDocs = true;
+                    requiereJustificacion = true;
                 }
             });
 
-            // Si hay errores de estados vacíos, mostramos el primero y bloqueamos [cite: 790-791]
+            // Si falta algún estado, bloqueamos
             if (erroresTabla.length > 0) {
                 mostrarMensaje("⚠️ " + erroresTabla[0], "error");
                 toggleFormFreeze(false);
                 return;
             }
-
-            // 3: Requerimiento de Observaciones (Avisos de requerimientos o falta de documentos)
-            // Se activa si hay avisos externos O si hay obras terminadas sin adjuntos 
-            if ((requiereJustificacionDocs || window.EIEL_CONFIG.hasAvisos) && obsValue.length < 15) {
+            
+            // 3: Validación de Observaciones (Avisos o falta de documentos en tabla)
+            if ((requiereJustificacion || window.EIEL_CONFIG.hasAvisos) && obsValue.length < 15) {
                 mostrarMensaje("⚠️ Debe justificar en Observaciones (mín. 15 car.) la falta de documentos o atender requerimientos.", "error");
                 obsField.focus(); 
                 toggleFormFreeze(false); 
                 return;
             }
+            
 
-            // 4: Persistencia de datos del técnico
+            
+            // 4: Persistencia
             localStorage.setItem("eiel_user_name", nombreContacto);
             localStorage.setItem("eiel_user_email", emailContacto);
             localStorage.setItem("eiel_user_dept", departamentoVal);
 
+            
+            
+            
             // D. Subida de Archivos a Google Drive (Unificada) [cite: 328-333]
             const listaArchivosSubida = [];
             for (const [obraId, archivos] of Object.entries(colaAdjuntos)) {
