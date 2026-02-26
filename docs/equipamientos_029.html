@@ -105,9 +105,10 @@
 <div class="card card-info">
     <h4><i data-lucide="info"></i> Instrucciones</h4>
     <ul>
-        <li>
-            Rellene los datos requeridos acerca de los Equipamientos. Si no dispone de algún dato, indíquelo en el apartado de <strong>Observaciones</strong>.
-        </li>
+        Despliegue cada temática para ver los equipamientos disponibles en la EIEL.
+        <li><strong>Estado</strong>Seleccione el estado de conservación en el que se encuentra cada equipamiento.</li>
+        <li><strong>Observaciones</strong>Añada cualquier observación que pueda ser de interés para algún equipamiento como cambio de nombre o cambio de uso.</li>
+
     </ul>
 </div>
 
@@ -1072,10 +1073,9 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
        
-    // 0. ACTIVADOR DE TEMA (Clase Maestra)
+    // 0. ACTIVADOR DE TEMA
     document.body.classList.add('theme-equipamientos');
     
-    // Ejecuta la creación de iconos de Lucide
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -1083,7 +1083,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. SETUP DE ESTILOS
     const header = document.querySelector('.site-header');
     if(header) header.classList.add('header-equipamientos');
-    
+
     // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "029",
@@ -1096,20 +1096,19 @@ document.addEventListener("DOMContentLoaded", () => {
         yearActual: new Date().getFullYear()
     };
 
-    // 3. SELECTOR ESTADOS
+    // 3. SELECTOR ESTADOS (Cambio dinámico de color del punto)
     document.querySelectorAll('.select-estado-eq').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
             if (dot) {
                 dot.className = 'status-dot';
-                // Normalizamos: "En ejecución" -> "enejecucion"
                 const classValue = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, "");
                 dot.classList.add('dot-' + classValue);
             }
         });
     });
 
-    // 4. GESTIÓN DE ADJUNTOS (Limpio y Único)
+    // 4. GESTIÓN DE ADJUNTOS
     let archivosAdjuntos = [];
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
@@ -1128,6 +1127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     function renderFiles() {
+        if(!fileList) return;
         fileList.innerHTML = archivosAdjuntos.map((f, i) => `
             <div class="file-item">
                 <span>📄 ${f.name}</span>
@@ -1139,18 +1139,17 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // --- 5. ACTIVACIÓN DEL BOTÓN DE ENVÍO ---
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConformidad = document.getElementById("checkConformidad");
+    // 5. UTILIDADES DE MENSAJERÍA Y PROGRESO
+    const mensajeDiv = document.getElementById("mensaje");
 
-    if (checkConformidad && btnEnviar) {
-        checkConformidad.addEventListener('change', function() {
-            btnEnviar.disabled = !this.checked;
-        });
+    function mostrarMensaje(texto, tipo) {
+        if(!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`; 
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-    
 
-    // Control visual de la barra de progreso
     const UIProgress = {
         container: document.getElementById("progressContainer"),
         bar: document.getElementById("progressBar"),
@@ -1166,62 +1165,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
         update(completed, total, message) {
             const msg = message.toLowerCase();
-            // Detectamos si es el paso del registro o PDF
-            const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
-            
-            let targetPercentage = 0;
-            if (total > 0) {
-                const fileWeight = 90 / total;
-                targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
-            } else {
-                targetPercentage = isFinalStep ? 95 : 0;
-            }
+            const isFinalStep = msg.includes("pdf") || msg.includes("registro");
+            let targetPercentage = total > 0 ? (isFinalStep ? 95 : Math.round(completed * (90 / total))) : (isFinalStep ? 95 : 0);
 
-            // --- EL BLOQUEO DE SEGURIDAD ---
-            // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
             if (targetPercentage > this.maxReached) {
                 this.maxReached = targetPercentage;
                 if (this.bar) this.bar.style.width = this.maxReached + "%";
                 if (this.percent) this.percent.textContent = this.maxReached + "%";
             }
-            
-            // El texto sí lo actualizamos siempre para dar feedback constante
-            if (this.text && message) this.text.textContent = message;
-    },
+            if (this.text) this.text.textContent = message;
+        },
 
         complete() {
-            if (this.bar) {
-                this.bar.style.width = "100%";
-                this.bar.classList.add("progress-success");
-            }
+            if (this.bar) { this.bar.style.width = "100%"; this.bar.classList.add("progress-success"); }
             if (this.percent) this.percent.textContent = "100%";
-            // Mensaje de éxito unificado en la barra
-            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email facilitado";
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
         }
     };
 
-    // Servicio de subida de archivos (Ajustar según tu backend)
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
+            const reader = new FileReader(); reader.readAsDataURL(file);
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-
-        async uploadFile(file, tipoFicha, muniCode, seccion = "GENERAL", idEnvio) {
+        async uploadFile(file, muniCode, idEnvio) {
             try {
                 const base64 = await this.toBase64(file);
                 const userEmail = document.getElementById("contactoEmail").value || "anonimo";
                 const payload = {
-                    filename: file.name,
-                    mimeType: file.type,
-                    bytesBase64: base64, 
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha,
-                    seccion: seccion,
-                    id_envio: idEnvio
+                    filename: file.name, mimeType: file.type, bytesBase64: base64, 
+                    municipio: muniCode, usuario: userEmail, tipo: 'equipamiento',
+                    seccion: 'GENERAL', id_envio: idEnvio
                 };
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
                     method: 'POST', mode: 'no-cors',
@@ -1232,148 +1207,137 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) { return false; }
         }
     };
-    
 
-    // --- 6. LA FUNCIÓN DE ENVÍO (MÁXIMA PRIORIDAD) ---
-    // La definimos como una función global (window) para que el 'onclick' del HTML la encuentre
+    // 6. LÓGICA DE ENVÍO
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
+
+    if (checkConformidad && btnEnviar) {
+        checkConformidad.addEventListener('change', function() {
+            btnEnviar.disabled = !this.checked;
+        });
+    }
+
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
+            const idEnvio = "EXP_E_" + new Date().getTime(); 
+            toggleFormFreeze(true);
+            if(mensajeDiv) mensajeDiv.classList.add('hidden');
+
+            // B. Lectura de Variables
             const nombre = document.getElementById("contactoNombre").value.trim();
             const email = document.getElementById("contactoEmail").value.trim();
             const emailConfirm = document.getElementById("contactoEmailConfirm").value.trim();
             const depto = document.getElementById("contactoDepartamento").value.trim();
-            const obsGenerales = document.getElementById("observaciones").value.trim();
+            const obsValue = document.getElementById("observaciones").value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            if (!nombre || !email || email !== emailConfirm) {
-                mostrarMensaje("⚠️ Verifique los datos de contacto y que el email coincida.", "error");
-                return;
+            // C. Validaciones
+            if (nombre.length < 2) { mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning"); toggleFormFreeze(false); return; }
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error"); toggleFormFreeze(false); return;
             }
 
-            const idEnvio = "EXP_E_" + new Date().getTime(); 
-            toggleFormFreeze(true);
+            const selects = document.querySelectorAll('.select-estado-eq');
+            let erroresTabla = [];
+            selects.forEach(select => {
+                if (!select.value) {
+                    const nombreEq = select.closest('tr').querySelector('.nombre-eq strong').textContent;
+                    erroresTabla.push(`Falta seleccionar el estado en: ${nombreEq}`);
+                }
+            });
+
+            if (erroresTabla.length > 0) { mostrarMensaje("⚠️ " + erroresTabla[0], "error"); toggleFormFreeze(false); return; }
+
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos.", "error");
+                document.getElementById("observaciones").focus(); toggleFormFreeze(false); return;
+            }
+
+            // D. Proceso de Envío real
             UIProgress.show(archivosAdjuntos.length);
 
-        try {
-            // Subida de archivos 
-            let nombresArchivos = [];
-            for (let i = 0; i < archivosAdjuntos.length; i++) {
-                const file = archivosAdjuntos[i];
-                UIProgress.update(i, archivosAdjuntos.length, `Subiendo: ${file.name}`);
-                await UploadService.uploadFile(file, 'equipamiento', window.EIEL_CONFIG.muniCode, 'GENERAL', idEnvio);
-                nombresArchivos.push(file.name);
-            }
+            try {
+                // 1. Subida de archivos
+                let nombresArchivos = [];
+                for (let i = 0; i < archivosAdjuntos.length; i++) {
+                    const file = archivosAdjuntos[i];
+                    UIProgress.update(i, archivosAdjuntos.length, `Subiendo: ${file.name}`);
+                    await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idEnvio);
+                    nombresArchivos.push(file.name);
+                }
 
-            // Recopilación de datos de la tabla para el PDF 
-            UIProgress.update(archivosAdjuntos.length, archivosAdjuntos.length, "Generando PDF...");
-        
-        const datosEquipamientos = [];
+                // 2. Recopilación de datos de tablas
+                UIProgress.update(archivosAdjuntos.length, archivosAdjuntos.length, "Generando justificante...");
+                const datosEquipamientos = [];
 
-            // Registros de las tablas de los acordeones
-            document.querySelectorAll('.fila-equip').forEach(fila => {
-                const sel = fila.querySelector('.select-estado-eq'); // Capturamos el selector
-                const categoria = fila.closest('details').querySelector('.acc-header span').textContent.trim();
-                
-                datosEquipamientos.push({
-                    categoria: categoria,
-                    id: fila.dataset.id,
-                    nombre: fila.querySelector('.nombre-eq').textContent,
-                    estado: sel.value,
-                    obs: fila.querySelector('.txt-obs-eq').value.trim(),
-                    // Enviamos 'true' si el valor actual es distinto al que había al cargar
-                    modificado: sel.value !== sel.dataset.original,
-                    validado_ok: false
+                document.querySelectorAll('.fila-equip').forEach(fila => {
+                    const sel = fila.querySelector('.select-estado-eq');
+                    const cat = fila.closest('details').querySelector('.acc-header span').textContent.trim();
+                    datosEquipamientos.push({
+                        categoria: cat, id: fila.dataset.id,
+                        nombre: fila.querySelector('.nombre-eq').textContent,
+                        estado: sel.value, obs: fila.querySelector('.txt-obs-eq').value.trim(),
+                        modificado: sel.value !== sel.dataset.original
+                    });
                 });
-            });
 
-            // Registros de la sección "Sin Uso"
-            document.querySelectorAll('.fila-sin-uso').forEach(fila => {
-                const sigueSinUso = fila.querySelector('.select-sin-uso').value;
-                const nuevoUso = fila.querySelector('.txt-nuevo-uso').value.trim();
-                const cod = fila.dataset.id;
-
-                datosEquipamientos.push({
-                    categoria: "EDIFICIO PÚBLICO SIN USO",
-                    id: cod,
-                    nombre: fila.querySelector('strong').textContent,
-                    estado: sigueSinUso === 'SI' ? 'SIN USO' : 'CON USO',
-                    obs: sigueSinUso === 'NO' ? "NUEVO USO: " + nuevoUso : "Confirmado sigue sin uso",
-                    validado_ok: true
+                document.querySelectorAll('.fila-sin-uso').forEach(fila => {
+                    const sigueSinUso = fila.querySelector('.select-sin-uso').value;
+                    datosEquipamientos.push({
+                        categoria: "EDIFICIO PÚBLICO SIN USO", id: fila.dataset.id,
+                        nombre: fila.querySelector('strong').textContent,
+                        estado: sigueSinUso === 'SI' ? 'SIN USO' : 'CON USO',
+                        obs: sigueSinUso === 'NO' ? "NUEVO USO: " + fila.querySelector('.txt-nuevo-uso').value.trim() : "Sigue sin uso"
+                    });
                 });
-            });
 
-            // Envío final al Apps Script del PDF 
-            const payload = {
-                tipo_formulario: "equipamientos",
-                fase: window.EIEL_CONFIG.fase,
-                id_envio: idEnvio,
-                municipio_codigo: window.EIEL_CONFIG.muniCode,
-                municipio_nombre: window.EIEL_CONFIG.muniName,
-                nombre_contacto: nombre,
-                email_contacto: email,
-                departamento_contacto: depto,
-                observaciones: obsGenerales,
-                datos_equipamientos_json: JSON.stringify(datosEquipamientos),
-                archivos_adjuntos: nombresArchivos.join("\n")
-            };
+                const payload = {
+                    tipo_formulario: "equipamientos", fase: window.EIEL_CONFIG.fase, id_envio: idEnvio,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode, municipio_nombre: window.EIEL_CONFIG.muniName,
+                    nombre_contacto: nombre, email_contacto: email, departamento_contacto: depto,
+                    observaciones: obsValue, datos_equipamientos_json: JSON.stringify(datosEquipamientos),
+                    archivos_adjuntos: nombresArchivos.join("\n")
+                };
 
-            // F. Registro y Envío de PDF
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST", mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
 
-            // G. Finalización y Limpieza (SIN VOLVER AL INDEX)
-            UIProgress.complete();
+                UIProgress.complete();
+                archivosAdjuntos = []; renderFiles();
+                document.querySelectorAll("input, select, textarea").forEach(el => {
+                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                    if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                });
+                if(checkConformidad) checkConformidad.checked = false;
+                btnEnviar.disabled = true;
 
-            archivosAdjuntos = [];
-            renderFiles(); 
-
-            document.querySelectorAll("input, select, textarea").forEach(el => {
-                if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                if(el.tagName === 'SELECT') el.selectedIndex = 0;
-            });
-
-            if(checkConformidad) checkConformidad.checked = false;
-            btnEnviar.disabled = true;
-
-
-
-        } catch (error) {
+            } catch (error) {
                 console.error(error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
     }
-    
-    lucide.createIcons();
-    
-    // Función para ampliar imágenes
+
+    // Modal de imagen
     window.abrirVisorImagen = (src) => {
-    // Creamos el contenedor del modal si no existe
-    let modal = document.getElementById('visorImagenGlobal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'visorImagenGlobal';
-        modal.className = 'modal-img';
-        modal.innerHTML = `<img src="" id="imgVisor">`;
-        modal.onclick = () => modal.style.display = 'none';
-        document.body.appendChild(modal);
-    }
-    
-    // Asignamos la imagen y mostramos
-    const img = modal.querySelector('img');
-    img.src = src;
-    modal.style.display = 'flex';
-};
-    
+        let modal = document.getElementById('visorImagenGlobal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'visorImagenGlobal';
+            modal.className = 'modal-img';
+            modal.innerHTML = `<img src="" id="imgVisor">`;
+            modal.onclick = () => modal.style.display = 'none';
+            document.body.appendChild(modal);
+        }
+        modal.querySelector('img').src = src;
+        modal.style.display = 'flex';
+    };
 });
-
-
-
-
 </script>
 
 
