@@ -1147,37 +1147,43 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // 2: Estados e Integridad de Obras Oficiales
-            let errores = [];
+            const selects = document.querySelectorAll('.select-estado');
+            let erroresTabla = [];
+            let requiereJustificacion = false;
+
             selects.forEach(select => {
                 const clave = select.dataset.clave;
                 const obraId = select.dataset.obraId;
                 const requiereDoc = select.dataset.requiereDoc === "true";
 
                 if (!select.value) {
-                    errores.push(`Falta seleccionar el estado en la obra ${clave}`);
+                    erroresTabla.push(`Falta seleccionar el estado en la obra ${clave}`);
                 }
+                // Si está finalizada y requiere doc pero no hay nada en la cola de adjuntos
                 if (select.value === 'Finalizada' && requiereDoc && !(colaAdjuntos[obraId]?.length > 0)) {
-                    // Si no hay documentos en una finalizada, obligamos a explicar en observaciones
-                    if (obsValue.length < 15) {
-                        errores.push(`La obra ${clave} está finalizada sin documentos. Debe justificarlo en Observaciones (mín. 15 car.)`);
-                    }
+                    requiereJustificacion = true;
                 }
             });
 
-            if (errores.length > 0) {
-                mostrarMensaje("⚠️ " + errores[0], "error"); // Mostramos el primer error detectado
+            // Si falta algún estado, bloqueamos
+            if (erroresTabla.length > 0) {
+                mostrarMensaje("⚠️ " + erroresTabla[0], "error");
                 toggleFormFreeze(false);
                 return;
             }
-            // 3: Requerimiento de Observaciones (Incluye avisos y validaciones de tabla)
-            const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
-            if (requiereObs && obsValue.length < 15) {
-                let msg = "⚠️ Debe completar las Observaciones (mín. 15 caracteres) por estados faltantes, falta de documentos o avisos pendientes.";
-                mostrarMensaje(msg, "error");
+            
+            
+            
+            
+            // 3: Validación de Observaciones (Avisos o falta de documentos en tabla)
+            if ((requiereJustificacion || window.EIEL_CONFIG.hasAvisos) && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Debe justificar en Observaciones (mín. 15 car.) la falta de documentos o atender requerimientos.", "error");
                 obsField.focus(); 
                 toggleFormFreeze(false); 
                 return;
             }
+            
+            
             
             // 4: Persistencia
             localStorage.setItem("eiel_user_name", nombreContacto);
