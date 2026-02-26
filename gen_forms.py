@@ -347,19 +347,8 @@ def main():
                     avisos_personalizados=avisos_residuos
                 ))
 
-            # 4. CEMENTERIOS
-            cementerios = obtener_cementerios(conn, code_bd)
-            avisos_cementerios = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'cementerios')
 
-            with open(os.path.join(OUTPUT_DIR, f'cementerios_{code}.html'), "w", encoding="utf-8") as f:
-                f.write(template_cementerios.render(
-                    **common_ctx, 
-                    cementerios=cementerios, 
-                    cementerios_json=json.dumps(cementerios, ensure_ascii=False),
-                    avisos_personalizados=avisos_cementerios
-                ))
-                
-            # 5. EQUIPAMIENTOS (Nuevo bloque)
+            # 4. EQUIPAMIENTOS (Nuevo bloque)
             equip_data = obtener_equipamientos(conn, code_bd)
             avisos_equip = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'equipamientos')
 
@@ -375,6 +364,22 @@ def main():
             flag_alumbrado = False
             flag_viario = False
             flag_saneamiento = False
+            flag_cementerios = False
+            
+            
+            # 5. CEMENTERIOS
+            cementerios = obtener_cementerios(conn, code_bd)
+            if len(cementerios) > 0:
+                flag_cementerios = True
+                avisos_cementerios = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'cementerios')
+                
+                with open(os.path.join(OUTPUT_DIR, f'cementerios_{code}.html'), "w", encoding="utf-8") as f:
+                    f.write(template_cementerios.render(
+                        **common_ctx, 
+                        cementerios=cementerios, 
+                        cementerios_json=json.dumps(cementerios, ensure_ascii=False),
+                        avisos_personalizados=avisos_cementerios
+                    ))
 
             # 6. ALUMBRADO
             avisos_alumbrado = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'alumbrado')
