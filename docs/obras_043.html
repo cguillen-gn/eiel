@@ -1414,7 +1414,7 @@
     </div>
 
     
-    <div id="mensaje" class="message"></div>
+    <div id="mensaje" class="message hidden"></div>
     
     <button id="btnEnviar" class="btn btn-primary btn-obras" disabled>
         Enviar Datos
@@ -1770,8 +1770,10 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim(); 
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // C. Validaciones [cite: 313-325]
-            // 1: Identidad
+            // C. Validaciones
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+            // 1: Identidad y Email
             if (nombreContacto.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); 
@@ -1783,40 +1785,45 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2: Estados e Integridad de Obras Oficiales
-            let errores = [];
+            // 2: Estados e Integridad de la Tabla (Oficiales)
+            // Capturamos los selectores aquí para evitar errores de referencia 
+            const selects = document.querySelectorAll('.select-estado'); 
+            let erroresTabla = [];
+            let requiereJustificacionDocs = false;
+
             selects.forEach(select => {
                 const clave = select.dataset.clave;
                 const obraId = select.dataset.obraId;
                 const requiereDoc = select.dataset.requiereDoc === "true";
 
+                // Error A: No se ha seleccionado estado en una obra del listado [cite: 788]
                 if (!select.value) {
-                    errores.push(`Falta seleccionar el estado en la obra ${clave}`);
+                    erroresTabla.push(`Falta seleccionar el estado en la obra ${clave}`);
                 }
+                
+                // Error B: Obra finalizada que requiere proyecto pero no tiene archivos adjuntos [cite: 789]
                 if (select.value === 'Finalizada' && requiereDoc && !(colaAdjuntos[obraId]?.length > 0)) {
-                    // Si no hay documentos en una finalizada, obligamos a explicar en observaciones
-                    if (obsValue.length < 15) {
-                        errores.push(`La obra ${clave} está finalizada sin documentos. Debe justificarlo en Observaciones (mín. 15 car.)`);
-                    }
+                    requiereJustificacionDocs = true;
                 }
             });
 
-            if (errores.length > 0) {
-                mostrarMensaje("⚠️ " + errores[0], "error"); // Mostramos el primer error detectado
+            // Si hay errores de estados vacíos, mostramos el primero y bloqueamos [cite: 790-791]
+            if (erroresTabla.length > 0) {
+                mostrarMensaje("⚠️ " + erroresTabla[0], "error");
                 toggleFormFreeze(false);
                 return;
             }
-            // 3: Requerimiento de Observaciones (Incluye avisos y validaciones de tabla)
-            const requiereObs = obrasSinEstado.length > 0 || obrasFiSinDocs.length > 0 || window.EIEL_CONFIG.hasAvisos;
-            if (requiereObs && obsValue.length < 15) {
-                let msg = "⚠️ Debe completar las Observaciones (mín. 15 caracteres) por estados faltantes, falta de documentos o avisos pendientes.";
-                mostrarMensaje(msg, "error");
+
+            // 3: Requerimiento de Observaciones (Avisos de requerimientos o falta de documentos)
+            // Se activa si hay avisos externos O si hay obras terminadas sin adjuntos 
+            if ((requiereJustificacionDocs || window.EIEL_CONFIG.hasAvisos) && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Debe justificar en Observaciones (mín. 15 car.) la falta de documentos o atender requerimientos.", "error");
                 obsField.focus(); 
                 toggleFormFreeze(false); 
                 return;
             }
-            
-            // 4: Persistencia
+
+            // 4: Persistencia de datos del técnico
             localStorage.setItem("eiel_user_name", nombreContacto);
             localStorage.setItem("eiel_user_email", emailContacto);
             localStorage.setItem("eiel_user_dept", departamentoVal);
