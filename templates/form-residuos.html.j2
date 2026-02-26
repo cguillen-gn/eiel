@@ -1,15 +1,12 @@
 {% extends "base.html.j2" %}
 
-{% block bloque_fase %}
-    Fase {{ fase_actual }}
-{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block title %}EIEL - Gestión de Residuos{% endblock %}
 {% block header_icon %}<i data-lucide="recycle"></i>{% endblock %}
 {% block header_title %}GESTIÓN DE RESIDUOS{% endblock %}
 
 {% block content %}
-
 
 {# --- SECCIÓN: INSTRUCCIONES --- #}
 <div class="card card-info">
@@ -128,7 +125,6 @@
     </div>
 </div>
 
-
 {# --- SECCIÓN: LIMPIEZA VIARIA --- #}
 <div class="card">
     <h2 class="section-title"><i data-lucide="brush-cleaning"></i>Limpieza Viaria</h2>
@@ -139,7 +135,6 @@
         <input type="number" id="personasLimpieza" class="form-input" placeholder="Ej: 5" min="0">
     </div>
 </div>
-
 
 {# --- SECCIÓN: REQUERIMIENTOS --- #}
 {% if avisos_personalizados and avisos_personalizados|length > 0 %}
@@ -179,7 +174,6 @@
 </div>
 {% endif %}
 
-
 {# --- SECCIÓN: OBSERVACIONES --- #}
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
@@ -188,8 +182,6 @@
         <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
     </div>
 </div>
-
-
 
 {# --- SECCIÓN: ADJUNTOS --- #}
 <div class="card">
@@ -257,49 +249,6 @@
     </button>
 </div>
 
-<style>
-
-    .select-periodicidad { 
-        color: #94a3b8 !important; /* Solo la palabra en gris por defecto */
-        border: 1px solid #cbd5e1 !important; /* Borde con color normal constante */
-        background-color: #ffffff !important;
-        
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23334155' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
-        background-repeat: no-repeat !important;
-        background-position: right 0.75rem center !important;
-        background-size: 16px 12px !important;
-        appearance: none !important; /* Quitamos la flecha del sistema */
-        padding-right: 2.5rem !important;
-    }
-    
-    .select-periodicidad option {
-        color: #1e293b !important;
-        font-weight: normal !important;
-    }
-
-    .select-periodicidad.has-value { 
-        color: #1e293b !important; /* Texto pasa a negro/azul oscuro */
-        font-weight: normal !important;
-        border-color: #cbd5e1 !important;
-    }
-    
-    .select-periodicidad:focus {
-        border-color: var(--theme-residuos) !important;
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
-    }
-    
-    .residuo-label {
-    text-transform: uppercase;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #475569;
-    vertical-align: middle;
-}
-    
-
-</style>
-
 {% endblock %}
 {% block scripts %}
 <script>
@@ -330,8 +279,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     });
-        
-    
 
     // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
@@ -350,7 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (window.EIEL_CONFIG.hasAvisos) {
         const labelObs = document.querySelector("label[for='observaciones']");
         if (labelObs) {
-            labelObs.innerHTML += " <span class='text-required'>(* Obligatorio por requerimiento)</span>";
+            labelObs.innerHTML += " <span class='text-required'>(* Obligatorio)</span>";
         }
     }
 
@@ -485,38 +432,32 @@ document.addEventListener("DOMContentLoaded", () => {
     const mensajeDiv = document.getElementById("mensaje");
 
     function mostrarMensaje(texto, tipo) {
-        if(!mensajeDiv) return;
+        if (!mensajeDiv) return;
         mensajeDiv.textContent = texto;
-        // Limpiamos clases previas y aplicamos las nuevas
         mensajeDiv.className = `message ${tipo}`; 
         mensajeDiv.classList.remove('hidden');
-        // Scroll automático al mensaje para que el usuario lo vea
         mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // 6.1 Checkbox Habilitador
+    // Control de habilitación del botón de envío
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
-            if (this.checked) {
-                btnEnviar.disabled = false;
-            } else {
-                btnEnviar.disabled = true;
-            }
+            btnEnviar.disabled = !this.checked;
         });
     }
 
-    // 6.2 Listener Principal de Envío
+    // Listener principal de envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            // A. Preparación y Bloqueo UI
+            
+            // Preparación del proceso y bloqueo de interfaz
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
 
-            // --- LIMPIEZA PROACTIVA ---
-            // Ocultamos cualquier mensaje previo antes de validar
-            if(mensajeDiv) mensajeDiv.classList.add('hidden'); 
+            // Limpieza proactiva de mensajes previos
+            if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // B. Lectura de Variables
+            // Lectura de variables generales y específicas
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
@@ -526,57 +467,35 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // C. Validaciones Atómicas
-            // 1: Identidad y Email
+            // VALIDACIONES
+
+            // Identidad y Email
             if (nombreContacto.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); return;
             }
+
             if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
                 toggleFormFreeze(false); return;
             }
 
-            // 2: REGLA BLOQUEANTE - Producción Mínima [cite: 822-824]
-            const producciones = RESIDUO_FIELDS.map(r => {
-                const val = document.getElementById(r.prod).value.replace(',', '.');
-                return parseFloat(val) || 0;
-            });
-            const totalProduccion = producciones.reduce((a, b) => a + b, 0);
-
-            if (totalProduccion === 0 && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Si la producción de todos los residuos es 0, debe justificar el motivo en 'Observaciones' (mín. 15 car.).", "error");
-                obsField.focus();
-                toggleFormFreeze(false); return;
-            }
-
-            // 3: AVISO NO BLOQUEANTE - Contenedores a Cero [cite: 813-816]
-            let hayCerosEnContenedores = false;
-            document.querySelectorAll('input[id^="cont_"]').forEach(input => {
-                if (parseInt(input.value) === 0) hayCerosEnContenedores = true;
-            });
-
-            if (hayCerosEnContenedores) {
-                mostrarMensaje("ℹ️ Ha indicado 0 en algún campo de contenedores. Si es correcto (ej: recogida puerta a puerta), recuerde mencionarlo en Observaciones.", "warning");
-                // No hacemos return, permitimos continuar
-            }
-
-            // 4: REGLA BLOQUEANTE - Requerimientos EIEL
+            // Validación de requerimientos (Observaciones mínimas si hay avisos)
             if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos pendientes.", "error");
-                obsField.focus();
+                mostrarMensaje("⚠️ Es necesario escribir en observaciones la explicación de la documentación proporcionada o indicar la razón si no se aporta (mín. 15 car.)", "error");
+                obsField.focus(); 
                 toggleFormFreeze(false); return;
             }
             
-            // 5: Persistencia
+            // Persistencia de datos del técnico
             localStorage.setItem("eiel_user_name", nombreContacto);
             localStorage.setItem("eiel_user_email", emailContacto);
             localStorage.setItem("eiel_user_dept", departamentoVal);
 
-            // D. Proceso de Envío (Subida de Archivos)
+            // PROCESO DE SUBIDA A GOOGLE DRIVE
             const totalArchivos = archivos.length;
             let completados = 0;
-            UIProgress.show(totalArchivos); // La función show ahora usa classList.remove('hidden')
+            UIProgress.show(totalArchivos);
 
             try {
                 if (totalArchivos > 0) {
@@ -587,23 +506,13 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
 
-                // E. Recopilación de Datos y Envío Final [cite: 822-829]
+                // RECOPILACIÓN DE DATOS PARA EL PAYLOAD
                 UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
-
-                const residuosData = RESIDUO_FIELDS.map(r => ({
-                    tipo: r.type,
-                    produccion: parseFloat(document.getElementById(r.prod).value.replace(',', '.')) || 0,
-                    contenedores: document.getElementById(r.cont).value || "0",
-                    periodicidad: document.getElementById(r.period).value || "Sin datos",
-                    vertedero: document.getElementById(r.dest).value || "Sin datos"
-                }));
-
+                
                 const payload = {
                     tipo_formulario: "residuos",
                     fase: window.EIEL_CONFIG.fase,
                     id_envio: idBatch,
-                    residuos_data: JSON.stringify(residuosData),
-                    personas_limpieza: document.getElementById("personasLimpieza").value || "Sin datos",
                     observaciones: obsValue,
                     nombre_contacto: nombreContacto,
                     departamento_contacto: departamentoVal,
@@ -611,9 +520,45 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    
+                    // Datos específicos de la tabla de residuos
+                    datos_residuos: {
+                        plastico: { 
+                            prod: document.getElementById("prod_plastico").value, 
+                            cont: document.getElementById("cont_plastico").value,
+                            period: document.getElementById("period_plastico").value,
+                            dest: document.getElementById("dest_plastico").value
+                        },
+                        papel: { 
+                            prod: document.getElementById("prod_papel").value, 
+                            cont: document.getElementById("cont_papel").value,
+                            period: document.getElementById("period_papel").value,
+                            dest: document.getElementById("dest_papel").value
+                        },
+                        vidrio: { 
+                            prod: document.getElementById("prod_vidrio").value, 
+                            cont: document.getElementById("cont_vidrio").value,
+                            period: document.getElementById("period_vidrio").value,
+                            dest: document.getElementById("dest_vidrio").value
+                        },
+                        organico: { 
+                            prod: document.getElementById("prod_organico").value, 
+                            cont: document.getElementById("cont_organico").value,
+                            period: document.getElementById("period_organico").value,
+                            dest: document.getElementById("dest_organico").value
+                        },
+                        resto: { 
+                            prod: document.getElementById("prod_resto").value, 
+                            cont: document.getElementById("cont_resto").value,
+                            period: document.getElementById("period_resto").value,
+                            dest: document.getElementById("dest_resto").value
+                        },
+                        personas_limpieza: document.getElementById("personasLimpieza").value
+                    }
                 };
 
+                // Envío al servidor
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
                     mode: "no-cors",
@@ -621,26 +566,27 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // G. Finalización y Limpieza
+                // Finalización y limpieza
                 UIProgress.complete();
-                if(mensajeDiv) mensajeDiv.classList.add('hidden'); // Limpiamos mensaje al éxito
+                if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
+                // Reseteo de estado y UI
                 archivos = [];
                 renderArchivos(); 
 
                 document.querySelectorAll("input, select, textarea").forEach(el => {
-                   if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                   if(el.tagName === 'SELECT') {
+                   if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                   if (el.tagName === 'SELECT') {
                        el.selectedIndex = 0;
                        el.classList.remove('has-value');
                    }
                 });
 
-                if(checkConformidad) checkConformidad.checked = false;
+                if (checkConformidad) checkConformidad.checked = false;
                 btnEnviar.disabled = true;
 
             } catch (error) {
-                console.error(error);
+                console.error("Error en el proceso de residuos:", error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }

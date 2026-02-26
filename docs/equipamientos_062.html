@@ -58,6 +58,21 @@
             }
         }
         
+        // 4. MODAL DE IMAGEN
+        window.abrirVisorImagen = (src) => {
+            let modal = document.getElementById('visorImagenGlobal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'visorImagenGlobal';
+                modal.className = 'modal-img';
+                modal.innerHTML = `<img src="" id="imgVisor">`;
+                modal.onclick = () => modal.style.display = 'none';
+                document.body.appendChild(modal);
+            }
+            modal.querySelector('img').src = src;
+            modal.style.display = 'flex';
+        };
+        
     </script>
    
     
@@ -69,7 +84,7 @@
             <div class="logo-area">
                 <h1>EIEL</h1>
                 <span class="badge-fase">
-                     Fase 2026 
+                    Fase 2026
                 </span>
             </div>
         
@@ -111,7 +126,6 @@
 
     </ul>
 </div>
-
 
 
 
@@ -867,8 +881,6 @@
 
 
 
-
-
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -879,10 +891,10 @@
 
 
 <div class="card">
-    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
         <div class="upload-icon">📎</div>
-        <div class="upload-text">Haga clic para adjuntar archivos</div>
+        <div style="font-weight: 600;">Haga clic para adjuntar archivos</div>
         <p class="upload-help">(Planos, fotos, informes, análisis...)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
@@ -1142,132 +1154,133 @@ document.addEventListener("DOMContentLoaded", () => {
     // 6. LÓGICA DE ENVÍO
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
+    const mensajeDiv = document.getElementById("mensaje");
 
+    function mostrarMensaje(texto, tipo) {
+        if (!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`; 
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Control de habilitación del botón de envío
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             btnEnviar.disabled = !this.checked;
         });
     }
 
+    // Listener principal de envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            const idEnvio = "EXP_E_" + new Date().getTime(); 
+            
+            // Preparación del proceso y bloqueo de interfaz
+            const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
-            if(mensajeDiv) mensajeDiv.classList.add('hidden');
 
-            // B. Lectura de Variables
-            const nombre = document.getElementById("contactoNombre").value.trim();
-            const email = document.getElementById("contactoEmail").value.trim();
-            const emailConfirm = document.getElementById("contactoEmailConfirm").value.trim();
-            const depto = document.getElementById("contactoDepartamento").value.trim();
-            const obsValue = document.getElementById("observaciones").value.trim();
+            // Limpieza proactiva de mensajes previos
+            if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
+
+            // Lectura de variables generales
+            const nombreContacto = document.getElementById("contactoNombre").value.trim();
+            const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
+            const emailContacto = document.getElementById("contactoEmail").value.trim();
+            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
+            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
+            const obsField = document.getElementById("observaciones");
+            const obsValue = obsField.value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // C. Validaciones
-            if (nombre.length < 2) { mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning"); toggleFormFreeze(false); return; }
-            if (!regexEmail.test(email) || email.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error"); toggleFormFreeze(false); return;
+            // VALIDACIONES
+
+            // Identidad y Email
+            if (nombreContacto.length < 2) {
+                mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+                toggleFormFreeze(false); return;
             }
 
-            const selects = document.querySelectorAll('.select-estado-eq');
-            let erroresTabla = [];
-            selects.forEach(select => {
-                if (!select.value) {
-                    const nombreEq = select.closest('tr').querySelector('.nombre-eq strong').textContent;
-                    erroresTabla.push(`Falta seleccionar el estado en: ${nombreEq}`);
-                }
-            });
+            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                toggleFormFreeze(false); return;
+            }
 
-            if (erroresTabla.length > 0) { mostrarMensaje("⚠️ " + erroresTabla[0], "error"); toggleFormFreeze(false); return; }
-
+            // Validación de requerimientos (Observaciones obligatorias si hay avisos)
             if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos.", "error");
-                document.getElementById("observaciones").focus(); toggleFormFreeze(false); return;
+                mostrarMensaje("⚠️ Es necesario detallar las observaciones sobre los equipamientos (mín. 15 car.)", "error");
+                obsField.focus(); 
+                toggleFormFreeze(false); return;
             }
+            
+            // Persistencia de datos del técnico
+            localStorage.setItem("eiel_user_name", nombreContacto);
+            localStorage.setItem("eiel_user_email", emailContacto);
+            localStorage.setItem("eiel_user_dept", departamentoVal);
 
-            // D. Proceso de Envío real
-            UIProgress.show(archivosAdjuntos.length);
+            // PROCESO DE SUBIDA A GOOGLE DRIVE
+            const totalArchivos = archivos.length;
+            let completados = 0;
+            UIProgress.show(totalArchivos);
 
             try {
-                // 1. Subida de archivos
-                let nombresArchivos = [];
-                for (let i = 0; i < archivosAdjuntos.length; i++) {
-                    const file = archivosAdjuntos[i];
-                    UIProgress.update(i, archivosAdjuntos.length, `Subiendo: ${file.name}`);
-                    await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idEnvio);
-                    nombresArchivos.push(file.name);
+                if (totalArchivos > 0) {
+                    for (const file of archivos) {
+                        await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
+                        completados++;
+                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
+                    }
                 }
 
-                // 2. Recopilación de datos de tablas
-                UIProgress.update(archivosAdjuntos.length, archivosAdjuntos.length, "Generando justificante...");
-                const datosEquipamientos = [];
-
-                document.querySelectorAll('.fila-equip').forEach(fila => {
-                    const sel = fila.querySelector('.select-estado-eq');
-                    const cat = fila.closest('details').querySelector('.acc-header span').textContent.trim();
-                    datosEquipamientos.push({
-                        categoria: cat, id: fila.dataset.id,
-                        nombre: fila.querySelector('.nombre-eq').textContent,
-                        estado: sel.value, obs: fila.querySelector('.txt-obs-eq').value.trim(),
-                        modificado: sel.value !== sel.dataset.original
-                    });
-                });
-
-                document.querySelectorAll('.fila-sin-uso').forEach(fila => {
-                    const sigueSinUso = fila.querySelector('.select-sin-uso').value;
-                    datosEquipamientos.push({
-                        categoria: "EDIFICIO PÚBLICO SIN USO", id: fila.dataset.id,
-                        nombre: fila.querySelector('strong').textContent,
-                        estado: sigueSinUso === 'SI' ? 'SIN USO' : 'CON USO',
-                        obs: sigueSinUso === 'NO' ? "NUEVO USO: " + fila.querySelector('.txt-nuevo-uso').value.trim() : "Sigue sin uso"
-                    });
-                });
-
+                // RECOPILACIÓN DE DATOS Y ENVÍO FINAL
+                UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
+                
                 const payload = {
-                    tipo_formulario: "equipamientos", fase: window.EIEL_CONFIG.fase, id_envio: idEnvio,
-                    municipio_codigo: window.EIEL_CONFIG.muniCode, municipio_nombre: window.EIEL_CONFIG.muniName,
-                    nombre_contacto: nombre, email_contacto: email, departamento_contacto: depto,
-                    observaciones: obsValue, datos_equipamientos_json: JSON.stringify(datosEquipamientos),
-                    archivos_adjuntos: nombresArchivos.join("\n")
+                    tipo_formulario: "equipamientos",
+                    fase: window.EIEL_CONFIG.fase,
+                    id_envio: idBatch,
+                    observaciones: obsValue,
+                    nombre_contacto: nombreContacto,
+                    departamento_contacto: departamentoVal,
+                    email_contacto: emailContacto,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
                 };
 
+                // Envío al servidor
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST", mode: "no-cors",
+                    method: "POST",
+                    mode: "no-cors",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
+                // Finalización y limpieza de interfaz
                 UIProgress.complete();
-                archivosAdjuntos = []; renderFiles();
+                if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
+
+                // Reseteo de estado y UI
+                archivos = [];
+                renderArchivos(); 
+
                 document.querySelectorAll("input, select, textarea").forEach(el => {
-                    if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                    if(el.tagName === 'SELECT') el.selectedIndex = 0;
+                   if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                   if (el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
-                if(checkConformidad) checkConformidad.checked = false;
+
+                if (checkConformidad) checkConformidad.checked = false;
                 btnEnviar.disabled = true;
 
             } catch (error) {
-                console.error(error);
+                console.error("Error en el proceso de equipamientos:", error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
     }
 
-    // Modal de imagen
-    window.abrirVisorImagen = (src) => {
-        let modal = document.getElementById('visorImagenGlobal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'visorImagenGlobal';
-            modal.className = 'modal-img';
-            modal.innerHTML = `<img src="" id="imgVisor">`;
-            modal.onclick = () => modal.style.display = 'none';
-            document.body.appendChild(modal);
-        }
-        modal.querySelector('img').src = src;
-        modal.style.display = 'flex';
-    };
+    
 });
 </script>
 
