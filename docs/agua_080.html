@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <title>EIEL - Abastecimiento de agua</title>
+    <title>EIEL - Abastecimiento de Agua</title>
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -69,9 +69,7 @@
             <div class="logo-area">
                 <h1>EIEL</h1>
                 <span class="badge-fase">
-                    
-    Fase 2026
-
+                    Fase 2026
                 </span>
             </div>
         
@@ -263,7 +261,6 @@
 </div>
 
 
-
 <div class="card">
         <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
     
@@ -299,7 +296,8 @@
             </span>
         </label>
     </div>
-    
+
+
     <div id="progressContainer" class="progress-container hidden">
         <div class="progress-labels">
             <span id="progressText">Preparando envío...</span>
@@ -378,7 +376,6 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-    
     // 0. ACTIVADOR DE TEMA
     document.body.classList.add('theme-agua');
     
@@ -424,7 +421,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const val = this.value;
 
             // Si es "Indirecta" o "Mancomunidad", mostramos los campos
-            if (val === 'Indirecta (Concesionaria)' || val === 'Mancomunidad') {
+            if (val --- 'Indirecta (Concesionaria)' || val --- 'Mancomunidad') {
                 divExterno.classList.remove('hidden');
             } else {
                 divExterno.classList.add('hidden');
@@ -460,7 +457,6 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
         // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage > this.maxReached) {
             this.maxReached = targetPercentage;
@@ -514,7 +510,6 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) { return false; }
         }
     };
-   
     
     // 5. GESTIÓN DE ARCHIVOS (UI)
     let archivos = [];
@@ -536,7 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function renderArchivos() {
         if (!fileList) return;
-        if (archivos.length === 0) {
+        if (archivos.length --- 0) {
             fileList.innerHTML = '';
             return;
         }
@@ -579,15 +574,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // 6.2 Listener Principal de Envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            // A. Preparación y Bloqueo UI
+            
+            // Preparación del proceso y bloqueo de interfaz
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true); 
 
-            // --- LIMPIEZA PROACTIVA ---
-            // Ocultamos cualquier mensaje de error previo inmediatamente
+            // Limpieza proactiva de mensajes previos
             if(mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // B. Lectura de Variables 
+            // Lectura de variables generales
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
@@ -600,56 +595,57 @@ document.addEventListener("DOMContentLoaded", () => {
             const tipoGestion = document.getElementById("tipo_gestion")?.value;
             const empresa = document.getElementById("nombre_empresa")?.value.trim();
 
-            // C. Validaciones Atómicas
-                // 1: Identidad y Email
-                if (nombreContacto.length < 2) {
-                    mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+            // VALIDACIONES
+            
+            // 1. Identidad y Email
+            if (nombreContacto.length < 2) {
+                mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+                toggleFormFreeze(false); return;
+            }
+            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
+                toggleFormFreeze(false); return;
+            }
+
+            // 2. Requerimiento de Observaciones (Avisos pendientes) 
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos pendientes.", "error");
+                obsField.focus(); 
+                toggleFormFreeze(false); return;
+            }
+
+            // 3. Integridad de datos (Año limpieza depósitos) 
+            const yearMax = new Date().getFullYear() + 1;
+            const inputsLimpieza = document.querySelectorAll('.input-limpieza');
+            let errorAnio = null;
+
+            inputsLimpieza.forEach(input => {
+                const anio = parseInt(input.value);
+                const nombreDep = input.dataset.nombre;
+                if (anio && (anio < 1900 || anio > yearMax)) {
+                    errorAnio = `El año de limpieza del depósito "${nombreDep}" no parece correcto.`;
+                }
+            });
+
+            if (errorAnio) {
+                mostrarMensaje(`⚠️ ${errorAnio}`, "error");
+                toggleFormFreeze(false); return;
+            }
+
+            // 4. Gestión y Empresa 
+            if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad')) {
+                if (!empresa || empresa.length < 3) {
+                    mostrarMensaje("⚠️ Debe indicar el nombre de la Empresa o Mancomunidad gestora.", "error");
                     toggleFormFreeze(false); return;
                 }
-                if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                    mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                    toggleFormFreeze(false); return;
-                }
+            }
 
-                // 2: Requerimiento de Observaciones (Avisos pendientes) 
-                if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                    mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos pendientes.", "error");
-                    obsField.focus(); 
-                    toggleFormFreeze(false); return;
-                }
+            // 5. Persistencia local de datos del técnico
+            localStorage.setItem("eiel_user_name", nombreContacto);
+            localStorage.setItem("eiel_user_email", emailContacto);
+            localStorage.setItem("eiel_user_dept", departamentoVal);
 
-                // 3: Integridad de datos (Año limpieza depósitos - Especificidad mejorada) 
-                const yearMax = new Date().getFullYear() + 1;
-                const inputsLimpieza = document.querySelectorAll('.input-limpieza');
-                let errorAnio = null;
-
-                inputsLimpieza.forEach(input => {
-                    const anio = parseInt(input.value);
-                    const nombreDep = input.dataset.nombre;
-                    if (anio && (anio < 1900 || anio > yearMax)) {
-                        errorAnio = `El año de limpieza del depósito "${nombreDep}" no parece correcto.`;
-                    }
-                });
-
-                if (errorAnio) {
-                    mostrarMensaje(`⚠️ ${errorAnio}`, "error");
-                    toggleFormFreeze(false); return;
-                }
-
-                // 4: Gestión y Empresa (Empresa obligatoria si es externa) 
-                if ((tipoGestion === 'Indirecta (Concesionaria)' || tipoGestion === 'Mancomunidad')) {
-                    if (!empresa || empresa.length < 3) {
-                        mostrarMensaje("⚠️ Debe indicar el nombre de la Empresa o Mancomunidad gestora.", "error");
-                        toggleFormFreeze(false); return;
-                    }
-                }
-
-                // 5: Persistencia de datos del técnico (Memoria proactiva)
-                localStorage.setItem("eiel_user_name", nombreContacto);
-                localStorage.setItem("eiel_user_email", emailContacto);
-                localStorage.setItem("eiel_user_dept", departamentoVal);
-
-            // D. Subida de Archivos a Google Drive
+            // PROCESO DE SUBIDA A GOOGLE DRIVE
             const totalArchivos = archivos.length;
             let completados = 0;
             UIProgress.show(totalArchivos);
@@ -666,42 +662,42 @@ document.addEventListener("DOMContentLoaded", () => {
                 await Promise.all(promesasSubida);
             }
 
-            // E. Recopilación de Datos para el Registro
+            // RECOPILACIÓN DE DATOS Y ENVÍO FINAL
             UIProgress.update(completados, totalArchivos, "Enviando datos y generando justificante PDF...");
             
-                // 1: Datos de limpieza de depósitos
-                const depositosData = [];
-                document.querySelectorAll('.input-limpieza').forEach(input => {
-                    depositosData.push({
-                        nombre: input.dataset.nombre,
-                        limpieza: input.value || "No indicado"
-                    });
+            // Recopilación de datos específicos: depósitos
+            const depositosData = [];
+            document.querySelectorAll('.input-limpieza').forEach(input => {
+                depositosData.push({
+                    nombre: input.dataset.nombre,
+                    limpieza: input.value || "No indicado"
                 });
+            });
 
-                // 2: Preparación del Payload
-                const payload = {
-                    tipo_formulario: "agua",
-                    fase: window.EIEL_CONFIG.fase,
-                    id_envio: idBatch,
-                    gestion_tipo: tipoGestion || "",
-                    gestion_empresa: empresa || "",
-                    gestion_tecnico_nombre: document.getElementById("tecnicoNombre")?.value || "",
-                    gestion_tecnico_tel: document.getElementById("tecnicoTel")?.value || "",
-                    gestion_tecnico_email: document.getElementById("tecnicoEmail")?.value || "",
-                    consumo: document.getElementById("consumoInput").value || "No indicado",
-                    depositos: JSON.stringify(depositosData),
-                    observaciones: obsValue,
-                    nombre_contacto: nombreContacto,
-                    departamento_contacto: departamentoVal,
-                    email_contacto: emailContacto,
-                    municipio_codigo: window.EIEL_CONFIG.muniCode,
-                    municipio_nombre: window.EIEL_CONFIG.muniName,
-                    timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
-                };
+            // Preparación del Payload
+            const payload = {
+                tipo_formulario: "agua",
+                fase: window.EIEL_CONFIG.fase,
+                id_envio: idBatch,
+                gestion_tipo: tipoGestion || "",
+                gestion_empresa: empresa || "",
+                gestion_tecnico_nombre: document.getElementById("tecnicoNombre")?.value || "",
+                gestion_tecnico_tel: document.getElementById("tecnicoTel")?.value || "",
+                gestion_tecnico_email: document.getElementById("tecnicoEmail")?.value || "",
+                consumo: document.getElementById("consumoInput").value || "No indicado",
+                depositos: JSON.stringify(depositosData),
+                observaciones: obsValue,
+                nombre_contacto: nombreContacto,
+                departamento_contacto: departamentoVal,
+                email_contacto: emailContacto,
+                municipio_codigo: window.EIEL_CONFIG.muniCode,
+                municipio_nombre: window.EIEL_CONFIG.muniName,
+                timestamp_envio: new Date().toISOString(),
+                archivos_adjuntos: archivos.map(a => a.name).join("\n")
+            };
 
-            // F. Registro y Envío de PDF
             try {
+                // Registro y Envío de datos
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
                     mode: "no-cors",
@@ -709,11 +705,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // G. Finalización y Limpieza
+                // Finalización y Limpieza de interfaz
                 UIProgress.complete();
-                if(mensajeDiv) mensajeDiv.style.display = 'hidden';
+                if(mensajeDiv) mensajeDiv.classList.add('hidden');
 
-                // Reset de variables y UI
+                // Reseteo de estado
                 archivos = [];
                 renderArchivos(); 
 
@@ -724,18 +720,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if(checkConformidad) checkConformidad.checked = false;
 
-                // Bloqueo final del botón tras éxito
+                // Bloqueo de botón para evitar duplicados
                 btnEnviar.disabled = true;
 
-
-                } catch (error) {
-                    console.error(error);
-                    mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
-                    // En caso de fallo en el envío, devolvemos el control al usuario
-                    toggleFormFreeze(false);
-                }
-            });
-        }
+            } catch (error) {
+                console.error("Error en el envío:", error);
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                toggleFormFreeze(false);
+            }
+        });
+    }
 });
 </script>
 
