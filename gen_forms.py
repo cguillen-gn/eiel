@@ -416,7 +416,8 @@ def main():
             config_municipios_js[code] = {
                 'alumbrado': flag_alumbrado,
                 'viario': flag_viario,
-                'saneamiento': flag_saneamiento
+                'saneamiento': flag_saneamiento,
+                'cementerios': flag_cementerios
             }
 
         # --- GENERAR INDEX ÚNICO (Al final del bucle) ---
