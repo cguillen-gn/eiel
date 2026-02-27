@@ -84,7 +84,7 @@
             <div class="logo-area">
                 <h1>EIEL</h1>
                 <span class="badge-fase">
-                    Fase 2026
+                     Fase 2026 
                 </span>
             </div>
         
@@ -120,12 +120,13 @@
 <div class="card card-info">
     <h4><i data-lucide="info"></i> Instrucciones</h4>
     <ul>
-        Despliegue cada temática para ver los equipamientos disponibles en la EIEL. Pulse en las miniaturas de las fotos para ver la imagen en grande o pulse en Mapa para ver el equipamiento en un visor.
-        <li><strong>Estado: </strong>Seleccione el estado de conservación en el que se encuentra cada equipamiento.</li>
-        <li><strong>Observaciones: </strong>Añada cualquier observación que pueda ser de interés para algún equipamiento como cambio de nombre o cambio de uso.</li>
+        Despliegue cada temática para ver los equipamientos disponibles en la EIEL.
+        <li><strong>Estado</strong>Seleccione el estado de conservación en el que se encuentra cada equipamiento.</li>
+        <li><strong>Observaciones</strong>Añada cualquier observación que pueda ser de interés para algún equipamiento como cambio de nombre o cambio de uso.</li>
 
     </ul>
 </div>
+
 
 
 
@@ -1071,6 +1072,8 @@
 
 
 
+
+
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1081,10 +1084,10 @@
 
 
 <div class="card">
-    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>
     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
         <div class="upload-icon">📎</div>
-        <div style="font-weight: 600;">Haga clic para adjuntar archivos</div>
+        <div class="upload-text">Haga clic para adjuntar archivos</div>
         <p class="upload-help">(Planos, fotos, informes, análisis...)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
@@ -1126,8 +1129,7 @@
             </span>
         </label>
     </div>
-
-
+    
     <div id="progressContainer" class="progress-container hidden">
         <div class="progress-labels">
             <span id="progressText">Preparando envío...</span>
@@ -1206,9 +1208,10 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
        
-    // 0. ACTIVADOR DE TEMA
+    // 0. ACTIVADOR DE TEMA (Clase Maestra)
     document.body.classList.add('theme-equipamientos');
     
+    // Ejecuta la creación de iconos de Lucide
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -1216,7 +1219,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 1. SETUP DE ESTILOS
     const header = document.querySelector('.site-header');
     if(header) header.classList.add('header-equipamientos');
-
+    
     // 2. CONFIGURACIÓN GLOBAL
     window.EIEL_CONFIG = {
         muniCode: "134",
@@ -1229,42 +1232,42 @@ document.addEventListener("DOMContentLoaded", () => {
         yearActual: new Date().getFullYear()
     };
 
-    // 3. SELECTOR ESTADOS (Cambio dinámico de color del punto)
+    // 3. SELECTOR ESTADOS
     document.querySelectorAll('.select-estado-eq').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
             if (dot) {
                 dot.className = 'status-dot';
+                // Normalizamos: "En ejecución" -> "enejecucion"
                 const classValue = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, "");
                 dot.classList.add('dot-' + classValue);
             }
         });
     });
 
-    // 4. GESTIÓN DE ADJUNTOS
-    let archivos = []; 
+    // 4. GESTIÓN DE ADJUNTOS (Limpio y Único)
+    let archivosAdjuntos = [];
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
 
     if (fileInput) {
         fileInput.addEventListener('change', () => {
-            archivos.push(...Array.from(fileInput.files));
-            renderArchivos(); 
+            archivosAdjuntos.push(...Array.from(fileInput.files));
+            renderFiles();
             fileInput.value = '';
         });
     }
 
-    window.eliminarArchivo = (i) => { 
-        archivos.splice(i, 1); 
-        renderArchivos();
+    window.removeFile = (i) => { 
+        archivosAdjuntos.splice(i, 1); 
+        renderFiles();
     };
 
-    function renderArchivos() {
-        if(!fileList) return;
-        fileList.innerHTML = archivos.map((f, i) => `
+    function renderFiles() {
+        fileList.innerHTML = archivosAdjuntos.map((f, i) => `
             <div class="file-item">
                 <span>📄 ${f.name}</span>
-                <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger-icon">
+                <button type="button" onclick="removeFile(${i})" class="btn-danger-icon">
                     <i data-lucide="trash-2" style="width:18px;"></i>
                 </button>
             </div>
@@ -1272,17 +1275,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // 5. UTILIDADES DE MENSAJERÍA Y PROGRESO
-    const mensajeDiv = document.getElementById("mensaje");
+    // --- 5. ACTIVACIÓN DEL BOTÓN DE ENVÍO ---
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
 
-    function mostrarMensaje(texto, tipo) {
-        if(!mensajeDiv) return;
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`; 
-        mensajeDiv.classList.remove('hidden');
-        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (checkConformidad && btnEnviar) {
+        checkConformidad.addEventListener('change', function() {
+            btnEnviar.disabled = !this.checked;
+        });
     }
+    
 
+    // Control visual de la barra de progreso
     const UIProgress = {
         container: document.getElementById("progressContainer"),
         bar: document.getElementById("progressBar"),
@@ -1298,38 +1302,62 @@ document.addEventListener("DOMContentLoaded", () => {
 
         update(completed, total, message) {
             const msg = message.toLowerCase();
-            const isFinalStep = msg.includes("pdf") || msg.includes("registro");
-            let targetPercentage = total > 0 ? (isFinalStep ? 95 : Math.round(completed * (90 / total))) : (isFinalStep ? 95 : 0);
+            // Detectamos si es el paso del registro o PDF
+            const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
+            
+            let targetPercentage = 0;
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                targetPercentage = isFinalStep ? 95 : 0;
+            }
 
+            // --- EL BLOQUEO DE SEGURIDAD ---
+            // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
             if (targetPercentage > this.maxReached) {
                 this.maxReached = targetPercentage;
                 if (this.bar) this.bar.style.width = this.maxReached + "%";
                 if (this.percent) this.percent.textContent = this.maxReached + "%";
             }
-            if (this.text) this.text.textContent = message;
-        },
+            
+            // El texto sí lo actualizamos siempre para dar feedback constante
+            if (this.text && message) this.text.textContent = message;
+    },
 
         complete() {
-            if (this.bar) { this.bar.style.width = "100%"; this.bar.classList.add("progress-success"); }
+            if (this.bar) {
+                this.bar.style.width = "100%";
+                this.bar.classList.add("progress-success");
+            }
             if (this.percent) this.percent.textContent = "100%";
-            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
+            // Mensaje de éxito unificado en la barra
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email facilitado";
         }
     };
 
+    // Servicio de subida de archivos (Ajustar según tu backend)
     const UploadService = {
         toBase64: file => new Promise((resolve, reject) => {
-            const reader = new FileReader(); reader.readAsDataURL(file);
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-        async uploadFile(file, muniCode, idEnvio) {
+
+        async uploadFile(file, tipoFicha, muniCode, seccion = "GENERAL", idEnvio) {
             try {
                 const base64 = await this.toBase64(file);
                 const userEmail = document.getElementById("contactoEmail").value || "anonimo";
                 const payload = {
-                    filename: file.name, mimeType: file.type, bytesBase64: base64, 
-                    municipio: muniCode, usuario: userEmail, tipo: 'equipamiento',
-                    seccion: 'GENERAL', id_envio: idEnvio
+                    filename: file.name,
+                    mimeType: file.type,
+                    bytesBase64: base64, 
+                    municipio: muniCode,
+                    usuario: userEmail,
+                    tipo: tipoFicha,
+                    seccion: seccion,
+                    id_envio: idEnvio
                 };
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
                     method: 'POST', mode: 'no-cors',
@@ -1340,138 +1368,201 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) { return false; }
         }
     };
+    
 
-    // 6. LÓGICA DE ENVÍO
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConformidad = document.getElementById("checkConformidad");
-    const mensajeDiv = document.getElementById("mensaje");
+    // --- 6. LA FUNCIÓN DE ENVÍO ---
 
+    // Función robusta para mostrar mensajes con scroll automático [cite: 1493-1494]
     function mostrarMensaje(texto, tipo) {
-        if (!mensajeDiv) return;
+        const mensajeDiv = document.getElementById("mensaje");
+        if(!mensajeDiv) return;
         mensajeDiv.textContent = texto;
         mensajeDiv.className = `message ${tipo}`; 
         mensajeDiv.classList.remove('hidden');
         mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-
-    // Control de habilitación del botón de envío
-    if (checkConformidad && btnEnviar) {
-        checkConformidad.addEventListener('change', function() {
-            btnEnviar.disabled = !this.checked;
-        });
-    }
-
-    // Listener principal de envío
+    
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            
-            // Preparación del proceso y bloqueo de interfaz
-            const idBatch = "ENVIO_" + new Date().getTime();
+            // A. Preparación y Bloqueo UI
+            const idEnvio = "EXP_E_" + new Date().getTime(); 
             toggleFormFreeze(true);
+            
+            // Limpieza de mensajes previos antes de empezar
+            const mensajeDiv = document.getElementById("mensaje");
+            if(mensajeDiv) mensajeDiv.classList.add('hidden');
 
-            // Limpieza proactiva de mensajes previos
-            if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
-
-            // Lectura de variables generales
-            const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
-            const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-            const obsField = document.getElementById("observaciones");
-            const obsValue = obsField.value.trim();
+            // B. Lectura de Variables [cite: 1628-1629]
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConfirm = document.getElementById("contactoEmailConfirm").value.trim();
+            const depto = document.getElementById("contactoDepartamento").value.trim();
+            const obsValue = document.getElementById("observaciones").value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // VALIDACIONES
-
-            // Identidad y Email
-            if (nombreContacto.length < 2) {
+            // C. Validaciones Atómicas
+            // 1: Identidad y Email
+            if (nombre.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); return;
             }
-
-            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConfirm.toLowerCase()) {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
                 toggleFormFreeze(false); return;
             }
 
-            // Validación de requerimientos (Observaciones obligatorias si hay avisos)
-            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es necesario detallar las observaciones sobre los equipamientos (mín. 15 car.)", "error");
-                obsField.focus(); 
+            // 2: Verificación de la Tabla de Equipamientos [cite: 1635-1637]
+            const selects = document.querySelectorAll('.select-estado-eq');
+            let erroresTabla = [];
+            selects.forEach(select => {
+                const nombreEq = select.closest('tr').querySelector('.nombre-eq strong').textContent;
+                if (!select.value) {
+                    erroresTabla.push(`Falta seleccionar el estado en: ${nombreEq}`);
+                }
+            });
+
+            if (erroresTabla.length > 0) {
+                mostrarMensaje("⚠️ " + erroresTabla[0], "error");
                 toggleFormFreeze(false); return;
             }
-            
-            // Persistencia de datos del técnico
-            localStorage.setItem("eiel_user_name", nombreContacto);
-            localStorage.setItem("eiel_user_email", emailContacto);
-            localStorage.setItem("eiel_user_dept", departamentoVal);
 
-            // PROCESO DE SUBIDA A GOOGLE DRIVE
-            const totalArchivos = archivos.length;
-            let completados = 0;
-            UIProgress.show(totalArchivos);
+            // 3: Requerimiento de Observaciones (Avisos pendientes) [cite: 1601]
+            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Es OBLIGATORIO responder en 'Observaciones' (mín. 15 car.) por requerimientos pendientes.", "error");
+                document.getElementById("observaciones").focus();
+                toggleFormFreeze(false); return;
+            }
 
+            // D. Inicio del proceso de subida si todo es OK
+            UIProgress.show(archivosAdjuntos.length);
             try {
-                if (totalArchivos > 0) {
-                    for (const file of archivos) {
-                        await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++;
-                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
-                    }
-                }
 
-                // RECOPILACIÓN DE DATOS Y ENVÍO FINAL
-                UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
+
+            const idEnvio = "EXP_E_" + new Date().getTime(); 
+            toggleFormFreeze(true);
+            UIProgress.show(archivosAdjuntos.length);
+
+        try {
+            // Subida de archivos 
+            let nombresArchivos = [];
+            for (let i = 0; i < archivosAdjuntos.length; i++) {
+                const file = archivosAdjuntos[i];
+                UIProgress.update(i, archivosAdjuntos.length, `Subiendo: ${file.name}`);
+                await UploadService.uploadFile(file, 'equipamiento', window.EIEL_CONFIG.muniCode, 'GENERAL', idEnvio);
+                nombresArchivos.push(file.name);
+            }
+
+            // Recopilación de datos de la tabla para el PDF 
+            UIProgress.update(archivosAdjuntos.length, archivosAdjuntos.length, "Generando PDF...");
+        
+        const datosEquipamientos = [];
+
+            // Registros de las tablas de los acordeones
+            document.querySelectorAll('.fila-equip').forEach(fila => {
+                const sel = fila.querySelector('.select-estado-eq'); // Capturamos el selector
+                const categoria = fila.closest('details').querySelector('.acc-header span').textContent.trim();
                 
-                const payload = {
-                    tipo_formulario: "equipamientos",
-                    fase: window.EIEL_CONFIG.fase,
-                    id_envio: idBatch,
-                    observaciones: obsValue,
-                    nombre_contacto: nombreContacto,
-                    departamento_contacto: departamentoVal,
-                    email_contacto: emailContacto,
-                    municipio_codigo: window.EIEL_CONFIG.muniCode,
-                    municipio_nombre: window.EIEL_CONFIG.muniName,
-                    timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
-                };
-
-                // Envío al servidor
-                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
+                datosEquipamientos.push({
+                    categoria: categoria,
+                    id: fila.dataset.id,
+                    nombre: fila.querySelector('.nombre-eq').textContent,
+                    estado: sel.value,
+                    obs: fila.querySelector('.txt-obs-eq').value.trim(),
+                    // Enviamos 'true' si el valor actual es distinto al que había al cargar
+                    modificado: sel.value !== sel.dataset.original,
+                    validado_ok: false
                 });
+            });
 
-                // Finalización y limpieza de interfaz
-                UIProgress.complete();
-                if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
+            // Registros de la sección "Sin Uso"
+            document.querySelectorAll('.fila-sin-uso').forEach(fila => {
+                const sigueSinUso = fila.querySelector('.select-sin-uso').value;
+                const nuevoUso = fila.querySelector('.txt-nuevo-uso').value.trim();
+                const cod = fila.dataset.id;
 
-                // Reseteo de estado y UI
-                archivos = [];
-                renderArchivos(); 
-
-                document.querySelectorAll("input, select, textarea").forEach(el => {
-                   if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-                   if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                datosEquipamientos.push({
+                    categoria: "EDIFICIO PÚBLICO SIN USO",
+                    id: cod,
+                    nombre: fila.querySelector('strong').textContent,
+                    estado: sigueSinUso === 'SI' ? 'SIN USO' : 'CON USO',
+                    obs: sigueSinUso === 'NO' ? "NUEVO USO: " + nuevoUso : "Confirmado sigue sin uso",
+                    validado_ok: true
                 });
+            });
 
-                if (checkConformidad) checkConformidad.checked = false;
-                btnEnviar.disabled = true;
+            // Envío final al Apps Script del PDF 
+            const payload = {
+                tipo_formulario: "equipamientos",
+                fase: window.EIEL_CONFIG.fase,
+                id_envio: idEnvio,
+                municipio_codigo: window.EIEL_CONFIG.muniCode,
+                municipio_nombre: window.EIEL_CONFIG.muniName,
+                nombre_contacto: nombre,
+                email_contacto: email,
+                departamento_contacto: depto,
+                observaciones: obsGenerales,
+                datos_equipamientos_json: JSON.stringify(datosEquipamientos),
+                archivos_adjuntos: nombresArchivos.join("\n")
+            };
 
-            } catch (error) {
-                console.error("Error en el proceso de equipamientos:", error);
+            // F. Registro y Envío de PDF
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            // G. Finalización y Limpieza 
+            UIProgress.complete();
+
+            archivosAdjuntos = [];
+            renderFiles(); 
+
+            document.querySelectorAll("input, select, textarea").forEach(el => {
+                if(!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                if(el.tagName === 'SELECT') el.selectedIndex = 0;
+            });
+
+            if(checkConformidad) checkConformidad.checked = false;
+            btnEnviar.disabled = true;
+
+
+
+        } catch (error) {
+                console.error(error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
     }
-
+    
+    lucide.createIcons();
+    
+    // Función para ampliar imágenes
+    window.abrirVisorImagen = (src) => {
+    // Creamos el contenedor del modal si no existe
+    let modal = document.getElementById('visorImagenGlobal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'visorImagenGlobal';
+        modal.className = 'modal-img';
+        modal.innerHTML = `<img src="" id="imgVisor">`;
+        modal.onclick = () => modal.style.display = 'none';
+        document.body.appendChild(modal);
+    }
+    
+    // Asignamos la imagen y mostramos
+    const img = modal.querySelector('img');
+    img.src = src;
+    modal.style.display = 'flex';
+};
     
 });
+
+
+
+
 </script>
 
 
