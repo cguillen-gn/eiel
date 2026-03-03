@@ -348,7 +348,7 @@ def main():
                 ))
 
 
-            # 4. EQUIPAMIENTOS (Nuevo bloque)
+            # 4. EQUIPAMIENTOS
             equip_data = obtener_equipamientos(conn, code_bd)
             avisos_equip = obtener_avisos_personalizados(conn, code_bd, fase_actual, 'equipamientos')
 
