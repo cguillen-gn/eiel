@@ -1739,15 +1739,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Listener principal de envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            
-            // Preparación del proceso y bloqueo de interfaz
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
-
-            // Limpieza proactiva de mensajes previos
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // Lectura de variables generales
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
@@ -1757,46 +1752,68 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // VALIDACIONES
-
-            // Identidad y Email
+            // --- 1. VALIDACIONES ---
             if (nombreContacto.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); return;
             }
-
             if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
                 toggleFormFreeze(false); return;
             }
-
-            // Validación de requerimientos (Observaciones obligatorias si hay avisos)
             if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es neceario responder en Observaciones a la información solicitada. (mín. 15 caracteres.).", "error");
-                obsField.focus(); 
-                toggleFormFreeze(false); return;
+                mostrarMensaje("⚠️ Es necesario responder en Observaciones a la información solicitada.", "error");
+                obsField.focus(); toggleFormFreeze(false); return;
             }
             
-            // Persistencia de datos del técnico
-            localStorage.setItem("eiel_user_name", nombreContacto);
-            localStorage.setItem("eiel_user_email", emailContacto);
-            localStorage.setItem("eiel_user_dept", departamentoVal);
+            // --- 2. RECOPILACIÓN DE DATOS DE EQUIPAMIENTOS ---
+            const datosEquipamientos = [];
 
-            // PROCESO DE SUBIDA A GOOGLE DRIVE
+            // A. Equipamientos Generales
+            document.querySelectorAll('.fila-equip').forEach(tr => {
+                const select = tr.querySelector('.select-estado');
+                const obs = tr.querySelector('.txt-obs-eq').value.trim();
+                const categoria = tr.closest('details').querySelector('.acc-title-box span').textContent;
+                
+                datosEquipamientos.push({
+                    id: tr.dataset.id,
+                    nombre: tr.querySelector('.nombre-eq strong').textContent,
+                    categoria: categoria,
+                    estado: select.value,
+                    modificado: select.value !== select.dataset.original,
+                    obs: obs
+                });
+            });
+
+            // B. Edificios Sin Uso
+            document.querySelectorAll('.fila-sin-uso').forEach(tr => {
+                const select = tr.querySelector('.select-sin-uso');
+                const nuevoUso = tr.querySelector('.txt-nuevo-uso').value.trim();
+                
+                datosEquipamientos.push({
+                    id: tr.dataset.id,
+                    nombre: tr.querySelector('.nombre-eq strong').textContent,
+                    categoria: "EDIFICIO PÚBLICO SIN USO",
+                    estado: select.value === 'SI' ? "YA TIENE USO" : "SIGUE SIN USO",
+                    modificado: select.value === 'SI',
+                    obs: select.value === 'SI' ? `Nuevo uso: ${nuevoUso}` : ""
+                });
+            });
+
+            // --- 3. PROCESO DE SUBIDA ---
             const totalArchivos = archivos.length;
             let completados = 0;
             UIProgress.show(totalArchivos);
 
             try {
-                if (totalArchivos > 0) {
-                    for (const file of archivos) {
-                        await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++;
-                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
-                    }
+                for (const file of archivos) {
+                    // Corregido: Solo pasamos 3 parámetros según la definición de la línea 1449
+                    await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch);
+                    completados++;
+                    UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
                 }
 
-                // RECOPILACIÓN DE DATOS Y ENVÍO FINAL
+                // --- 4. ENVÍO FINAL AL SERVIDOR ---
                 UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
                 
                 const payload = {
@@ -1810,35 +1827,28 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    // Enviamos la lista de equipamientos para el PDF
+                    datos_equipamientos_json: JSON.stringify(datosEquipamientos)
                 };
 
-                // Envío al servidor
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST",
-                    mode: "no-cors",
+                    method: "POST", mode: "no-cors",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
-                // Finalización y limpieza de interfaz
                 UIProgress.complete();
-                if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
-
-                // Reseteo de estado y UI
-                archivos = [];
-                renderArchivos(); 
-
+                archivos = []; renderArchivos(); 
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                    if (el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
-
                 if (checkConformidad) checkConformidad.checked = false;
                 btnEnviar.disabled = true;
 
             } catch (error) {
-                console.error("Error en el proceso de equipamientos:", error);
+                console.error("Error:", error);
                 mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
