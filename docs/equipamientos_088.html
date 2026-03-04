@@ -3050,7 +3050,7 @@
 
 
 <div class="card" id="cardNuevos" style="border-style: dashed; background-color: #f8fafc;">
-    <h2 class="section-title"><i data-lucide="plus-circle"></i>Notificar Nuevo Equipamiento</h2>
+    <h2 class="section-title"><i data-lucide="list-plus"></i>Notificar Nuevo Equipamiento</h2>
     <p class="form-help" style="margin-bottom: 1.5rem;">Use esta sección para dar de alta edificios o instalaciones que no aparecen en el listado superior.</p>
     
     <div class="table-wrapper" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
@@ -3058,8 +3058,8 @@
             <thead>
                 <tr>
                     <th style="width: 35%;">DENOMINACIÓN / UBICACIÓN</th>
-                    <th style="width: 35%;">USO / USOS</th>
-                    <th style="width: 15%; text-align: center;">ESTADO</th>
+                    <th style="width: 30%;">USO / USOS</th>
+                    <th style="width: 20%; text-align: center;">ESTADO</th>
                     <th style="width: 10%; text-align: center;">DOC.</th>
                     <th style="width: 5%;"></th>
                 </tr>
@@ -3324,7 +3324,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // --- FUNCIONES PARA NUEVOS EQUIPAMIENTOS ---
     window.agregarFilaNuevoEquipamiento = () => {
-        const idFila = Date.now();
+        const idFila = `NUEVO_${Date.now()}`; // ID único para la fila
         const tbody = document.getElementById('tbodyNuevos');
         
         const tr = document.createElement('tr');
@@ -3355,14 +3355,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 </select>
             </td>
             <td style="text-align: center; vertical-align: middle;">
-                <input type="file" id="file_${idFila}" style="display:none" onchange="actualizarIconoDoc(${idFila})">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_${idFila}').click()" style="width: auto; padding: 4px 8px;">
-                    <i data-lucide="paperclip" id="icon_${idFila}" style="width:14px;"></i> Adjuntar
+                <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosNuevoEq('${idFila}')" style="width: auto; padding: 4px 8px;">
+                    <i data-lucide="paperclip" style="width:14px;"></i> Adjuntar
                 </button>
-                <div id="name_${idFila}" style="font-size: 0.7rem; color: #22c55e; margin-top: 4px; font-weight: 600; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                <div id="lista_adjuntos_${idFila}" class="file-list-container" style="margin-top: 5px;"></div>
             </td>
             <td style="text-align: center; vertical-align: middle;">
-                <button type="button" class="btn-danger-icon" onclick="this.closest('tr').remove()" style="opacity: 0.6;">
+                <button type="button" class="btn-danger-icon" onclick="eliminarFilaNuevoEq('${idFila}')" style="opacity: 0.6;">
                     <i data-lucide="trash-2" style="width:18px;"></i>
                 </button>
             </td>
@@ -3370,6 +3369,56 @@ document.addEventListener("DOMContentLoaded", () => {
         
         tbody.appendChild(tr);
         if (window.lucide) lucide.createIcons();
+    };
+    
+    let colaAdjuntosNuevos = {}; // Objeto para guardar los archivos de cada fila nueva
+    let idFilaActual = null;
+
+    window.gestionarAdjuntosNuevoEq = (idFila) => {
+        idFilaActual = idFila;
+        document.getElementById('fileInput').click(); // Reutilizamos el input oculto general
+    };
+
+    // Modificamos el listener del fileInput para que sepa si los archivos van a una fila o al general
+    const originalFileInputChange = document.getElementById('fileInput').onchange;
+    document.getElementById('fileInput').addEventListener('change', () => {
+        if (!idFilaActual) return; // Si no hay fila seleccionada, es el flujo normal
+
+        const files = Array.from(document.getElementById('fileInput').files);
+        if (!colaAdjuntosNuevos[idFilaActual]) colaAdjuntosNuevos[idFilaActual] = [];
+        
+        colaAdjuntosNuevos[idFilaActual].push(...files);
+        renderColaNuevoEq(idFilaActual);
+        
+        document.getElementById('fileInput').value = '';
+        idFilaActual = null;
+    });
+
+    function renderColaNuevoEq(idFila) {
+        const contenedor = document.getElementById(`lista_adjuntos_${idFila}`);
+        const archivosFila = colaAdjuntosNuevos[idFila] || [];
+        
+        contenedor.innerHTML = archivosFila.map((f, i) => `
+            <div class="file-item" style="justify-content: space-between; padding: 2px 4px;">
+                <span style="font-size: 0.7rem; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${f.name}">
+                    📄 ${f.name}
+                </span>
+                <button type="button" onclick="eliminarDeColaNuevoEq('${idFila}', ${i})" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+                </button>
+            </div>
+        `).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarDeColaNuevoEq = (idFila, index) => {
+        colaAdjuntosNuevos[idFila].splice(index, 1);
+        renderColaNuevoEq(idFila);
+    };
+
+    window.eliminarFilaNuevoEq = (idFila) => {
+        document.getElementById(`fila_${idFila}`).remove();
+        delete colaAdjuntosNuevos[idFila];
     };
 
     window.actualizarIconoDoc = (id) => {
@@ -3547,28 +3596,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                 }
 
-                // B. Captura de datos de NUEVOS EQUIPOS y subida de sus archivos
+                // B. Captura de datos de NUEVOS EQUIPAMIENTOS y subida de sus archivos
                 const dataNuevos = [];
                 for (const fila of filasNuevas) {
-                    const idFila = fila.id.split('_')[1];
-                    const fileInputNuevo = document.getElementById(`file_${idFila}`);
-                    let fileName = "";
+                    const idFila = fila.id.replace('fila_', '');
+                    const archivosDeEstaFila = colaAdjuntosNuevos[idFila] || [];
+                    const nombresArchivos = [];
 
-                    if (fileInputNuevo && fileInputNuevo.files[0]) {
-                        fileName = fileInputNuevo.files[0].name;
-                        // Subida a la subcarpeta específica solicitada
-                        await UploadService.uploadFile(fileInputNuevo.files[0], window.EIEL_CONFIG.muniCode, idBatch, 'NUEVOS_EQUIPAMIENTOS');
+                    for (const file of archivosDeEstaFila) {
+                        await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'NUEVOS_EQUIPAMIENTOS');
+                        nombresArchivos.push(file.name);
+                        completados++;
+                        UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
                     }
-                    
-                    completados++;
-                    UIProgress.update(completados, totalTareas, `Registrando: ${fila.querySelector('.new-deno').value || 'Nuevo Equipo'}`);
 
                     dataNuevos.push({
                         nombre: fila.querySelector('.new-deno').value.trim(),
                         uso: fila.querySelector('.new-uso').value.trim(),
                         estado: fila.querySelector('.new-estado').value,
                         ubicacion: fila.querySelector('.new-ubica').value.trim(),
-                        archivo: fileName
+                        archivo: nombresArchivos.join("; ") // Guardamos todos los nombres separados por punto y coma
                     });
                 }
 
