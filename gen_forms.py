@@ -205,7 +205,10 @@ def obtener_avisos_personalizados(conn, codigo_ine, fase, tipo_form):
     sql = """
         SELECT mensaje, prioridad, url
         FROM coordinador.solicitud_datos_formularios
-        WHERE mun = %s AND fase = %s AND tipo_formulario = %s
+        WHERE mun = %s 
+            AND fase = %s 
+            AND tipo_formulario = %s
+            AND recibido IS NOT TRUE
         ORDER BY prioridad DESC, id ASC
     """
     try:
