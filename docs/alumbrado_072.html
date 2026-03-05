@@ -148,6 +148,9 @@
                     <span style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem;">Plano de alumbrado público indicando ubicacion de luminarias, potencia, tecnologia (led, halogenuro, vapor de sodio,..) y existencia o no de de reducción de flujo. Preferible formato SIG (.gpkg, .shp,…) o CAD (.dwg, .dxf..).</span>
                 </div>
                 
+                
+                </div>
+                
                 <div style="margin-left: 25px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
                     <textarea class="form-input txt-resp-req" data-msg="Plano de alumbrado público indicando ubicacion de luminarias, potencia, tecnologia (led, halogenuro, vapor de sodio,..) y existencia o no de de reducción de flujo. Preferible formato SIG (.gpkg, .shp,…) o CAD (.dwg, .dxf..)." data-id="0" rows="2" 
                               placeholder="Responda o aclare este punto aquí..." style="font-size: 0.85rem; margin-bottom: 8px;"></textarea>
@@ -502,21 +505,16 @@ document.addEventListener("DOMContentLoaded", () => {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
             if (!files.length || reqIdActual === null) return;
-
             if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
-            
             colaAdjuntosReq[reqIdActual].push(...files);
             renderColaReq(reqIdActual); 
-            
-            inputReq.value = ""; 
-            reqIdActual = null;
+            inputReq.value = ""; reqIdActual = null;
         });
     }
 
     function renderColaReq(id) {
         const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
         if (!contenedor) return;
-
         const archivosReq = colaAdjuntosReq[id] || [];
         contenedor.innerHTML = archivosReq.map((f, i) => `
             <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
@@ -544,41 +542,22 @@ document.addEventListener("DOMContentLoaded", () => {
         mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // Control de habilitación del botón de envío
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             btnEnviar.disabled = !this.checked;
         });
     }
 
-    // Listener principal de envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
-            
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
-
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-            const obsField = document.getElementById("observaciones");
-            const obsValue = obsField.value.trim();
-            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-
-            // --- 1. VALIDACIONES ---
-            if (nombreContacto.length < 2) {
-                mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
-                toggleFormFreeze(false); return;
-            }
-
-            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                toggleFormFreeze(false); return;
-            }
+            const obsValue = document.getElementById("observaciones").value.trim();
 
             const respuestasReq = [];
             document.querySelectorAll('.txt-resp-req').forEach(area => {
@@ -586,63 +565,41 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const archivosFila = colaAdjuntosReq[id] || [];
                 if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ 
-                        pregunta: area.dataset.msg, 
-                        respuesta: resp, 
-                        archivos: archivosFila.map(f => f.name).join("; ") 
-                    });
+                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
                 }
             });
 
-            const tieneRespuestas = respuestasReq.length > 0;
-            if (window.EIEL_CONFIG.hasAvisos && !tieneRespuestas && obsValue.length < 15) {
+            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
                 mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
                 toggleFormFreeze(false); return;
             }
 
-            // --- 2. PREPARACIÓN DE SUBIDA EN PARALELO ---
-            const numGenerales = archivos.length;
-            let numReq = 0;
-            Object.values(colaAdjuntosReq).forEach(lista => numReq += lista.length);
-            
-            const totalTareas = numGenerales + numReq;
+            const totalTareas = archivos.length + Object.values(colaAdjuntosReq).flat().length;
             let completados = 0;
-
             UIProgress.show(totalTareas);
 
             try {
                 const tareasSubida = [];
-
-                // A. Tareas de archivos de requerimientos
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
-                        const t = (async () => {
+                        tareasSubida.push((async () => {
                             await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
                             completados++;
                             UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
-                        })();
-                        tareasSubida.push(t);
+                        })());
                     });
                 });
-
-                // B. Tareas de archivos generales
                 archivos.forEach(file => {
-                    const t = (async () => {
+                    tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
                         completados++;
                         UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
-                    })();
-                    tareasSubida.push(t);
+                    })());
                 });
 
-                // EJECUCIÓN PARALELA: Iniciamos todas a la vez
-                if (tareasSubida.length > 0) {
-                    await Promise.all(tareasSubida);
-                }
+                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // --- 3. ENVÍO FINAL ---
-                UIProgress.update(completados, totalTareas, "Generando justificante y registrando datos...");
-                
+                UIProgress.update(completados, totalTareas, "Generando justificante...");
                 const payload = {
                     tipo_formulario: "alumbrado",
                     fase: window.EIEL_CONFIG.fase,
@@ -659,22 +616,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 };
 
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                    method: "POST",
-                    mode: "no-cors",
+                    method: "POST", mode: "no-cors",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
+                // --- FINALIZACIÓN Y LIMPIEZA ---
                 UIProgress.complete();
-                if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
-
-                // Reseteo de estado
-                archivos = [];
+                archivos = []; 
                 colaAdjuntosReq = {}; 
-                renderArchivos(); 
-
-                document.querySelectorAll('[id^="lista_adjuntos_req_"]').forEach(el => el.innerHTML = '');
                 
+                // Limpia visualmente TODAS las listas de archivos (general y requerimientos)
+                document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
+
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                    if (el.tagName === 'SELECT') el.selectedIndex = 0;
@@ -684,8 +638,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 btnEnviar.disabled = true;
 
             } catch (error) {
-                console.error("Error en el proceso:", error);
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                console.error(error);
+                mostrarMensaje(`❌ Error: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
