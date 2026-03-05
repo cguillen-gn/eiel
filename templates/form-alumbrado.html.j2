@@ -210,7 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // --- EL BLOQUEO DE SEGURIDAD ---
         // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
-        if (targetPercentage > this.maxReached) {
+        if (targetPercentage >= this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
@@ -324,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
-    
+
     let colaAdjuntosReq = {};
     let reqIdActual = null;
     const inputReq = document.getElementById('hiddenInputReq');
@@ -342,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
             
             colaAdjuntosReq[reqIdActual].push(...files);
-            renderColaReq(reqIdActual);
+            renderColaReq(reqIdActual); // Ahora se visualizarán correctamente
             
             inputReq.value = ""; 
             reqIdActual = null;
@@ -352,14 +352,15 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderColaReq(id) {
         const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
         if (!contenedor) return;
-        
+
         const archivosReq = colaAdjuntosReq[id] || [];
+        // Diseño unificado: papelera roja y icono de clip
         contenedor.innerHTML = archivosReq.map((f, i) => `
-            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px;">
+            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
                     <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
                 </span>
-                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none;">
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
                     <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
                 </button>
             </div>
@@ -391,14 +392,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             
-            // Preparación del proceso y bloqueo de interfaz
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
 
-            // Limpieza proactiva de mensajes previos
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // Lectura de variables generales
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
             const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
@@ -408,9 +406,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const obsValue = obsField.value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            // VALIDACIONES
-
-            // Identidad y Email
+            // --- 1. VALIDACIONES ---
             if (nombreContacto.length < 2) {
                 mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
                 toggleFormFreeze(false); return;
@@ -421,47 +417,58 @@ document.addEventListener("DOMContentLoaded", () => {
                 toggleFormFreeze(false); return;
             }
 
-            // 1. Recopilar respuestas a requerimientos
             const respuestasReq = [];
             document.querySelectorAll('.txt-resp-req').forEach(area => {
                 const id = area.dataset.id;
                 const resp = area.value.trim();
                 const archivosFila = colaAdjuntosReq[id] || [];
                 if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
+                    respuestasReq.push({ 
+                        pregunta: area.dataset.msg, 
+                        respuesta: resp, 
+                        archivos: archivosFila.map(f => f.name).join("; ") 
+                    });
                 }
             });
 
-            // 2. Nueva Validación: Si hay avisos, debe haber o respuestas específicas o una observación general
             const tieneRespuestas = respuestasReq.length > 0;
             if (window.EIEL_CONFIG.hasAvisos && !tieneRespuestas && obsValue.length < 15) {
                 mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
                 toggleFormFreeze(false); return;
             }
+
+            // --- 2. CÁLCULO TOTAL DE ARCHIVOS (GENERALES + REQUERIMIENTOS) ---
+            const numGenerales = archivos.length;
+            let numReq = 0;
+            Object.values(colaAdjuntosReq).forEach(lista => numReq += lista.length);
             
-            // 3. Subir archivos de requerimientos (dentro del try de subida)
-            for (const [id, files] of Object.entries(colaAdjuntosReq)) {
-                for (const file of files) {
-                    await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
-                }
-            }
-                     
-            // PROCESO DE SUBIDA A GOOGLE DRIVE
-            const totalArchivos = archivos.length;
+            const totalTareas = numGenerales + numReq;
             let completados = 0;
-            UIProgress.show(totalArchivos);
+
+            // MOSTRAR BARRA ANTES DE EMPEZAR LA SUBIDA
+            UIProgress.show(totalTareas);
 
             try {
-                if (totalArchivos > 0) {
-                    for (const file of archivos) {
-                        await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
+                // A. SUBIR ARCHIVOS DE REQUERIMIENTOS (A su carpeta específica)
+                for (const [id, listado] of Object.entries(colaAdjuntosReq)) {
+                    for (const file of listado) {
+                        await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
                         completados++;
-                        UIProgress.update(completados, totalArchivos, `Subido: ${file.name}`);
+                        UIProgress.update(completados, totalTareas, `Subido: ${file.name} (Respuesta)`);
                     }
                 }
 
-                // RECOPILACIÓN DE DATOS Y ENVÍO FINAL
-                UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
+                // B. SUBIR ARCHIVOS GENERALES
+                if (numGenerales > 0) {
+                    for (const file of archivos) {
+                        await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
+                        completados++;
+                        UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                    }
+                }
+
+                // --- 3. ENVÍO FINAL ---
+                UIProgress.update(completados, totalTareas, "Generando justificante y registrando datos...");
                 
                 const payload = {
                     tipo_formulario: "alumbrado",
@@ -474,11 +481,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n"), // Coma añadida aquí
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
 
-                // Registro en el servidor
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST",
                     mode: "no-cors",
@@ -486,12 +492,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // Finalización y limpieza de interfaz
                 UIProgress.complete();
                 if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
                 // Reseteo de estado
                 archivos = [];
+                colaAdjuntosReq = {}; // Limpiamos también la cola de requerimientos
                 renderArchivos(); 
 
                 document.querySelectorAll("input, select, textarea").forEach(el => {
@@ -500,8 +506,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 if (checkConformidad) checkConformidad.checked = false;
-                
-                // Bloqueo de seguridad para evitar duplicados
                 btnEnviar.disabled = true;
 
             } catch (error) {
