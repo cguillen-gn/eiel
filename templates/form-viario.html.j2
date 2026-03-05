@@ -33,7 +33,7 @@
             Se ha detectado falta de información o incidencias en el Viario que requieren su atención en el apartado de <strong>Observaciones</strong> y/o <strong>Documentación Adjunta</strong>. 
         </p>
 
-<       ul class="requerimientos-list" style="list-style: none; padding: 0;">
+        <ul class="requerimientos-list" style="list-style: none; padding: 0;">
             {% for aviso in avisos_personalizados %}
             {% set req_id = loop.index0 %}
             {# Añadimos display: flex para que el resto de estilos funcionen #}
@@ -216,7 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // --- EL BLOQUEO DE SEGURIDAD ---
         // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
-        if (targetPercentage > this.maxReached) {
+        if (targetPercentage >= this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
@@ -337,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (VIARIO - FINAL)
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -368,11 +368,11 @@ document.addEventListener("DOMContentLoaded", () => {
         const archivosReq = colaAdjuntosReq[id] || [];
         contenedor.innerHTML = archivosReq.map((f, i) => `
             <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;">
-                    <i data-lucide="paperclip" style="width:12px;"></i> ${f.name}
+                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
+                    <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
                 </span>
                 <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
-                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+                    <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
                 </button>
             </div>
         `).join("");
@@ -400,7 +400,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
             let targetPercentage = total > 0 ? (isFinalStep ? 95 : Math.round(completed * (90 / total))) : (isFinalStep ? 95 : 0);
             
-            // CORRECCIÓN: Usamos >= para visibilidad inicial
             if (targetPercentage >= this.maxReached) {
                 this.maxReached = targetPercentage;
                 if (this.bar) this.bar.style.width = this.maxReached + "%";
@@ -429,9 +428,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
             const nombreContacto = document.getElementById("contactoNombre").value.trim();
+            const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
             const emailContacto = document.getElementById("contactoEmail").value.trim();
             const obsValue = document.getElementById("observaciones").value.trim();
 
+            // 1. Recopilar respuestas
             const respuestasReq = [];
             document.querySelectorAll('.txt-resp-req').forEach(area => {
                 const id = area.dataset.id;
@@ -441,6 +442,17 @@ document.addEventListener("DOMContentLoaded", () => {
                     respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
                 }
             });
+
+            const tieneRespuestas = respuestasReq.length > 0;
+            if (window.EIEL_CONFIG.hasAvisos && !tieneRespuestas && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
+                toggleFormFreeze(false); return;
+            }
+
+            // Recordar datos del técnico
+            localStorage.setItem("eiel_user_name", nombreContacto);
+            localStorage.setItem("eiel_user_email", emailContacto);
+            localStorage.setItem("eiel_user_dept", departamentoVal);
 
             const numGenerales = archivos.length;
             let numReq = 0;
@@ -481,6 +493,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     id_envio: idBatch,
                     observaciones: obsValue,
                     nombre_contacto: nombreContacto,
+                    departamento_contacto: departamentoVal,
+                    email_contacto: emailContacto,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
