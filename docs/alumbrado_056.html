@@ -18,7 +18,7 @@
             muniName: "Cocentaina",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyAmgQiFoLYhXlad4Yd8lz5cWdVkr3bMYsH2D5DDm9xFPQHyZn-ac1XdK-2JnILDtW4/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwmd_ypCkqzoeY3_ucgu0FT1Vu_-YmCk2307SK2M_pTw0npwYxulJGOGeY-3EaKXtWn/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
             // Verifica si existen avisos personalizados para la validación de observaciones
             hasAvisos: true
@@ -141,21 +141,28 @@
 
         <ul class="requerimientos-list" style="list-style: none; padding: 0;">
             
-            <div class="aviso-item">
-                <div class="status-dot dot-media"></div>
+            
+            <div class="aviso-item" style="flex-direction: column; align-items: stretch; gap: 10px; padding: 15px; border-bottom: 1px dashed #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div class="status-dot dot-media"></div>
+                    <span style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem;">Plano de alumbrado público indicando ubicacion de luminarias, potencia, tecnologia (led, halogenuro, vapor de sodio,..) y existencia o no de de reducción de flujo. Preferible formato SIG (.gpkg, .shp,…) o CAD (.dwg, .dxf..).</span>
+                </div>
                 
-                <div style="flex: 1;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
-                        <span style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem; line-height: 1.4;">
-                            Plano de alumbrado público indicando ubicacion de luminarias, potencia, tecnologia (led, halogenuro, vapor de sodio,..) y existencia o no de de reducción de flujo. Preferible formato SIG (.gpkg, .shp,…) o CAD (.dwg, .dxf..).
-                        </span>
-                        
-                        
+                <div style="margin-left: 25px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <textarea class="form-input txt-resp-req" data-msg="Plano de alumbrado público indicando ubicacion de luminarias, potencia, tecnologia (led, halogenuro, vapor de sodio,..) y existencia o no de de reducción de flujo. Preferible formato SIG (.gpkg, .shp,…) o CAD (.dwg, .dxf..)." data-id="0" rows="2" 
+                              placeholder="Responda o aclare este punto aquí..." style="font-size: 0.85rem; margin-bottom: 8px;"></textarea>
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosReq('0')" style="background: white;">
+                            <i data-lucide="paperclip" style="width: 14px;"></i> Adjuntar doc.
+                        </button>
+                        <div id="lista_adjuntos_req_0" class="file-list-container" style="margin: 0; display: flex; gap: 8px;"></div>
                     </div>
                 </div>
             </div>
             
         </ul>
+        <input type="file" id="hiddenInputReq" multiple style="display: none;">
     </div>
 </div>
 
@@ -320,7 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
         muniCode: "056",
         muniName: "Cocentaina",
         fase: "2026",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyAmgQiFoLYhXlad4Yd8lz5cWdVkr3bMYsH2D5DDm9xFPQHyZn-ac1XdK-2JnILDtW4/exec",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwmd_ypCkqzoeY3_ucgu0FT1Vu_-YmCk2307SK2M_pTw0npwYxulJGOGeY-3EaKXtWn/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
         urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
         hasAvisos: true,
@@ -480,6 +487,48 @@ document.addEventListener("DOMContentLoaded", () => {
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
+    
+    let colaAdjuntosReq = {};
+    let reqIdActual = null;
+    const inputReq = document.getElementById('hiddenInputReq');
+
+    window.gestionarAdjuntosReq = (id) => {
+        reqIdActual = id;
+        inputReq.click();
+    };
+
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            const files = Array.from(inputReq.files);
+            if (!files.length || reqIdActual === null) return;
+
+            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[req_id_actual] = [];
+            colaAdjuntosReq[reqIdActual].push(...files);
+            renderColaReq(reqIdActual);
+            
+            inputReq.value = '';
+            reqIdActual = null;
+        });
+    }
+
+    function renderColaReq(id) {
+        const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+        const archivosReq = colaAdjuntosReq[id] || [];
+        contenedor.innerHTML = archivosReq.map((f, i) => `
+            <div class="file-item" style="margin: 0; padding: 2px 6px; background: white; border: 1px solid #e2e8f0;">
+                <span style="font-size: 0.7rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">📄 ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px;"></i>
+                </button>
+            </div>
+        `).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarArchivoReq = (id, i) => {
+        colaAdjuntosReq[id].splice(i, 1);
+        renderColaReq(id);
+    };
 
     function mostrarMensaje(texto, tipo) {
         if (!mensajeDiv) return;
@@ -530,13 +579,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 toggleFormFreeze(false); return;
             }
 
-            // Validación de requerimientos pendientes (Observaciones obligatorias)
-            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es neceario responder en Observaciones a la información solicitada. (mín. 15 caracteres.).", "error");
-                obsField.focus(); 
+            // 1. Recopilar respuestas a requerimientos
+            const respuestasReq = [];
+            document.querySelectorAll('.txt-resp-req').forEach(area => {
+                const id = area.dataset.id;
+                const resp = area.value.trim();
+                const archivosFila = colaAdjuntosReq[id] || [];
+                if (resp.length > 0 || archivosFila.length > 0) {
+                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
+                }
+            });
+
+            // 2. Nueva Validación: Si hay avisos, debe haber o respuestas específicas o una observación general
+            const tieneRespuestas = respuestasReq.length > 0;
+            if (window.EIEL_CONFIG.hasAvisos && !tieneRespuestas && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
                 toggleFormFreeze(false); return;
             }
             
+            // 3. Subir archivos de requerimientos (dentro del try de subida)
+            for (const [id, files] of Object.entries(colaAdjuntosReq)) {
+                for (const file of files) {
+                    await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
+                }
+            }
+                     
             // PROCESO DE SUBIDA A GOOGLE DRIVE
             const totalArchivos = archivos.length;
             let completados = 0;
@@ -565,7 +632,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n")
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
 
                 // Registro en el servidor
