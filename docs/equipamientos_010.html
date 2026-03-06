@@ -18,7 +18,7 @@
             muniName: "Alfafara",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz8VAMyun82rwIWkP31piTnXmoXUYyUukBMiSEBjPIqd5Xnq-2yWjHlb3fLWb7p5NWU/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwkaU9E6UXQrUB2mRL_88RkjvRco7Uu2dArlK9-_wTjEPcg6oM7eUZmlHNnismuvmMj/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
             // Verifica si existen avisos personalizados para la validación de observaciones
             hasAvisos: false
@@ -1303,7 +1303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         muniCode: "010",
         muniName: "Alfafara",
         fase: "2026",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbz8VAMyun82rwIWkP31piTnXmoXUYyUukBMiSEBjPIqd5Xnq-2yWjHlb3fLWb7p5NWU/exec",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwkaU9E6UXQrUB2mRL_88RkjvRco7Uu2dArlK9-_wTjEPcg6oM7eUZmlHNnismuvmMj/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
         urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
         hasAvisos: false,
@@ -1566,158 +1566,198 @@ document.addEventListener("DOMContentLoaded", () => {
     // Inicializamos con una fila vacía para invitar al usuario a escribir
     agregarFilaNuevoEquipamiento();
 
-    // 6. LÓGICA DE ENVÍO
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
+    const mensajeDiv = document.getElementById("mensaje");
 
-    // Control de habilitación del botón de envío
+    let colaAdjuntosReq = {};
+    let reqIdActual = null;
+    const inputReq = document.getElementById('hiddenInputReq');
+
+    // Gestión de adjuntos para Requerimientos
+    window.gestionarAdjuntosReq = (id) => {
+        reqIdActual = id;
+        inputReq.click();
+    };
+
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            const files = Array.from(inputReq.files);
+            if (!files.length || reqIdActual === null) return;
+            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
+            colaAdjuntosReq[reqIdActual].push(...files);
+            renderColaReq(reqIdActual);
+            inputReq.value = ""; reqIdActual = null;
+        });
+    }
+
+    function renderColaReq(id) {
+        const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+        if (!contenedor) return;
+        const archivosReq = colaAdjuntosReq[id] || [];
+        contenedor.innerHTML = archivosReq.map((f, i) => `
+            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
+                    <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
+                </span>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none;">
+                    <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
+                </button>
+            </div>
+        `).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarArchivoReq = (id, i) => {
+        colaAdjuntosReq[id].splice(i, 1);
+        renderColaReq(id);
+    };
+
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             btnEnviar.disabled = !this.checked;
         });
     }
 
-    // Listener principal de envío
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
-            const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-            const obsField = document.getElementById("observaciones");
-            const obsValue = obsField.value.trim();
-            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+            const obsValue = document.getElementById("observaciones").value.trim();
 
-            // --- 1. VALIDACIONES ---
-            if (nombreContacto.length < 2) {
-                mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+            // 1. Recopilar respuestas a requerimientos
+            const respuestasReq = [];
+            document.querySelectorAll('.txt-resp-req').forEach(area => {
+                const id = area.dataset.id;
+                const resp = area.value.trim();
+                const archivosFila = colaAdjuntosReq[id] || [];
+                if (resp.length > 0 || archivosFila.length > 0) {
+                    respuestasReq.push({ 
+                        pregunta: area.dataset.msg, 
+                        respuesta: resp, 
+                        archivos: archivosFila.map(f => f.name).join("; ") 
+                    });
+                }
+            });
+
+            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
+                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
                 toggleFormFreeze(false); return;
             }
-            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                toggleFormFreeze(false); return;
-            }
-            if (window.EIEL_CONFIG.hasAvisos && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Es necesario responder en Observaciones a la información solicitada.", "error");
-                obsField.focus(); toggleFormFreeze(false); return;
-            }
-            
-            // --- 2. RECOPILACIÓN DE DATOS DE EQUIPAMIENTOS ---
-            const datosEquipamientos = [];
 
-                // A. Equipamientos Generales
-                document.querySelectorAll('.fila-equip').forEach(tr => {
-                    const select = tr.querySelector('.select-estado');
-                    const obs = tr.querySelector('.txt-obs-eq').value.trim();
-                    const categoria = tr.closest('details').querySelector('.acc-title-box span').textContent;
-                    
-                    datosEquipamientos.push({
-                        id: tr.dataset.id,
-                        nombre: tr.querySelector('.nombre-eq strong').textContent,
-                        categoria: categoria,
-                        estado: select.value,
-                        modificado: select.value !== select.dataset.original,
-                        obs: obs
-                    });
-                });
-
-                // B. Edificios Sin Uso
-                document.querySelectorAll('.fila-sin-uso').forEach(tr => {
-                    const select = tr.querySelector('.select-sin-uso');
-                    const nuevoUso = tr.querySelector('.txt-nuevo-uso').value.trim();
-                    
-                    datosEquipamientos.push({
-                        id: tr.dataset.id,
-                        nombre: tr.querySelector('.nombre-eq strong').textContent,
-                        categoria: "EDIFICIO PÚBLICO SIN USO",
-                        estado: select.value === 'SI' ? "YA TIENE USO" : "SIGUE SIN USO",
-                        modificado: select.value === 'SI',
-                        obs: select.value === 'SI' ? `Nuevo uso: ${nuevoUso}` : ""
-                    });
-                });
-
-            // --- 3. PROCESO DE SUBIDA ---
-            const totalArchivos = archivos.length;
-            const filasNuevas = document.querySelectorAll('.fila-nuevo-eq');
-            const totalTareas = totalArchivos + filasNuevas.length;
-            
+            // 2. Cálculo de tareas totales (Generales + Requerimientos + Nuevos)
+            const numGenerales = archivos.length;
+            const numReq = Object.values(colaAdjuntosReq).flat().length;
+            const numNuevos = Object.values(colaAdjuntosNuevos).flat().length;
+            const totalTareas = numGenerales + numReq + numNuevos;
             let completados = 0;
             UIProgress.show(totalTareas);
 
             try {
-                // A. Archivos generales de la zona inferior
-                for (const file of archivos) {
-                    await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'GENERAL');
-                    completados++;
-                    UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
-                }
+                const tareasSubida = [];
 
-                // B. Captura de datos de NUEVOS EQUIPAMIENTOS y subida de sus archivos
-                const dataNuevos = [];
-                for (const fila of filasNuevas) {
-                    const idFila = fila.id.replace('fila_', '');
-                    const archivosDeEstaFila = colaAdjuntosNuevos[idFila] || [];
-                    const nombresArchivos = [];
-
-                    for (const file of archivosDeEstaFila) {
-                        await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'NUEVOS_EQUIPAMIENTOS');
-                        nombresArchivos.push(file.name);
+                // A. Archivos Generales
+                archivos.forEach(file => {
+                    tareasSubida.push((async () => {
+                        await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'GENERAL');
                         completados++;
-                        UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                    }
+                        UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                    })());
+                });
 
+                // B. Archivos de Requerimientos
+                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                    listado.forEach(file => {
+                        tareasSubida.push((async () => {
+                            await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'RESPUESTA_REQUERIMIENTOS');
+                            completados++;
+                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        })());
+                    });
+                });
+
+                // C. Archivos de Nuevos Equipamientos
+                Object.entries(colaAdjuntosNuevos).forEach(([id, listado]) => {
+                    listado.forEach(file => {
+                        tareasSubida.push((async () => {
+                            await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'NUEVOS_EQUIPAMIENTOS');
+                            completados++;
+                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        })());
+                    });
+                });
+
+                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
+
+                // 3. Recopilación de datos de tablas
+                const datosEquipamientos = [];
+                document.querySelectorAll('.fila-equip').forEach(tr => {
+                    const select = tr.querySelector('.select-estado');
+                    datosEquipamientos.push({
+                        id: tr.dataset.id,
+                        nombre: tr.querySelector('.nombre-eq strong').textContent,
+                        categoria: tr.closest('details').querySelector('.acc-title-box span').textContent,
+                        estado: select.value,
+                        modificado: select.value !== select.dataset.original,
+                        obs: tr.querySelector('.txt-obs-eq').value.trim()
+                    });
+                });
+
+                const dataNuevos = [];
+                document.querySelectorAll('.fila-nuevo-eq').forEach(fila => {
+                    const idFila = fila.id.replace('fila_', '');
                     dataNuevos.push({
                         nombre: fila.querySelector('.new-deno').value.trim(),
                         direccion: fila.querySelector('.new-ubica').value.trim(),
                         uso: fila.querySelector('.new-uso').value.trim(),
                         estado: fila.querySelector('.new-estado').value,
                         observaciones: fila.querySelector('.new-obs-fila').value.trim(),
-                        archivo: nombresArchivos.join("; ")
+                        archivo: (colaAdjuntosNuevos[idFila] || []).map(f => f.name).join("; ")
                     });
-                }
+                });
 
-            // --- 4. ENVÍO FINAL AL SERVIDOR ---
-            UIProgress.update(completados, totalArchivos, "Generando justificante y registrando datos...");
-            
-            const payload = {
-                tipo_formulario: "equipamientos",
-                fase: window.EIEL_CONFIG.fase,
-                id_envio: idBatch,
-                observaciones: obsValue,
-                nombre_contacto: nombreContacto,
-                departamento_contacto: departamentoVal,
-                email_contacto: emailContacto,
-                municipio_codigo: window.EIEL_CONFIG.muniCode,
-                municipio_nombre: window.EIEL_CONFIG.muniName,
-                timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: archivos.map(a => a.name).join("\n"),
-                datos_equipamientos_json: JSON.stringify(datosEquipamientos),
-                nuevos_equipamientos_json: JSON.stringify(dataNuevos)
-            };
+                UIProgress.update(completados, totalTareas, "Generando justificante...");
+                const payload = {
+                    tipo_formulario: "equipamientos",
+                    fase: window.EIEL_CONFIG.fase,
+                    id_envio: idBatch,
+                    observaciones: obsValue,
+                    nombre_contacto: document.getElementById("contactoNombre").value.trim(),
+                    departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
+                    email_contacto: document.getElementById("contactoEmail").value.trim(),
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    datos_equipamientos_json: JSON.stringify(datosEquipamientos),
+                    nuevos_equipamientos_json: JSON.stringify(dataNuevos),
+                    respuestas_requerimientos_json: JSON.stringify(respuestasReq)
+                };
 
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-                method: "POST", mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST", mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
 
-            UIProgress.complete();
-            archivos = []; renderArchivos(); 
-            document.querySelectorAll("input, select, textarea").forEach(el => {
-               if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
-               if (el.tagName === 'SELECT') el.selectedIndex = 0;
-            });
-            if (checkConformidad) checkConformidad.checked = false;
-            btnEnviar.disabled = true;
+                UIProgress.complete();
+                
+                // --- LIMPIEZA TOTAL ---
+                archivos = []; colaAdjuntosReq = {}; colaAdjuntosNuevos = {}; renderArchivos();
+                document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
+                document.querySelectorAll("input, select, textarea").forEach(el => {
+                   if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                   if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                });
+                if (checkConformidad) checkConformidad.checked = false;
+                btnEnviar.disabled = true;
 
             } catch (error) {
-                console.error("Error:", error);
-                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                console.error(error);
+                mostrarMensaje(`❌ Error: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
