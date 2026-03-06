@@ -252,7 +252,8 @@ def obtener_equipamientos(conn, mun):
         case when estado='B' then 'Bueno' when estado='R' then 'Regular' when estado='M' then 'Malo' when estado='E' then 'En ejecución' else 'Desconocido' end as estado_txt,
         concat('https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=', capa, '&atributo=foto&tipo=image/jpeg;jpg&identificador=', idu) as url_foto,
         concat('https://visoreiel.geonet.es?srs=4326&x_lon=', st_x(st_centroid(st_transform(geom, 4326))), '&y_lat=', st_y(st_centroid(st_transform(geom, 4326))), '&zoom=19&w=initlayer&layerIds=', capa) as url_visor
-    from t;
+    from t
+    order by cod;
     """
     
     # Mapeo de iconos de Lucide para cada categoría
