@@ -1399,154 +1399,32 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // 5. UTILIDADES DE MENSAJERÍA Y PROGRESO
-    
-    // --- FUNCIONES PARA NUEVOS EQUIPAMIENTOS ---
-    window.agregarFilaNuevoEquipamiento = () => {
-        const idFila = `NUEVO_${Date.now()}`;
-        const tbody = document.getElementById('tbodyNuevos');
-        const tr = document.createElement('tr');
-        tr.id = `fila_${idFila}`;
-        tr.className = 'fila-nuevo-eq';
-        
-        tr.innerHTML = `
-            <td style="vertical-align: top;">
-                <input type="text" class="form-input new-deno" 
-                       style="font-family: inherit; font-size: 0.9rem; margin-bottom: 6px;" 
-                       placeholder="Ej: Edificio Polivalente">
-                <input type="text" class="form-input new-ubica" 
-                       style="font-family: inherit; font-size: 0.9rem;" 
-                       placeholder="Dirección, coordenadas, ref. catastral...">
-            </td>
-            <td style="vertical-align: top;">
-                <input type="text" class="form-input new-uso" 
-                       style="font-family: inherit; font-size: 0.9rem; margin-bottom: 6px;" 
-                       placeholder="Ej: PB-Biblioteca / P1-Asociaciones ">
-                <select class="form-select new-estado" style="width: 100%; font-family: inherit;">
-                    <option value="">Seleccionar...</option>
-                    <option value="Bueno">Bueno</option>
-                    <option value="Regular">Regular</option>
-                    <option value="Malo">Malo</option>
-                    <option value="En ejecución">En ejecución</option>
-                </select>
-            </td>
-            <td style="vertical-align: top;">
-                <textarea class="form-input new-obs-fila" rows="3" 
-                          style="font-family: inherit; font-size: 0.9rem; resize: none; height: 82px;" 
-                          placeholder="Añada aquí cualquier detalle de interés..."></textarea>
-            </td>
-            <td style="text-align: center; vertical-align: middle;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosFila('${idFila}')" style="width: auto; padding: 4px 8px;">
-                    <i data-lucide="paperclip" style="width:14px;"></i> Adjuntar
-                </button>
-                <div id="lista_adjuntos_${idFila}" class="file-list-container" style="margin-top: 5px;"></div>
-            </td>
-            <td style="text-align: center; vertical-align: middle;">
-                <button type="button" class="btn-danger-icon" onclick="eliminarFilaNuevoEq('${idFila}')" style="opacity: 0.6;">
-                    <i data-lucide="trash-2" style="width:18px;"></i>
-                </button>
-            </td>
-        `;
-        
-        tbody.appendChild(tr);
-        if (window.lucide) lucide.createIcons();
-    };
-    
-    let colaAdjuntosNuevos = {}; 
-    let filaActualAdjuntos = null;
-    const inputNuevos = document.getElementById('hiddenInputNuevos');
-
-    window.gestionarAdjuntosFila = (idFila) => {
-        filaActualAdjuntos = idFila;
-        inputNuevos.click();
-    };
-
-    if (inputNuevos) {
-        inputNuevos.addEventListener('change', () => {
-            const files = Array.from(inputNuevos.files);
-            if (!files.length || !filaActualAdjuntos) return;
-
-            if (!colaAdjuntosNuevos[filaActualAdjuntos]) {
-                colaAdjuntosNuevos[filaActualAdjuntos] = [];
-            }
-            
-            colaAdjuntosNuevos[filaActualAdjuntos].push(...files);
-            renderFilaAdjuntos(filaActualAdjuntos);
-            
-            inputNuevos.value = ""; 
-            filaActualAdjuntos = null;
-        });
-    }
-
-    function renderFilaAdjuntos(idFila) {
-        const contenedor = document.getElementById(`lista_adjuntos_${idFila}`);
-        if (!contenedor) return;
-        const archivosFila = colaAdjuntosNuevos[idFila] || [];
-
-        contenedor.innerHTML = archivosFila.map((f, i) => `
-            <div class="file-item" style="justify-content: space-between; padding: 2px 4px; border: 1px solid #e2e8f0; margin-bottom: 2px; border-radius: 4px;">
-                <span style="font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;" title="${f.name}">
-                    📄 ${f.name}
-                </span>
-                <button type="button" onclick="eliminarArchivoDeFila('${idFila}', ${i})" class="btn-danger-icon">
-                    <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
-                </button>
-            </div>
-        `).join("");
-        if (window.lucide) lucide.createIcons();
-    }
-
-    window.eliminarArchivoDeFila = (idFila, index) => {
-        colaAdjuntosNuevos[idFila].splice(index, 1);
-        renderFilaAdjuntos(idFila);
-    };
-
-    window.eliminarFilaNuevoEq = (idFila) => {
-        const fila = document.getElementById(`fila_${idFila}`);
-        if (fila) fila.remove();
-        delete colaAdjuntosNuevos[idFila];
-    }; 
-    
-    const mensajeDiv = document.getElementById("mensaje");
-
-    function mostrarMensaje(texto, tipo) {
-        if(!mensajeDiv) return;
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`; 
-        mensajeDiv.classList.remove('hidden');
-        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
+    // 5. UTILIDADES Y GESTIÓN DE FILAS (EQUIPAMIENTOS)
     const UIProgress = {
         container: document.getElementById("progressContainer"),
         bar: document.getElementById("progressBar"),
         text: document.getElementById("progressText"),
         percent: document.getElementById("progressPercentage"),
         maxReached: 0,
-
         show(totalTasks) {
             this.maxReached = 0;
             if (this.container) this.container.classList.remove('hidden');
             this.update(0, totalTasks, "Iniciando envío...");
         },
-
         update(completed, total, message) {
-            const msg = message.toLowerCase();
-            const isFinalStep = msg.includes("pdf") || msg.includes("registro");
+            const isFinalStep = message.toLowerCase().includes("pdf") || message.toLowerCase().includes("registro");
             let targetPercentage = total > 0 ? (isFinalStep ? 95 : Math.round(completed * (90 / total))) : (isFinalStep ? 95 : 0);
-
-            if (targetPercentage > this.maxReached) {
+            if (targetPercentage >= this.maxReached) {
                 this.maxReached = targetPercentage;
                 if (this.bar) this.bar.style.width = this.maxReached + "%";
                 if (this.percent) this.percent.textContent = this.maxReached + "%";
             }
             if (this.text) this.text.textContent = message;
         },
-
         complete() {
             if (this.bar) { this.bar.style.width = "100%"; this.bar.classList.add("progress-success"); }
             if (this.percent) this.percent.textContent = "100%";
-            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado al email.";
+            if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Justificante enviado.";
         }
     };
 
@@ -1556,16 +1434,14 @@ document.addEventListener("DOMContentLoaded", () => {
             reader.onload = () => resolve(reader.result.split(',')[1]);
             reader.onerror = error => reject(error);
         }),
-        async uploadFile(file, muniCode, idEnvio, seccion = 'GENERAL') { // <--- Parámetro añadido
-            try 
-            {
+        async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio) {
+            try {
                 const base64 = await this.toBase64(file);
                 const userEmail = document.getElementById("contactoEmail").value || "anonimo";
                 const payload = {
                     filename: file.name, mimeType: file.type, bytesBase64: base64, 
-                    municipio: muniCode, usuario: userEmail, tipo: 'equipamiento',
-                    seccion: seccion, // <--- Usamos la variable
-                    id_envio: idEnvio
+                    municipio: muniCode, usuario: userEmail, tipo: tipoFicha,
+                    seccion: seccion, id_envio: idEnvio
                 };
                 await fetch(window.EIEL_CONFIG.urlAdjuntos, {
                     method: 'POST', mode: 'no-cors',
@@ -1576,25 +1452,95 @@ document.addEventListener("DOMContentLoaded", () => {
             } catch (e) { return false; }
         }
     };
-    
-    // Inicializamos con una fila vacía para invitar al usuario a escribir
-    agregarFilaNuevoEquipamiento();
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
+    // Gestión de filas para NUEVOS EQUIPAMIENTOS
+    let colaAdjuntosNuevos = {}; 
+    let filaActualAdjuntos = null;
+    const inputNuevos = document.getElementById('hiddenInputNuevos');
+
+    window.agregarFilaNuevoEquipamiento = () => {
+        const idFila = `NUEVO_${Date.now()}`;
+        const tbody = document.getElementById('tbodyNuevos');
+        const tr = document.createElement('tr');
+        tr.id = `fila_${idFila}`;
+        tr.className = 'fila-nuevo-eq';
+        tr.innerHTML = `
+            <td style="vertical-align: top;">
+                <input type="text" class="form-input new-deno" placeholder="Ej: Centro Juvenil" style="margin-bottom:6px;">
+                <input type="text" class="form-input new-ubica" placeholder="Dirección o Ref. Catastral">
+            </td>
+            <td style="vertical-align: top;">
+                <input type="text" class="form-input new-uso" placeholder="Uso principal" style="margin-bottom:6px;">
+                <select class="form-select new-estado">
+                    <option value="">Seleccionar...</option>
+                    <option value="Bueno">Bueno</option><option value="Regular">Regular</option>
+                    <option value="Malo">Malo</option><option value="En ejecución">En ejecución</option>
+                </select>
+            </td>
+            <td style="vertical-align: top;">
+                <textarea class="form-input new-obs-fila" rows="3" placeholder="Observaciones de este nuevo equipamiento..."></textarea>
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosFila('${idFila}')">
+                    <i data-lucide="paperclip" style="width:14px;"></i> Adjuntar
+                </button>
+                <div id="lista_adjuntos_${idFila}" class="file-list-container" style="margin-top: 5px;"></div>
+            </td>
+            <td>
+                <button type="button" class="btn-danger-icon" onclick="eliminarFilaNuevoEq('${idFila}')">
+                    <i data-lucide="trash-2" style="width:18px;"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        if (window.lucide) lucide.createIcons();
+    };
+
+    window.gestionarAdjuntosFila = (idFila) => { filaActualAdjuntos = idFila; inputNuevos.click(); };
+    if (inputNuevos) {
+        inputNuevos.addEventListener('change', () => {
+            const files = Array.from(inputNuevos.files);
+            if (!files.length || !filaActualAdjuntos) return;
+            if (!colaAdjuntosNuevos[filaActualAdjuntos]) colaAdjuntosNuevos[filaActualAdjuntos] = [];
+            colaAdjuntosNuevos[filaActualAdjuntos].push(...files);
+            renderFilaAdjuntos(filaActualAdjuntos);
+            inputNuevos.value = ""; filaActualAdjuntos = null;
+        });
+    }
+
+    function renderFilaAdjuntos(idFila) {
+        const contenedor = document.getElementById(`lista_adjuntos_${idFila}`);
+        if (!contenedor) return;
+        contenedor.innerHTML = (colaAdjuntosNuevos[idFila] || []).map((f, i) => `
+            <div class="file-item" style="font-size:0.7rem; border:1px solid #e2e8f0; margin-bottom:2px; padding:2px; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
+                <span title="${f.name}">📄 ${f.name.substring(0,12)}...</span>
+                <button type="button" onclick="eliminarArchivoDeFila('${idFila}', ${i})" class="btn-danger-icon"><i data-lucide="trash-2" style="width:12px;"></i></button>
+            </div>
+        `).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarArchivoDeFila = (idFila, index) => { colaAdjuntosNuevos[idFila].splice(index, 1); renderFilaAdjuntos(idFila); };
+    window.eliminarFilaNuevoEq = (idFila) => { const fila = document.getElementById(`fila_${idFila}`); if (fila) fila.remove(); delete colaAdjuntosNuevos[idFila]; };
+
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (EQUIPAMIENTOS - FINAL)
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
+
+    function mostrarMensaje(texto, tipo) {
+        if (!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`;
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     let colaAdjuntosReq = {};
     let reqIdActual = null;
     const inputReq = document.getElementById('hiddenInputReq');
 
-    // Gestión de adjuntos para Requerimientos
-    window.gestionarAdjuntosReq = (id) => {
-        reqIdActual = id;
-        inputReq.click();
-    };
-
+    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; inputReq.click(); };
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
@@ -1609,38 +1555,29 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderColaReq(id) {
         const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
         if (!contenedor) return;
-        const archivosReq = colaAdjuntosReq[id] || [];
-        contenedor.innerHTML = archivosReq.map((f, i) => `
-            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
-                    <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
-                </span>
-                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none;">
-                    <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
-                </button>
+        contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
+            <div class="file-item" style="margin-bottom:4px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
             </div>
         `).join("");
         if (window.lucide) lucide.createIcons();
     }
 
-    window.eliminarArchivoReq = (id, i) => {
-        colaAdjuntosReq[id].splice(i, 1);
-        renderColaReq(id);
-    };
+    window.eliminarArchivoReq = (id, i) => { colaAdjuntosReq[id].splice(i, 1); renderColaReq(id); };
 
     if (checkConformidad && btnEnviar) {
-        checkConformidad.addEventListener('change', function() {
-            btnEnviar.disabled = !this.checked;
-        });
+        checkConformidad.addEventListener('change', function() { btnEnviar.disabled = !this.checked; });
     }
+
+    // Inicializar con una fila vacía para nuevos equipamientos
+    agregarFilaNuevoEquipamiento();
 
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
-
-            const obsValue = document.getElementById("observaciones").value.trim();
 
             // 1. Recopilar respuestas a requerimientos
             const respuestasReq = [];
@@ -1649,64 +1586,55 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const archivosFila = colaAdjuntosReq[id] || [];
                 if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ 
-                        pregunta: area.dataset.msg, 
-                        respuesta: resp, 
-                        archivos: archivosFila.map(f => f.name).join("; ") 
-                    });
+                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
                 }
             });
 
+            const obsValue = document.getElementById("observaciones").value.trim();
             if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
                 mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
                 toggleFormFreeze(false); return;
             }
 
-            // 2. Cálculo de tareas totales (Generales + Requerimientos + Nuevos)
+            // 2. Cálculo de tareas y Subida Paralela Masiva
             const numGenerales = archivos.length;
             const numReq = Object.values(colaAdjuntosReq).flat().length;
             const numNuevos = Object.values(colaAdjuntosNuevos).flat().length;
             const totalTareas = numGenerales + numReq + numNuevos;
-            let completados = 0;
             UIProgress.show(totalTareas);
+            let completados = 0;
 
             try {
                 const tareasSubida = [];
-
-                // A. Archivos Generales
+                // Subida Generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
-                        await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'GENERAL');
-                        completados++;
-                        UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'GENERAL', idBatch);
+                        completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                     })());
                 });
-
-                // B. Archivos de Requerimientos
+                // Subida Requerimientos
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'RESPUESTA_REQUERIMIENTOS');
-                            completados++;
-                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
+                            completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                         })());
                     });
                 });
-
-                // C. Archivos de Nuevos Equipamientos
+                // Subida Nuevos Equipamientos
                 Object.entries(colaAdjuntosNuevos).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, window.EIEL_CONFIG.muniCode, idBatch, 'NUEVOS_EQUIPAMIENTOS');
-                            completados++;
-                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'NUEVOS_EQUIPAMIENTOS', idBatch);
+                            completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                         })());
                     });
                 });
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // 3. Recopilación de datos de tablas
+                // 3. Recopilar datos de las tablas de equipamientos
                 const datosEquipamientos = [];
                 document.querySelectorAll('.fila-equip').forEach(tr => {
                     const select = tr.querySelector('.select-estado');
@@ -1733,7 +1661,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                UIProgress.update(completados, totalTareas, "Generando justificante...");
+                UIProgress.update(completados, totalTareas, "Generando justificante PDF...");
                 const payload = {
                     tipo_formulario: "equipamientos",
                     fase: window.EIEL_CONFIG.fase,
@@ -1759,7 +1687,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // --- LIMPIEZA TOTAL ---
+                // --- RESET Y LIMPIEZA FINAL ---
                 archivos = []; colaAdjuntosReq = {}; colaAdjuntosNuevos = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
@@ -1771,12 +1699,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             } catch (error) {
                 console.error(error);
-                mostrarMensaje(`❌ Error: ${error.message}`, "error");
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
                 toggleFormFreeze(false);
             }
         });
     }
-
     
 });
 </script>
