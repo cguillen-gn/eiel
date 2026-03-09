@@ -491,6 +491,14 @@ document.addEventListener("DOMContentLoaded", () => {
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
 
+    function mostrarMensaje(texto, tipo) {
+        if (!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`;
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     let colaAdjuntosReq = {};
     let reqIdActual = null;
     const inputReq = document.getElementById('hiddenInputReq');
@@ -533,14 +541,6 @@ document.addEventListener("DOMContentLoaded", () => {
         renderColaReq(id);
     };
 
-    function mostrarMensaje(texto, tipo) {
-        if (!mensajeDiv) return;
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`; 
-        mensajeDiv.classList.remove('hidden');
-        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
             btnEnviar.disabled = !this.checked;
@@ -550,49 +550,76 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
-            toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const departamentoVal = document.getElementById("contactoDepartamento").value.trim();
-            const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const obsValue = document.getElementById("observaciones").value.trim();
+            // --- A. VALIDACIÓN DE CONTACTO ---
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+            if (nombre.length < 2) {
+                mostrarMensaje("⚠️ Por favor, introduzca su nombre y apellidos.", "error");
+                return;
+            }
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
+                return;
+            }
+
+            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            const areasReq = document.querySelectorAll('.txt-resp-req');
+            let reqIncompletos = false;
             const respuestasReq = [];
-            document.querySelectorAll('.txt-resp-req').forEach(area => {
+
+            areasReq.forEach(area => {
                 const id = area.dataset.id;
                 const resp = area.value.trim();
-                const archivosFila = colaAdjuntosReq[id] || [];
-                if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
+                const adjuntos = colaAdjuntosReq[id] || [];
+                
+                // Validación individual: cada aviso requiere texto O archivo
+                if (resp === "" && adjuntos.length === 0) {
+                    reqIncompletos = true;
+                } else {
+                    respuestasReq.push({ 
+                        pregunta: area.dataset.msg, 
+                        respuesta: resp, 
+                        archivos: adjuntos.map(f => f.name).join("; ") 
+                    });
                 }
             });
 
-            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
-                toggleFormFreeze(false); return;
+            if (reqIncompletos) {
+                mostrarMensaje("⚠️ Debe responder individualmente a cada uno de los requerimientos mostrados.", "error");
+                return;
             }
 
-            const totalTareas = archivos.length + Object.values(colaAdjuntosReq).flat().length;
-            let completados = 0;
+            // --- C. PROCESO DE ENVÍO ---
+            toggleFormFreeze(true);
+            const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
+            const numGenerales = archivos.length;
+            const totalTareas = numReqFiles + numGenerales;
+            
             UIProgress.show(totalTareas);
+            let completados = 0;
 
             try {
                 const tareasSubida = [];
+                // Subida paralela de avisos
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
-                            completados++;
-                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
+                            completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                         })());
                     });
                 });
+                
+                // Subida paralela de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++;
-                        UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
                     })());
                 });
 
@@ -603,10 +630,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     tipo_formulario: "alumbrado",
                     fase: window.EIEL_CONFIG.fase,
                     id_envio: idBatch,
-                    observaciones: obsValue,
-                    nombre_contacto: nombreContacto,
-                    departamento_contacto: departamentoVal,
-                    email_contacto: emailContacto,
+                    observaciones: document.getElementById("observaciones").value.trim(),
+                    nombre_contacto: nombre,
+                    departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
+                    email_contacto: email,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
@@ -620,19 +647,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // --- FINALIZACIÓN Y LIMPIEZA ---
                 UIProgress.complete();
-                archivos = []; 
-                colaAdjuntosReq = {}; 
                 
-                // Limpia visualmente TODAS las listas de archivos (general y requerimientos)
+                // Limpieza total tras éxito
+                archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
-
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                    if (el.tagName === 'SELECT') el.selectedIndex = 0;
                 });
-
                 if (checkConformidad) checkConformidad.checked = false;
                 btnEnviar.disabled = true;
 
