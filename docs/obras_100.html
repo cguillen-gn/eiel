@@ -182,7 +182,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -238,7 +239,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -294,7 +296,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" selected>
+                            <option value="Finalizada" selected>Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -352,7 +355,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -408,7 +412,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -466,7 +471,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" selected>
+                            <option value="Finalizada" selected>Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -524,7 +530,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -580,7 +587,8 @@
                             <option value="No iniciada">No iniciada</option>
                             <option value="En ejecución">En ejecución</option>
                             <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" >
+                            <option value="Finalizada" >Finalizada</option>
+                            <option value="Desconocido">Desconocido / Sin datos</option>
                                 Finalizada
                             </option>
                         </select>
@@ -657,14 +665,14 @@
             <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
         </div>
         <div class="form-group">
-            <label class="form-label">Email (Para recibir justificante) *</label>
-            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
-        </div>
-        
-        <div class="form-group">
-            <label class="form-label">Confirme su Email *</label>
-            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
-            </div>
+        <label class="form-label">Email (Para recibir justificante) *</label>
+        <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Confirme su Email *</label>
+        <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+    </div>
     </div>
 </div>
 
@@ -1013,7 +1021,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderColaReq(id); 
     };
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN 
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -1032,47 +1040,68 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Inicializamos la primera fila de nuevas obras
-    agregarFilaNuevaObra();
+    // Inicialización de fila vacía
+    if (typeof agregarFilaNuevaObra === 'function') agregarFilaNuevaObra();
 
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
-            toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // 1. Recopilar respuestas a requerimientos
+            // --- A. VALIDACIÓN DE CONTACTO ---
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+            if (nombre.length < 2) {
+                mostrarMensaje("⚠️ Por favor, introduzca su nombre y apellidos.", "error");
+                return;
+            }
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
+                return;
+            }
+
+            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            const areasReq = document.querySelectorAll('.txt-resp-req');
+            let reqIncompletos = false;
             const respuestasReq = [];
-            document.querySelectorAll('.txt-resp-req').forEach(area => {
+
+            areasReq.forEach(area => {
                 const id = area.dataset.id;
                 const resp = area.value.trim();
-                const archivosFila = colaAdjuntosReq[id] || [];
-                if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ 
-                        pregunta: area.dataset.msg, 
-                        respuesta: resp, 
-                        archivos: archivosFila.map(f => f.name).join("; ") 
+                const adjuntos = colaAdjuntosReq[id] || [];
+                
+                // Si falta respuesta escrita Y no hay adjuntos, bloqueamos
+                if (resp === "" && adjuntos.length === 0) {
+                    reqIncompletos = true;
+                } else {
+                    respuestasReq.push({
+                        pregunta: area.dataset.msg,
+                        respuesta: resp,
+                        archivos: adjuntos.map(f => f.name).join("; ")
                     });
                 }
             });
 
-            // VALIDACIONES
+            if (reqIncompletos) {
+                mostrarMensaje("⚠️ Debe dar una respuesta individualizada a cada uno de los requerimientos mostrados.", "error");
+                return;
+            }
+
+            // --- C. VALIDACIÓN DE TABLA DE OBRAS ---
             const selects = document.querySelectorAll('.fila-obra .select-estado');
-            let todasRellenas = true;
-            selects.forEach(s => { if(!s.value) todasRellenas = false; });
+            let obrasSinEstado = false;
+            selects.forEach(s => { if (!s.value) obrasSinEstado = true; });
 
-            if (!todasRellenas) {
-                mostrarMensaje("⚠️ Por favor, rellene el estado de todas las obras del listado.", "warning");
-                toggleFormFreeze(false); return;
+            if (obrasSinEstado) {
+                mostrarMensaje("⚠️ Por favor, indique el estado de todas las obras del listado oficial (puede marcar 'Desconocido').", "error");
+                return;
             }
 
-            const obsValue = document.getElementById("observaciones").value.trim();
-            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
-                toggleFormFreeze(false); return;
-            }
-
-            // 2. Cálculo de tareas y Subida Paralela Total
+            // --- D. ENVÍO (Si las validaciones anteriores pasan) ---
+            toggleFormFreeze(true);
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const totalTareas = numObrasFiles + numReqFiles;
@@ -1082,40 +1111,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida de Adjuntos de Obras (Oficiales y Nuevas)
-                Object.entries(colaAdjuntos).forEach(([id, listado]) => {
-                    listado.forEach(file => {
-                        tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'obras', window.EIEL_CONFIG.muniCode, id, idBatch);
-                            completados++; 
-                            UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                        })());
-                    });
-                });
-                // Subida de Adjuntos de Requerimientos
-                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    listado.forEach(file => {
-                        tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'obras', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
-                            completados++; 
-                            UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                        })());
+                // Subida de archivos en paralelo (Obras y Requerimientos)
+                [colaAdjuntos, colaAdjuntosReq].forEach((cola, idx) => {
+                    const seccionPrefix = idx === 0 ? '' : 'REQ_';
+                    Object.entries(cola).forEach(([id, listado]) => {
+                        listado.forEach(file => {
+                            tareasSubida.push((async () => {
+                                await UploadService.uploadFile(file, 'obras', window.EIEL_CONFIG.muniCode, id, idBatch);
+                                completados++; 
+                                UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
+                            })());
+                        });
                     });
                 });
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // 3. Recopilación de datos de las tablas
-                const estadosObras = [];
-                selects.forEach(select => {
-                    const idO = select.dataset.obraId;
-                    estadosObras.push({
-                        obra: idO, clave: select.dataset.clave, orden: select.dataset.orden,
-                        nombre: select.dataset.nombre, plan: select.dataset.plan,
-                        estado: select.value, modificado: select.value !== select.dataset.original,
-                        archivos: (colaAdjuntos[idO] || []).map(f => f.name).join("; ")
-                    });
-                });
+                // Recopilación de datos de tablas
+                const estadosObras = Array.from(selects).map(select => ({
+                    obra: select.dataset.obraId, clave: select.dataset.clave, 
+                    orden: select.dataset.orden, nombre: select.dataset.nombre, 
+                    plan: select.dataset.plan, estado: select.value, 
+                    modificado: select.value !== select.dataset.original,
+                    archivos: (colaAdjuntos[select.dataset.obraId] || []).map(f => f.name).join("; ")
+                }));
 
                 const nuevasObrasData = [];
                 document.querySelectorAll(".fila-nueva-obra").forEach(fila => {
@@ -1135,10 +1154,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     tipo_formulario: "obras",
                     fase: window.EIEL_CONFIG.fase,
                     id_envio: idBatch,
-                    observaciones: obsValue,
-                    nombre_contacto: document.getElementById("contactoNombre").value.trim(),
+                    observaciones: document.getElementById("observaciones").value.trim(),
+                    nombre_contacto: nombre,
                     departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
-                    email_contacto: document.getElementById("contactoEmail").value.trim(),
+                    email_contacto: email,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
@@ -1155,12 +1174,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // --- LIMPIEZA FINAL ---
-                colaAdjuntos = {}; colaAdjuntosReq = {}; contadorNuevas = 0;
+                // Limpieza total
+                colaAdjuntos = {}; colaAdjuntosReq = {};
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
-                const bodyNuevas = document.getElementById("bodyNuevasObras");
-                if (bodyNuevas) bodyNuevas.innerHTML = "";
-                agregarFilaNuevaObra();
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
                    if (el.tagName === 'SELECT') el.selectedIndex = 0;
