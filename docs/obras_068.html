@@ -1529,13 +1529,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     // 3. INICIALIZACIÓN UI
-    // 3.1 Marcado visual de obligatoriedad en observaciones
-    if (window.EIEL_CONFIG.hasAvisos) {
-        const labelObs = document.querySelector("label[for='observaciones']");
-        if (labelObs) {
-            labelObs.innerHTML += " <span class='text-required'>(* Obligatorio)</span>";
-        }
-    }
+
 
     // 4. SERVICIOS Y UTILIDADES DE UI
     const UIProgress = {
@@ -1737,7 +1731,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderColaReq(id); 
     };
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (OBRAS - SIN MARCAS VISUALES)
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -1755,9 +1749,6 @@ document.addEventListener("DOMContentLoaded", () => {
             btnEnviar.disabled = !this.checked; 
         });
     }
-
-    // Inicialización de fila vacía
-    if (typeof agregarFilaNuevaObra === 'function') agregarFilaNuevaObra();
 
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
@@ -1789,7 +1780,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Si falta respuesta escrita Y no hay adjuntos, bloqueamos
+                // Validación individual: texto o adjunto obligatorio por cada aviso
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -1816,7 +1807,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- D. ENVÍO (Si las validaciones anteriores pasan) ---
+            // --- D. ENVÍO ---
             toggleFormFreeze(true);
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
@@ -1827,9 +1818,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida de archivos en paralelo (Obras y Requerimientos)
-                [colaAdjuntos, colaAdjuntosReq].forEach((cola, idx) => {
-                    const seccionPrefix = idx === 0 ? '' : 'REQ_';
+                // Subida paralela
+                [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
                     Object.entries(cola).forEach(([id, listado]) => {
                         listado.forEach(file => {
                             tareasSubida.push((async () => {
@@ -1843,7 +1833,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // Recopilación de datos de tablas
+                // Recopilación de datos
                 const estadosObras = Array.from(selects).map(select => ({
                     obra: select.dataset.obraId, clave: select.dataset.clave, 
                     orden: select.dataset.orden, nombre: select.dataset.nombre, 
