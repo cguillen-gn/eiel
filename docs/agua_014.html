@@ -748,6 +748,49 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
+    
+    // --- A. GESTIÓN DE ADJUNTOS PARA REQUERIMIENTOS (FALTANTE EN TU ARCHIVO) ---
+    let colaAdjuntosReq = {};
+    let reqIdActual = null;
+    const inputReq = document.getElementById('hiddenInputReq');
+
+    window.gestionarAdjuntosReq = (id) => {
+        reqIdActual = id;
+        if (inputReq) inputReq.click();
+    };
+
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            const files = Array.from(inputReq.files);
+            if (!files.length || reqIdActual === null) return;
+            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
+            colaAdjuntosReq[reqIdActual].push(...files);
+            renderColaReq(reqIdActual);
+            inputReq.value = ""; reqIdActual = null;
+        });
+    }
+
+    function renderColaReq(id) {
+        const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+        if (!contenedor) return;
+        const archivosReq = colaAdjuntosReq[id] || [];
+        contenedor.innerHTML = archivosReq.map((f, i) => `
+            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
+                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+                </button>
+            </div>
+        `).join("");
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarArchivoReq = (id, i) => {
+        colaAdjuntosReq[id].splice(i, 1);
+        renderColaReq(id);
+    };
+
+    // --- B. LÓGICA DE BOTÓN Y MENSAJES ---
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -766,12 +809,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // --- C. EVENTO DE ENVÍO ---
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // --- A. VALIDACIÓN DE CONTACTO ---
+            // 1. VALIDACIÓN DE CONTACTO
             const nombre = document.getElementById("contactoNombre").value.trim();
             const email = document.getElementById("contactoEmail").value.trim();
             const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
@@ -786,7 +830,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -796,7 +840,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Validación individual: cada aviso requiere texto O archivo 
+                // Validación individual: texto o adjunto obligatorio por aviso
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -813,7 +857,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO ---
+            // 3. PROCESO DE SUBIDA Y ENVÍO
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -844,7 +888,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // Recopilación de datos de Depósitos 
+                // Recopilación de datos de Depósitos
                 const depositosData = [];
                 document.querySelectorAll('.input-limpieza').forEach(input => {
                     depositosData.push({ 
@@ -854,7 +898,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 UIProgress.update(completados, totalTareas, "Generando justificante...");
-                
                 const payload = {
                     tipo_formulario: "agua",
                     fase: window.EIEL_CONFIG.fase,
@@ -885,7 +928,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // Limpieza total tras éxito
+                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
