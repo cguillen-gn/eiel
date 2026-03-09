@@ -260,8 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // 0. ACTIVADOR DE TEMA
     document.body.classList.add('theme-obras');
-    
-    // Ejecuta la creación de iconos de Lucide
+   
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -270,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const header = document.querySelector('.site-header');
     if(header) header.classList.add('header-obras');
     
-    // Cambio de color dinámico para los estados
     document.querySelectorAll('.select-estado').forEach(select => {
         if (select.value !== "") select.classList.add('has-value');
         
@@ -291,7 +289,7 @@ document.addEventListener("DOMContentLoaded", () => {
         urlAdjuntos: "{{ url_adjuntos }}",
         urlLogger: "{{ url_logger }}",
         hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }},
-        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+        yearActual: new Date().getFullYear()
     };
 
     // 3. INICIALIZACIÓN UI
@@ -302,18 +300,17 @@ document.addEventListener("DOMContentLoaded", () => {
     bar: document.getElementById("progressBar"),
     text: document.getElementById("progressText"),
     percent: document.getElementById("progressPercentage"),
-    // Variable para recordar el punto más alto alcanzado
     maxReached: 0, 
 
     show(totalTasks) {
-        this.maxReached = 0; // Reiniciamos al empezar
+        this.maxReached = 0; 
         if (this.container) this.container.classList.remove('hidden');
         this.update(0, totalTasks, "Iniciando envío...");
     },
 
     update(completed, total, message) {
         const msg = message.toLowerCase();
-        // Detectamos si es el paso del registro o PDF
+
         const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
         
         let targetPercentage = 0;
@@ -324,15 +321,12 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
-        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage > this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
         }
-        
-        // El texto sí lo actualizamos siempre para dar feedback constante
+
         if (this.text && message) this.text.textContent = message;
     },
 
@@ -385,12 +379,12 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ADJUNTOS Y FILAS 
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     
-    // --- GESTIÓN DE ADJUNTOS POR OBRA (Tabla de Seguimiento y Nuevas) ---
+    // --- GESTIÓN DE ADJUNTOS POR OBRA ---
     let colaAdjuntos = {}; 
     let idObraActual = null;
-    const inputObras = document.getElementById('hiddenFileInput'); // ID corregido según tu HTML
+    const inputObras = document.getElementById('hiddenFileInput');
 
     window.gestionarAdjuntos = (id) => { 
         idObraActual = id; 
@@ -496,7 +490,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderColaReq(id); 
     };
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (OBRAS - SIN MARCAS VISUALES)
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -545,7 +539,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Validación individual: texto o adjunto obligatorio por cada aviso
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -572,7 +565,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- D. ENVÍO ---
+            // --- D. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
@@ -583,7 +576,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida paralela
+
                 [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
                     Object.entries(cola).forEach(([id, listado]) => {
                         listado.forEach(file => {
@@ -598,7 +591,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // Recopilación de datos
+
                 const estadosObras = Array.from(selects).map(select => ({
                     obra: select.dataset.obraId, clave: select.dataset.clave, 
                     orden: select.dataset.orden, nombre: select.dataset.nombre, 
@@ -645,7 +638,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // Limpieza total
                 colaAdjuntos = {}; colaAdjuntosReq = {};
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {

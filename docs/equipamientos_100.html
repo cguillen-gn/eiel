@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        // 1. CONFIGURACIÓN GLOBAL
         window.EIEL_CONFIG = {
             muniCode: "100",
             muniName: "Parcent",
@@ -33,8 +33,6 @@
         
         // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
         function toggleFormFreeze(isFrozen) {
-            // Seleccionamos todos los elementos interactivos del formulario
-            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
             const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
             const elements = document.querySelectorAll(selectors);
             
@@ -1433,7 +1431,9 @@ document.addEventListener("DOMContentLoaded", () => {
         yearActual: new Date().getFullYear()
     };
 
-    // 3. SELECTOR ESTADOS (Cambio dinámico de color del punto)
+    // 3. INICIALIZACIÓN UI
+    
+    // 4. SERVICIOS Y UTILIDADES DE UI
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1445,7 +1445,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // 4. GESTIÓN DE ADJUNTOS
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     let archivos = []; 
     const fileInput = document.getElementById('fileInput');
     const fileList = document.getElementById('fileList');
@@ -1462,7 +1462,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dropZone = document.querySelector('.file-upload-area');
     
     if (dropZone) {
-        // Evita que el navegador abra el archivo al soltarlo
+        
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, e => {
                 e.preventDefault();
@@ -1470,22 +1470,19 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Efecto visual: añade la clase al entrar/moverse
         ['dragenter', 'dragover'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.add('drag-over'));
         });
 
-        // Efecto visual: quita la clase al salir o soltar
         ['dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.remove('drag-over'));
         });
 
-        // Captura de los archivos soltados
         dropZone.addEventListener('drop', e => {
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
                 archivos.push(...files);
-                renderArchivos(); // Llama a la función que dibuja la lista
+                renderArchivos();
             }
         });
     }
@@ -1508,7 +1505,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // 5. UTILIDADES Y GESTIÓN DE FILAS (EQUIPAMIENTOS)
     const UIProgress = {
         container: document.getElementById("progressContainer"),
         bar: document.getElementById("progressBar"),
@@ -1632,7 +1628,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.eliminarArchivoDeFila = (idFila, index) => { colaAdjuntosNuevos[idFila].splice(index, 1); renderFilaAdjuntos(idFila); };
     window.eliminarFilaNuevoEq = (idFila) => { const fila = document.getElementById(`fila_${idFila}`); if (fila) fila.remove(); delete colaAdjuntosNuevos[idFila]; };
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (EQUIPAMIENTOS - VERSIÓN FINAL UNIFICADA)
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -1689,7 +1685,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Inicializar con una fila vacía para nuevos equipamientos
     if (typeof agregarFilaNuevoEquipamiento === 'function') {
         agregarFilaNuevoEquipamiento();
     }
@@ -1699,7 +1694,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // 1. VALIDACIÓN DE CONTACTO
+            // --- A. VALIDACIÓN DE CONTACTO ---
             const nombre = document.getElementById("contactoNombre").value.trim();
             const email = document.getElementById("contactoEmail").value.trim();
             const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
@@ -1714,7 +1709,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
+            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -1724,7 +1719,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Validación estricta: cada aviso requiere texto O archivo
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -1741,7 +1735,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 3. PROCESO DE SUBIDA Y ENVÍO
+            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numGenerales = archivos.length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
@@ -1753,7 +1747,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida paralela de todos los archivos
+
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'GENERAL', idBatch);
@@ -1781,7 +1775,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // Recopilación de datos de tablas
+
                 const datosEquipamientos = Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
                     const select = tr.querySelector('.select-estado');
                     return {
@@ -1832,7 +1826,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; colaAdjuntosNuevos = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
@@ -1866,7 +1859,6 @@ document.addEventListener("DOMContentLoaded", () => {
             fase: "2026",
             tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
             ua: navigator.userAgent,
-            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
             contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
             departamento: localStorage.getItem("eiel_user_dept") || "N/A",
             email: localStorage.getItem("eiel_user_email") || "N/A" 

@@ -160,7 +160,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // 0. ACTIVADOR DE TEMA
     document.body.classList.add('theme-viario');
     
-    // Ejecuta la creación de iconos de Lucide
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -178,7 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
         urlAdjuntos: "{{ url_adjuntos }}",
         urlLogger: "{{ url_logger }}",
         hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }},
-        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+        yearActual: new Date().getFullYear()
     };
 
     // 3. INICIALIZACIÓN UI
@@ -189,7 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
     bar: document.getElementById("progressBar"),
     text: document.getElementById("progressText"),
     percent: document.getElementById("progressPercentage"),
-    //Variable para recordar el punto más alto alcanzado
     maxReached: 0, 
 
     show(totalTasks) {
@@ -199,7 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
     },
     update(completed, total, message) {
         const msg = message.toLowerCase();
-        // Detectamos si es el paso del registro o PDF
+        
         const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
         
         let targetPercentage = 0;
@@ -210,15 +208,12 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
-        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage >= this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
         }
         
-        // El texto sí lo actualizamos siempre para dar feedback constante
         if (this.text && message) this.text.textContent = message;
     },
 
@@ -265,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS (UI)
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -282,7 +277,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dropZone = document.querySelector('.file-upload-area');
     
     if (dropZone) {
-        // Evita que el navegador abra el archivo al soltarlo
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, e => {
                 e.preventDefault();
@@ -290,22 +285,19 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Efecto visual: añade la clase al entrar/moverse
         ['dragenter', 'dragover'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.add('drag-over'));
         });
 
-        // Efecto visual: quita la clase al salir o soltar
         ['dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.remove('drag-over'));
         });
 
-        // Captura de los archivos soltados
         dropZone.addEventListener('drop', e => {
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
                 archivos.push(...files);
-                renderArchivos(); // Llama a la función que dibuja la lista
+                renderArchivos();
             }
         });
     }
@@ -398,7 +390,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // 1. VALIDACIÓN DE CONTACTO
+            // --- A. VALIDACIÓN DE CONTACTO ---
             const nombre = document.getElementById("contactoNombre").value.trim();
             const email = document.getElementById("contactoEmail").value.trim();
             const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
@@ -413,7 +405,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
+            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -423,7 +415,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Cada aviso debe tener texto O archivo obligatoriamente
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -440,7 +431,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 3. PROCESO DE SUBIDA Y ENVÍO
+           // --- C. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -451,7 +442,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida de archivos de avisos
+
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
@@ -461,7 +452,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                // Subida de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'viario', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
@@ -495,7 +485,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {

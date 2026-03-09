@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        // 1. CONFIGURACIÓN GLOBAL
         window.EIEL_CONFIG = {
             muniCode: "093",
             muniName: "Novelda",
@@ -33,8 +33,6 @@
         
         // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
         function toggleFormFreeze(isFrozen) {
-            // Seleccionamos todos los elementos interactivos del formulario
-            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
             const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
             const elements = document.querySelectorAll(selectors);
             
@@ -336,7 +334,7 @@ document.addEventListener("DOMContentLoaded", () => {
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
         urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
         hasAvisos: true,
-        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+        yearActual: new Date().getFullYear() 
     };
 
     // 3. INICIALIZACIÓN UI
@@ -347,7 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
     bar: document.getElementById("progressBar"),
     text: document.getElementById("progressText"),
     percent: document.getElementById("progressPercentage"),
-    //Variable para recordar el punto más alto alcanzado
     maxReached: 0, 
 
     show(totalTasks) {
@@ -358,7 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     update(completed, total, message) {
         const msg = message.toLowerCase();
-        // Detectamos si es el paso del registro o PDF
+
         const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
         
         let targetPercentage = 0;
@@ -369,15 +366,12 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
-        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage >= this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
         }
         
-        // El texto sí lo actualizamos siempre para dar feedback constante
         if (this.text && message) this.text.textContent = message;
     },
 
@@ -424,7 +418,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS (UI)
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -572,7 +566,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Validación individual: cada aviso requiere texto O archivo
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -589,7 +582,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO ---
+            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -600,7 +593,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida paralela de avisos
+
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
@@ -610,7 +603,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
                 
-                // Subida paralela de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
@@ -644,7 +636,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // Limpieza total tras éxito
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
@@ -677,7 +668,6 @@ document.addEventListener("DOMContentLoaded", () => {
             fase: "2026",
             tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
             ua: navigator.userAgent,
-            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
             contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
             departamento: localStorage.getItem("eiel_user_dept") || "N/A",
             email: localStorage.getItem("eiel_user_email") || "N/A" 

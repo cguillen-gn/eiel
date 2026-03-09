@@ -178,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
         urlAdjuntos: "{{ url_adjuntos }}",
         urlLogger: "{{ url_logger }}",
         hasAvisos: {{ 'true' if avisos_personalizados and avisos_personalizados|length > 0 else 'false' }},
-        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+        yearActual: new Date().getFullYear() 
     };
 
     // 3. INICIALIZACIÓN UI
@@ -189,7 +189,6 @@ document.addEventListener("DOMContentLoaded", () => {
     bar: document.getElementById("progressBar"),
     text: document.getElementById("progressText"),
     percent: document.getElementById("progressPercentage"),
-    //Variable para recordar el punto más alto alcanzado
     maxReached: 0, 
 
     show(totalTasks) {
@@ -200,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     update(completed, total, message) {
         const msg = message.toLowerCase();
-        // Detectamos si es el paso del registro o PDF
+
         const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
         
         let targetPercentage = 0;
@@ -211,15 +210,12 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
-        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage >= this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
         }
         
-        // El texto sí lo actualizamos siempre para dar feedback constante
         if (this.text && message) this.text.textContent = message;
     },
 
@@ -266,7 +262,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS (UI)
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -414,7 +410,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Validación individual: cada aviso requiere texto O archivo
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -431,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO ---
+            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -442,7 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida paralela de avisos
+
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
@@ -452,7 +447,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
                 
-                // Subida paralela de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'alumbrado', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
@@ -486,7 +480,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // Limpieza total tras éxito
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {

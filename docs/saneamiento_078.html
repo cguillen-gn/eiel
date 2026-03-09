@@ -12,7 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL (Puente entre Python/Jinja2 y JS)
+        // 1. CONFIGURACIÓN GLOBAL
         window.EIEL_CONFIG = {
             muniCode: "078",
             muniName: "Hondón de los Frailes",
@@ -33,8 +33,6 @@
         
         // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
         function toggleFormFreeze(isFrozen) {
-            // Seleccionamos todos los elementos interactivos del formulario
-            // Excluimos el botón de "Salir" para que siempre puedan cerrar sesión
             const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
             const elements = document.querySelectorAll(selectors);
             
@@ -358,7 +356,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // 0. ACTIVADOR DE TEMA
     document.body.classList.add('theme-saneamiento');
     
-    // Ejecuta la creación de iconos de Lucide
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -376,23 +373,20 @@ document.addEventListener("DOMContentLoaded", () => {
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
         urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
         hasAvisos: true,
-        yearActual: new Date().getFullYear() // Año dinámico para validaciones
+        yearActual: new Date().getFullYear()
     };
 
     // 3. INICIALIZACIÓN UI
     
-    // 3.2 Lógica de gestión del servicio
+    // Lógica de gestión del servicio
     const selectGestion = document.getElementById('tipo_gestion');
     const divExterno = document.getElementById('campos_gestion_externa');
 
-    // Solo activamos la lógica si existen los elementos en pantalla
     if (selectGestion && divExterno) {
         
-        // Escuchamos cuando el usuario cambia la opción
         selectGestion.addEventListener('change', function() {
             const val = this.value;
 
-            // Si es "Indirecta" o "Mancomunidad", mostramos los campos
             if (val === 'Indirecta (Concesionaria)' || val === 'Mancomunidad') {
                 divExterno.classList.remove('hidden');
             } else {
@@ -407,19 +401,18 @@ document.addEventListener("DOMContentLoaded", () => {
     bar: document.getElementById("progressBar"),
     text: document.getElementById("progressText"),
     percent: document.getElementById("progressPercentage"),
-    //Variable para recordar el punto más alto alcanzado
     maxReached: 0, 
 
    
     show(totalTasks) {
-        this.maxReached = 0; // Reiniciamos al empezar
+        this.maxReached = 0;
         if (this.container) this.container.classList.remove('hidden');
         this.update(0, totalTasks, "Iniciando envío...");
     },
 
     update(completed, total, message) {
         const msg = message.toLowerCase();
-        // Detectamos si es el paso del registro o PDF
+
         const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
         
         let targetPercentage = 0;
@@ -430,15 +423,12 @@ document.addEventListener("DOMContentLoaded", () => {
             targetPercentage = isFinalStep ? 95 : 0;
         }
 
-        // --- EL BLOQUEO DE SEGURIDAD ---
-        // Solo actualizamos si el nuevo porcentaje es mayor al que ya mostramos
         if (targetPercentage > this.maxReached) {
             this.maxReached = targetPercentage;
             if (this.bar) this.bar.style.width = this.maxReached + "%";
             if (this.percent) this.percent.textContent = this.maxReached + "%";
         }
         
-        // El texto sí lo actualizamos siempre para dar feedback constante
         if (this.text && message) this.text.textContent = message;
     },
 
@@ -486,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 5. GESTIÓN DE ARCHIVOS (UI)
+    // 5. GESTIÓN DE ARCHIVOS Y ADJUNTOS
     let archivos = [];
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
@@ -503,7 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const dropZone = document.querySelector('.file-upload-area');
     
     if (dropZone) {
-        // Evita que el navegador abra el archivo al soltarlo
+
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, e => {
                 e.preventDefault();
@@ -511,22 +501,19 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Efecto visual: añade la clase al entrar/moverse
         ['dragenter', 'dragover'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.add('drag-over'));
         });
 
-        // Efecto visual: quita la clase al salir o soltar
         ['dragleave', 'drop'].forEach(name => {
             dropZone.addEventListener(name, () => dropZone.classList.remove('drag-over'));
         });
 
-        // Captura de los archivos soltados
         dropZone.addEventListener('drop', e => {
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
                 archivos.push(...files);
-                renderArchivos(); // Llama a la función que dibuja la lista
+                renderArchivos();
             }
         });
     }
@@ -620,7 +607,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const idBatch = "ENVIO_" + new Date().getTime();
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // 1. VALIDACIÓN DE CONTACTO
+            // --- A. VALIDACIÓN DE CONTACTO ---
             const nombre = document.getElementById("contactoNombre").value.trim();
             const email = document.getElementById("contactoEmail").value.trim();
             const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
@@ -635,7 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
+            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -645,7 +632,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = area.value.trim();
                 const adjuntos = colaAdjuntosReq[id] || [];
                 
-                // Si el aviso está vacío de texto Y no tiene archivos, bloqueamos
                 if (resp === "" && adjuntos.length === 0) {
                     reqIncompletos = true;
                 } else {
@@ -662,7 +648,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // 3. PROCESO DE SUBIDA Y ENVÍO
+            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -673,7 +659,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             try {
                 const tareasSubida = [];
-                // Subida de archivos de avisos
+
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
@@ -683,7 +669,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
                 
-                // Subida de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
@@ -723,7 +708,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
@@ -756,7 +740,6 @@ document.addEventListener("DOMContentLoaded", () => {
             fase: "2026",
             tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
             ua: navigator.userAgent,
-            // Prioridad: 1. Nombre técnico guardado | 2. Fallback descriptivo
             contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
             departamento: localStorage.getItem("eiel_user_dept") || "N/A",
             email: localStorage.getItem("eiel_user_email") || "N/A" 
