@@ -2727,7 +2727,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.eliminarArchivoDeFila = (idFila, index) => { colaAdjuntosNuevos[idFila].splice(index, 1); renderFilaAdjuntos(idFila); };
     window.eliminarFilaNuevoEq = (idFila) => { const fila = document.getElementById(`fila_${idFila}`); if (fila) fila.remove(); delete colaAdjuntosNuevos[idFila]; };
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (EQUIPAMIENTOS - FINAL)
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN (EQUIPAMIENTOS - VERSIÓN FINAL UNIFICADA)
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConformidad = document.getElementById("checkConformidad");
     const mensajeDiv = document.getElementById("mensaje");
@@ -2744,7 +2744,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let reqIdActual = null;
     const inputReq = document.getElementById('hiddenInputReq');
 
-    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; inputReq.click(); };
+    window.gestionarAdjuntosReq = (id) => {
+        reqIdActual = id;
+        inputReq.click();
+    };
+
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
@@ -2759,7 +2763,8 @@ document.addEventListener("DOMContentLoaded", () => {
     function renderColaReq(id) {
         const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
         if (!contenedor) return;
-        contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
+        const archivosReq = colaAdjuntosReq[id] || [];
+        contenedor.innerHTML = archivosReq.map((f, i) => `
             <div class="file-item" style="margin-bottom:4px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
                 <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
@@ -2768,112 +2773,143 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    window.eliminarArchivoReq = (id, i) => { colaAdjuntosReq[id].splice(i, 1); renderColaReq(id); };
+    window.eliminarArchivoReq = (id, i) => {
+        colaAdjuntosReq[id].splice(i, 1);
+        renderColaReq(id);
+    };
 
     if (checkConformidad && btnEnviar) {
-        checkConformidad.addEventListener('change', function() { btnEnviar.disabled = !this.checked; });
+        checkConformidad.addEventListener('change', function() { 
+            btnEnviar.disabled = !this.checked; 
+        });
     }
 
     // Inicializar con una fila vacía para nuevos equipamientos
-    agregarFilaNuevoEquipamiento();
+    if (typeof agregarFilaNuevoEquipamiento === 'function') {
+        agregarFilaNuevoEquipamiento();
+    }
 
     if (btnEnviar) {
         btnEnviar.addEventListener("click", async () => {
             const idBatch = "ENVIO_" + new Date().getTime();
-            toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            // 1. Recopilar respuestas a requerimientos
+            // 1. VALIDACIÓN DE CONTACTO
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
+            const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+            if (nombre.length < 2) {
+                mostrarMensaje("⚠️ Por favor, introduzca su nombre y apellidos.", "error");
+                return;
+            }
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
+                return;
+            }
+
+            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
+            const areasReq = document.querySelectorAll('.txt-resp-req');
+            let reqIncompletos = false;
             const respuestasReq = [];
-            document.querySelectorAll('.txt-resp-req').forEach(area => {
+
+            areasReq.forEach(area => {
                 const id = area.dataset.id;
                 const resp = area.value.trim();
-                const archivosFila = colaAdjuntosReq[id] || [];
-                if (resp.length > 0 || archivosFila.length > 0) {
-                    respuestasReq.push({ pregunta: area.dataset.msg, respuesta: resp, archivos: archivosFila.map(f => f.name).join("; ") });
+                const adjuntos = colaAdjuntosReq[id] || [];
+                
+                // Validación estricta: cada aviso requiere texto O archivo
+                if (resp === "" && adjuntos.length === 0) {
+                    reqIncompletos = true;
+                } else {
+                    respuestasReq.push({ 
+                        pregunta: area.dataset.msg, 
+                        respuesta: resp, 
+                        archivos: adjuntos.map(f => f.name).join("; ") 
+                    });
                 }
             });
 
-            const obsValue = document.getElementById("observaciones").value.trim();
-            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
-                toggleFormFreeze(false); return;
+            if (reqIncompletos) {
+                mostrarMensaje("⚠️ Debe dar una respuesta individualizada (texto o adjunto) a cada uno de los requerimientos mostrados.", "error");
+                return;
             }
 
-            // 2. Cálculo de tareas y Subida Paralela Masiva
+            // 3. PROCESO DE SUBIDA Y ENVÍO
+            toggleFormFreeze(true);
             const numGenerales = archivos.length;
-            const numReq = Object.values(colaAdjuntosReq).flat().length;
-            const numNuevos = Object.values(colaAdjuntosNuevos).flat().length;
-            const totalTareas = numGenerales + numReq + numNuevos;
-            UIProgress.show(totalTareas);
+            const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
+            const numNuevosFiles = Object.values(colaAdjuntosNuevos).flat().length;
+            const totalTasks = numGenerales + numReqFiles + numNuevosFiles;
+            
+            UIProgress.show(totalTasks);
             let completados = 0;
 
             try {
                 const tareasSubida = [];
-                // Subida Generales
+                // Subida paralela de todos los archivos
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'GENERAL', idBatch);
-                        completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        completados++; UIProgress.update(completados, totalTasks, `Subiendo: ${file.name}`);
                     })());
                 });
-                // Subida Requerimientos
+
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
-                            completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
+                            completados++; UIProgress.update(completados, totalTasks, `Subiendo: ${file.name}`);
                         })());
                     });
                 });
-                // Subida Nuevos Equipamientos
+
                 Object.entries(colaAdjuntosNuevos).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
                             await UploadService.uploadFile(file, 'equipamientos', window.EIEL_CONFIG.muniCode, 'NUEVOS_EQUIPAMIENTOS', idBatch);
-                            completados++; UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            completados++; UIProgress.update(completados, totalTasks, `Subiendo: ${file.name}`);
                         })());
                     });
                 });
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
-                // 3. Recopilar datos de las tablas de equipamientos
-                const datosEquipamientos = [];
-                document.querySelectorAll('.fila-equip').forEach(tr => {
+                // Recopilación de datos de tablas
+                const datosEquipamientos = Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
                     const select = tr.querySelector('.select-estado');
-                    datosEquipamientos.push({
+                    return {
                         id: tr.dataset.id,
                         nombre: tr.querySelector('.nombre-eq strong').textContent,
                         categoria: tr.closest('details').querySelector('.acc-title-box span').textContent,
                         estado: select.value,
                         modificado: select.value !== select.dataset.original,
                         obs: tr.querySelector('.txt-obs-eq').value.trim()
-                    });
+                    };
                 });
 
-                const dataNuevos = [];
-                document.querySelectorAll('.fila-nuevo-eq').forEach(fila => {
+                const dataNuevos = Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(fila => {
                     const idFila = fila.id.replace('fila_', '');
-                    dataNuevos.push({
+                    return {
                         nombre: fila.querySelector('.new-deno').value.trim(),
                         direccion: fila.querySelector('.new-ubica').value.trim(),
                         uso: fila.querySelector('.new-uso').value.trim(),
                         estado: fila.querySelector('.new-estado').value,
                         observaciones: fila.querySelector('.new-obs-fila').value.trim(),
                         archivo: (colaAdjuntosNuevos[idFila] || []).map(f => f.name).join("; ")
-                    });
+                    };
                 });
 
-                UIProgress.update(completados, totalTareas, "Generando justificante PDF...");
+                UIProgress.update(completados, totalTasks, "Generando justificante PDF...");
                 const payload = {
                     tipo_formulario: "equipamientos",
                     fase: window.EIEL_CONFIG.fase,
                     id_envio: idBatch,
-                    observaciones: obsValue,
-                    nombre_contacto: document.getElementById("contactoNombre").value.trim(),
+                    observaciones: document.getElementById("observaciones").value.trim(),
+                    nombre_contacto: nombre,
                     departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
-                    email_contacto: document.getElementById("contactoEmail").value.trim(),
+                    email_contacto: email,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
@@ -2891,7 +2927,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // --- RESET Y LIMPIEZA FINAL ---
+                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; colaAdjuntosNuevos = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
