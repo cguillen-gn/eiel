@@ -624,26 +624,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (window.lucide) lucide.createIcons();
     }
 
-    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConformidad = document.getElementById("checkConformidad");
-    const mensajeDiv = document.getElementById("mensaje");
-
+    // 6. LÓGICA DE ENVÍO Y VALIDACIÓN 
+    
     let colaAdjuntosReq = {};
     let reqIdActual = null;
     const inputReq = document.getElementById('hiddenInputReq');
 
-    function mostrarMensaje(texto, tipo) {
-        if (!mensajeDiv) return;
-        mensajeDiv.textContent = texto;
-        mensajeDiv.className = `message ${tipo}`; 
-        mensajeDiv.classList.remove('hidden');
-        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
     window.gestionarAdjuntosReq = (id) => {
         reqIdActual = id;
-        inputReq.click();
+        if (inputReq) inputReq.click();
     };
 
     if (inputReq) {
@@ -663,11 +652,9 @@ document.addEventListener("DOMContentLoaded", () => {
         const archivosReq = colaAdjuntosReq[id] || [];
         contenedor.innerHTML = archivosReq.map((f, i) => `
             <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
-                    <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
-                </span>
+                <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
                 <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
-                    <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
+                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
                 </button>
             </div>
         `).join("");
@@ -678,6 +665,18 @@ document.addEventListener("DOMContentLoaded", () => {
         colaAdjuntosReq[id].splice(i, 1);
         renderColaReq(id);
     };
+
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConformidad = document.getElementById("checkConformidad");
+    const mensajeDiv = document.getElementById("mensaje");
+
+    function mostrarMensaje(texto, tipo) {
+        if (!mensajeDiv) return;
+        mensajeDiv.textContent = texto;
+        mensajeDiv.className = `message ${tipo}`; 
+        mensajeDiv.classList.remove('hidden');
+        mensajeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 
     if (checkConformidad && btnEnviar) {
         checkConformidad.addEventListener('change', function() {
@@ -691,72 +690,78 @@ document.addEventListener("DOMContentLoaded", () => {
             toggleFormFreeze(true);
             if (mensajeDiv) mensajeDiv.classList.add('hidden'); 
 
-            const nombreContacto = document.getElementById("contactoNombre").value.trim();
-            const emailContacto = document.getElementById("contactoEmail").value.trim();
-            const emailConfirmInput = document.getElementById("contactoEmailConfirm");
-            const emailConfirm = emailConfirmInput ? emailConfirmInput.value.trim() : emailContacto;
-            const obsValue = document.getElementById("observaciones").value.trim();
+            // 1. VALIDACIÓN DE CONTACTO
+            const nombre = document.getElementById("contactoNombre").value.trim();
+            const email = document.getElementById("contactoEmail").value.trim();
+            const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
             const regexEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-            if (nombreContacto.length < 2) {
-                mostrarMensaje("⚠️ El nombre es demasiado corto.", "warning");
+            if (nombre.length < 2) {
+                mostrarMensaje("⚠️ Por favor, introduzca su nombre y apellidos.", "error");
+                toggleFormFreeze(false); return;
+            }
+            if (!regexEmail.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
+                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
                 toggleFormFreeze(false); return;
             }
 
-            if (!regexEmail.test(emailContacto) || emailContacto.toLowerCase() !== emailConfirm.toLowerCase()) {
-                mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida.", "error");
-                toggleFormFreeze(false); return;
-            }
-
-            // 1. Recopilar respuestas a requerimientos
+            // 2. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS
+            const areasReq = document.querySelectorAll('.txt-resp-req');
+            let reqIncompletos = false;
             const respuestasReq = [];
-            document.querySelectorAll('.txt-resp-req').forEach(area => {
+
+            areasReq.forEach(area => {
                 const id = area.dataset.id;
                 const resp = area.value.trim();
-                const archivosFila = colaAdjuntosReq[id] || [];
-                if (resp.length > 0 || archivosFila.length > 0) {
+                const adjuntos = colaAdjuntosReq[id] || [];
+                
+                // Cada aviso debe tener texto O archivo obligatoriamente
+                if (resp === "" && adjuntos.length === 0) {
+                    reqIncompletos = true;
+                } else {
                     respuestasReq.push({ 
                         pregunta: area.dataset.msg, 
                         respuesta: resp, 
-                        archivos: archivosFila.map(f => f.name).join("; ") 
+                        archivos: adjuntos.map(f => f.name).join("; ") 
                     });
                 }
             });
 
-            if (window.EIEL_CONFIG.hasAvisos && respuestasReq.length === 0 && obsValue.length < 15) {
-                mostrarMensaje("⚠️ Debe responder a los requerimientos o justificarlo en Observaciones generales.", "error");
+            if (reqIncompletos) {
+                mostrarMensaje("⚠️ Debe dar una respuesta individualizada (texto o adjunto) a cada uno de los requerimientos mostrados.", "error");
                 toggleFormFreeze(false); return;
             }
 
+            // 3. PROCESO DE SUBIDA Y ENVÍO
             const totalTareas = archivos.length + Object.values(colaAdjuntosReq).flat().length;
             let completados = 0;
             UIProgress.show(totalTareas);
 
             try {
                 const tareasSubida = [];
-                // Subida paralela de requerimientos
+                // Subida paralela de avisos
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     listado.forEach(file => {
                         tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode, 'RESPUESTA_REQUERIMIENTOS', idBatch);
-                            completados++;
-                            UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                            await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
+                            completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
                         })());
                     });
                 });
+                
                 // Subida paralela de archivos generales
                 archivos.forEach(file => {
                     tareasSubida.push((async () => {
                         await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++;
-                        UIProgress.update(completados, totalTareas, `Subido: ${file.name}`);
+                        completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
                     })());
                 });
 
                 if (tareasSubida.length > 0) await Promise.all(tareasSubida);
 
                 // Recopilación de datos de la tabla de cementerios
-                const datosCementerios = cementerios.map((cem, index) => {
+                const cementeriosConfig = [{"nombre": "CEMENTERIO MUNICIPAL"}, {"nombre": "CEMENTERIO NUEVO"}];
+                const datosCementerios = cementeriosConfig.map((cem, index) => {
                     const cemIndex = index + 1;
                     const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
                     let datos = { nombre: cem.nombre };
@@ -773,10 +778,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     tipo_formulario: "cementerios",
                     fase: window.EIEL_CONFIG.fase,
                     id_envio: idBatch,
-                    observaciones: obsValue,
-                    nombre_contacto: nombreContacto,
+                    observaciones: document.getElementById("observaciones").value.trim(),
+                    nombre_contacto: nombre,
                     departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
-                    email_contacto: emailContacto,
+                    email_contacto: email,
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
@@ -792,6 +797,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 UIProgress.complete();
+                
+                // 4. LIMPIEZA TOTAL TRAS ÉXITO
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
