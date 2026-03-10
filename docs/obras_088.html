@@ -692,10 +692,12 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th style="width: 5%;"></th> <th style="width: 55%;">Denominación de la Obra</th>
-                        <th style="width: 20%;" class="td-ubicacion">Estado</th>
-                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
-                        <th style="width: 5%;"></th> </tr>
+                        <th style="width: 30%;">Denominación de la Obra</th>
+                        <th style="width: 32%;">Estado</th>
+                        <th style="width: 22%;">Observaciones</th>
+                        <th style="width: 15%; text-align: center;">Documentación</th>
+                        <th style="width: 5%; text-align: center;"></th> 
+                    </tr>
                 </thead>
                 <tbody id="bodyNuevasObras"></tbody>
             </table>
@@ -1021,16 +1023,18 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- GESTIÓN DE FILAS PARA OTRAS OBRAS ---
     let contadorNuevas = 0;
     window.agregarFilaNuevaObra = () => {
-        contadorNuevas++;
         const idTemp = `NUEVA_${Date.now()}`;
         const tbody = document.getElementById('bodyNuevasObras');
         if (!tbody) return;
+
         const tr = document.createElement('tr');
+        tr.id = `fila_${idTemp}`;
         tr.className = 'fila-nueva-obra';
         tr.innerHTML = `
-            <td style="text-align: center; color: #64748b;">${contadorNuevas}</td>
-            <td><input type="text" class="form-input input-nueva-nombre" data-temp-id="${idTemp}" placeholder="Nombre de la obra..."></td>
-            <td>
+            <td style="vertical-align: top; padding: 12px 8px;">
+                <input type="text" class="form-input input-nueva-nombre" placeholder="Nombre de la obra...">
+            </td>
+            <td style="vertical-align: top; padding: 12px 8px;">
                 <select class="form-select input-nueva-estado">
                     <option value="">Seleccionar...</option>
                     <option value="No iniciada">No iniciada</option>
@@ -1039,24 +1043,42 @@ document.addEventListener("DOMContentLoaded", () => {
                     <option value="Finalizada">Finalizada</option>
                 </select>
             </td>
-            <td style="text-align: center;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('${idTemp}')">
-                    <i data-lucide="paperclip" style="width:14px;"></i> Adjuntar
+            <td style="vertical-align: top; padding: 12px 8px;">
+                <textarea class="form-input input-nueva-obs" rows="1" placeholder="..." style="min-height:38px; font-family: inherit;"></textarea>
+            </td>
+            <td style="vertical-align: top; text-align: center; padding: 12px 8px;">
+                <button type="button" class="btn-adjuntar-req" onclick="gestionarAdjuntos('${idTemp}')" title="Adjuntar archivos">
+                    <i data-lucide="paperclip" style="width:16px;"></i>
                 </button>
                 <div id="lista_adjuntos_${idTemp}" class="file-list-container" style="margin-top: 5px;"></div>
             </td>
+            <td style="vertical-align: top; text-align: center; padding: 12px 8px;">
+                <button type="button" class="btn-danger-icon" onclick="eliminarFilaNuevaObra('${idTemp}')" title="Eliminar fila">
+                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
-        
-        const nuevoSelect = tr.querySelector('.new-estado');
+
+        // Lógica de color para el combo
+        const nuevoSelect = tr.querySelector('.input-nueva-estado');
         if (nuevoSelect) {
-            nuevoSelect.addEventListener('change', () => {
-                if (nuevoSelect.value === "") nuevoSelect.classList.remove('has-value');
-                else nuevoSelect.classList.add('has-value');
-            });
+            handleSelectColor(nuevoSelect);
+            nuevoSelect.addEventListener('change', () => handleSelectColor(nuevoSelect));
         }
-        
+
         if (window.lucide) lucide.createIcons();
+    };
+    
+    window.eliminarFilaNuevaObra = (idFila) => {
+        const fila = document.getElementById(`fila_${idFila}`);
+        if (fila) {
+            fila.remove();
+            // Limpiamos los adjuntos de esa fila si existen en la cola
+            if (colaAdjuntos && colaAdjuntos[idFila]) {
+                delete colaAdjuntos[idFila];
+            }
+        }
     };
     
     agregarFilaNuevaObra();
@@ -1264,8 +1286,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-});
-</script>
 });
 </script>
 
