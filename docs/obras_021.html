@@ -126,7 +126,7 @@
 
 <div class="card">
     <h2 class="section-title"><i data-lucide="list-checks"></i> SEGUIMIENTO DE OBRAS</h2>
-    <div class="table-wrapper" style="margin: 0;">
+    <div class="table-wrapper table-margin-reset">
         <table class="data-table">
             <thead>
                 <tr>
@@ -1256,9 +1256,12 @@ document.addEventListener("DOMContentLoaded", () => {
         tr.className = 'fila-nueva-obra';
         tr.innerHTML = `
             <td style="vertical-align: top; padding: 12px 8px;">
-                <input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Urbanización C/La Paz">
+                <input type="text" 
+                       class="form-input input-nueva-nombre" 
+                       data-temp-id="${idTemp}" 
+                       placeholder="Ej: Urbanización C/La Paz">
             </td>
-            <td style="vertical-align: top; padding: 12px 8px;">
+            <td class="td-align-top td-padding-sm">
                 <select class="form-select input-nueva-estado">
                     <option value="">Seleccionar...</option>
                     <option value="No iniciada">No iniciada</option>
@@ -1267,7 +1270,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     <option value="Finalizada">Finalizada</option>
                 </select>
             </td>
-            <td style="vertical-align: top; padding: 12px 8px;">
+            <td class="td-align-top td-padding-sm">
                 <textarea class="form-input input-nueva-obs" rows="1" placeholder="..." 
                           style="min-height:38px; font-family: inherit; resize: none;"></textarea>
             </td>
@@ -1300,7 +1303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (fila) {
             fila.remove();
             // Limpiamos los adjuntos de esa fila si existen en la cola
-            if (colaAdjuntos && colaAdjuntos[idFila]) {
+            if (typeof colaAdjuntos !== 'undefined' && colaAdjuntos[idFila]) {
                 delete colaAdjuntos[idFila];
             }
         }
@@ -1427,32 +1430,52 @@ document.addEventListener("DOMContentLoaded", () => {
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const totalTareas = numObrasFiles + numReqFiles;
-            
+
             UIProgress.show(totalTareas);
             let completados = 0;
 
             try {
-                const tareasSubida = [];
-
+                // 1. CREAMOS UNA LISTA PLANA DE TAREAS (Archivos + su ID correspondiente)
+                const listaTareas = [];
                 [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
                     Object.entries(cola).forEach(([id, listado]) => {
                         listado.forEach(file => {
-                            tareasSubida.push((async () => {
-                                await UploadService.uploadFile(file, 'obras', window.EIEL_CONFIG.muniCode, id, idBatch);
-                                completados++; 
-                                UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                            })());
+                            listaTareas.push({ file, id });
                         });
                     });
                 });
 
-                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
+                // 2. SUBIDA POR LOTES DE 3 (Batching)
+                const TAMAÑO_LOTE = 3;
+                for (let i = 0; i < listaTareas.length; i += TAMAÑO_LOTE) {
+                    const lote = listaTareas.slice(i, i + TAMAÑO_LOTE);
+                    
+                    // Ejecuta 3 subidas en paralelo y espera a que terminen
+                    await Promise.all(lote.map(async (tarea) => {
+                        try {
+                            await UploadService.uploadFile(tarea.file, 'obras', window.EIEL_CONFIG.muniCode, tarea.id, idBatch);
+                            completados++;
+                            UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                        } catch (e) {
+                            console.error(`Error subiendo ${tarea.file.name}:`, e);
+                            // Si uno falla, seguimos con el resto para no bloquear todo el envío
+                        }
+                    }));
+                    
+                    // Pequeña pausa de 200ms entre lotes para dejar "respirar" al servidor
+                    if (i + TAMAÑO_LOTE < listaTareas.length) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                }
 
-
+                // --- RECOLECCIÓN DE DATOS PARA EL PDF ---
                 const estadosObras = Array.from(selects).map(select => ({
-                    obra: select.dataset.obraId, clave: select.dataset.clave, 
-                    orden: select.dataset.orden, nombre: select.dataset.nombre, 
-                    plan: select.dataset.plan, estado: select.value, 
+                    obra: select.dataset.obraId, 
+                    clave: select.dataset.clave, 
+                    orden: select.dataset.orden, 
+                    nombre: select.dataset.nombre, 
+                    plan: select.dataset.plan, 
+                    estado: select.value, 
                     modificado: select.value !== select.dataset.original,
                     archivos: (colaAdjuntos[select.dataset.obraId] || []).map(f => f.name).join("; ")
                 }));
@@ -1460,22 +1483,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 const nuevasObrasData = [];
                 document.querySelectorAll(".fila-nueva-obra").forEach(fila => {
                     const inputN = fila.querySelector(".input-nueva-nombre");
-                    const inputO = fila.querySelector(".input-nueva-obs"); // Referencia a las observaciones
+                    const inputO = fila.querySelector(".input-nueva-obs");
+                    const inputE = fila.querySelector(".input-nueva-estado");
 
                     if (inputN && inputN.value.trim()) {
-                        const idT = inputN.dataset.tempId; // Seguimos necesitando el ID para los archivos
+                        const idT = inputN.dataset.tempId; 
                         nuevasObrasData.push({
                             nombre: inputN.value.trim(),
-                            estado: fila.querySelector(".input-nueva-estado")?.value || "",
-                            // AÑADIMOS LAS OBSERVACIONES AQUÍ:
+                            estado: inputE ? inputE.value : "",
                             observaciones: inputO ? inputO.value.trim() : "",
-                            // MANTENEMOS LOS ARCHIVOS:
                             archivos: (colaAdjuntos[idT] || []).map(f => f.name).join("; ")
                         });
                     }
                 });
 
                 UIProgress.update(completados, totalTareas, "Generando justificante...");
+                
                 const payload = {
                     tipo_formulario: "obras",
                     fase: window.EIEL_CONFIG.fase,
@@ -1500,6 +1523,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
+                // Limpieza de campos y variables
                 colaAdjuntos = {}; colaAdjuntosReq = {};
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
