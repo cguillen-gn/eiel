@@ -850,7 +850,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
+            // --- C. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -860,25 +860,33 @@ document.addEventListener("DOMContentLoaded", () => {
             let completados = 0;
 
             try {
-                const tareasSubida = [];
+                // 1. Unificamos todos los archivos en una lista única de tareas
+                const listaTareas = [];
+                
+                // Archivos de Requerimientos (Cambiado a REQUERIMIENTO_1, 2...)
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    listado.forEach(file => {
-                        tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
-                            completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                        })());
-                    });
+                    const numReq = parseInt(id) + 1;
+                    listado.forEach(file => listaTareas.push({ file, seccion: `REQUERIMIENTO_${numReq}` }));
                 });
 
-                archivos.forEach(file => {
-                    tareasSubida.push((async () => {
-                        await UploadService.uploadFile(file, 'agua', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                    })());
-                });
+                // Archivos generales (Cambiado de DOCUMENTACION a GENERAL)
+                archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
 
-                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
+                // 2. Subida Secuencial (Uno a uno) para máxima estabilidad
+                for (const tarea of listaTareas) {
+                    try {
+                        UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                        await UploadService.uploadFile(tarea.file, 'agua', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
+                        completados++;
+                        
+                        // Pequeña pausa de 300ms para dejar que el servidor procese el archivo
+                        await new Promise(r => setTimeout(r, 300));
+                    } catch (e) {
+                        console.error("Fallo en subida individual:", e);
+                    }
+                }
 
+                // Recopilación de datos de la tabla de depósitos
                 const depositosData = [];
                 document.querySelectorAll('.input-limpieza').forEach(input => {
                     depositosData.push({ 
@@ -888,7 +896,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     });
                 });
 
-                UIProgress.update(completados, totalTareas, "Generando justificante...");
+                UIProgress.update(completados, totalTareas, "Finalizando registro...");
+
+                // 3. Recolectamos TODOS los nombres de archivos para el PDF
+                const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
+
                 const payload = {
                     tipo_formulario: "agua",
                     fase: window.EIEL_CONFIG.fase,
@@ -908,7 +920,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    archivos_adjuntos: nombresTodosAdjuntos, // Ahora incluye requerimientos
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
 
@@ -920,6 +932,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
+                // Limpieza de campos y variables
                 archivos = []; colaAdjuntosReq = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
