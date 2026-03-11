@@ -704,7 +704,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
+            // --- C. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
@@ -714,28 +714,37 @@ document.addEventListener("DOMContentLoaded", () => {
             let completados = 0;
 
             try {
-                const tareasSubida = [];
-
+                // 1. Unificamos todos los archivos en una lista única de tareas
+                const listaTareas = [];
+                
+                // Archivos de Requerimientos (Cambiado a REQUERIMIENTO_1, 2...)
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    listado.forEach(file => {
-                        tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
-                            completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                        })());
-                    });
-                });
-                
-                archivos.forEach(file => {
-                    tareasSubida.push((async () => {
-                        await UploadService.uploadFile(file, 'saneamiento', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                    })());
+                    const numReq = parseInt(id) + 1;
+                    listado.forEach(file => listaTareas.push({ file, seccion: `REQUERIMIENTO_${numReq}` }));
                 });
 
-                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
+                // Archivos generales (Cambiado de DOCUMENTACION a GENERAL)
+                archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
 
-                UIProgress.update(completados, totalTareas, "Generando justificante...");
-                
+                // 2. Subida Secuencial (Uno a uno) para máxima estabilidad
+                for (const tarea of listaTareas) {
+                    try {
+                        UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                        await UploadService.uploadFile(tarea.file, 'saneamiento', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
+                        completados++;
+                        
+                        // Pequeña pausa de 300ms entre archivos
+                        await new Promise(r => setTimeout(r, 300));
+                    } catch (e) {
+                        console.error("Fallo en subida individual:", e);
+                    }
+                }
+
+                UIProgress.update(completados, totalTareas, "Finalizando registro...");
+
+                // 3. Recolectamos TODOS los nombres de archivos para el PDF
+                const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
+
                 const payload = {
                     tipo_formulario: "saneamiento",
                     fase: window.EIEL_CONFIG.fase,
@@ -753,7 +762,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    archivos_adjuntos: nombresTodosAdjuntos, // Lista unificada completa
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
 
@@ -765,6 +774,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
+                // Limpieza de campos y variables
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
