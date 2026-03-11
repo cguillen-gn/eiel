@@ -11542,7 +11542,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- GESTIÓN DE FILAS PARA OTRAS OBRAS ---
     let contadorNuevas = 0;
     window.agregarFilaNuevaObra = () => {
-        const idTemp = `NUEVA_${Date.now()}`;
+        contadorNuevas++; 
+        const idTemp = `NUEVA_OBRA_${contadorNuevas}`;
         const tbody = document.getElementById('bodyNuevasObras');
         if (!tbody) return;
 
@@ -11733,11 +11734,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 // 1. CREAMOS UNA LISTA PLANA DE TAREAS (Archivos + su ID correspondiente)
                 const listaTareas = [];
                 [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
-                    Object.entries(cola).forEach(([id, listado]) => {
-                        listado.forEach(file => {
-                            listaTareas.push({ file, id });
-                        });
+
+                    Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                        const numReq = parseInt(id) + 1;
+                        listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
                     });
+
+                    archivos.forEach(file => listaTareas.push({ file, id: 'GENERAL' }));
+                    });
+                });
+
+                UIProgress.show(totalTareas);
+            let completados = 0;
+
+            try {
+                // 1. CREAMOS LA LISTA PLANA DE TAREAS (Corrección de bucles)
+                const listaTareas = [];
+
+                // SECCIÓN A: OBRAS (Seguimiento y Nuevas)
+                // El 'id' ya viene como "OBXXXX" o "NUEVA_OBRA_X"
+                Object.entries(colaAdjuntos).forEach(([id, listado]) => {
+                    listado.forEach(file => listaTareas.push({ file, id: id }));
+                });
+
+                // SECCIÓN B: REQUERIMIENTOS (Empezando en 1 y nombre completo)
+                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                    const numReq = parseInt(id) + 1;
+                    listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
                 });
 
                 // 2. SUBIDA POR LOTES DE 3 (Batching)
@@ -11745,7 +11768,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 for (let i = 0; i < listaTareas.length; i += TAMAÑO_LOTE) {
                     const lote = listaTareas.slice(i, i + TAMAÑO_LOTE);
                     
-                    // Ejecuta 3 subidas en paralelo y espera a que terminen
                     await Promise.all(lote.map(async (tarea) => {
                         try {
                             await UploadService.uploadFile(tarea.file, 'obras', window.EIEL_CONFIG.muniCode, tarea.id, idBatch);
@@ -11753,11 +11775,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
                         } catch (e) {
                             console.error(`Error subiendo ${tarea.file.name}:`, e);
-                            // Si uno falla, seguimos con el resto para no bloquear todo el envío
                         }
                     }));
-                    
-                    // Pequeña pausa de 200ms entre lotes para dejar "respirar" al servidor
+
                     if (i + TAMAÑO_LOTE < listaTareas.length) {
                         await new Promise(r => setTimeout(r, 200));
                     }

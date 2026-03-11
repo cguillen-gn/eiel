@@ -467,59 +467,6 @@
                 <tr class="fila-obra">
                     
                     <td class="td-ubicacion text-xs" style="font-weight: 500; color: var(--text-secondary);">
-                        030
-                    </td>
-
-                    <td>
-                        <div class="obra-column-container">
-                            <div class="item-title-row">
-                                <span class="item-title">ACONDICIONAMIENTO DE LOS BARRIOS LABORINQUEN Y SOCA</span>
-                            </div>
-
-                            
-                                <div class="obra-details-row">
-                                    <span class="subvencion-badge">SUBVENCIÓN</span>
-                                    <span class="header-plan">Procedente de volcado de licitaciones de contrataciondelestado.es</span>
-                                </div>
-                            
-                        </div>
-                    </td>
-                  
-                    
-                    
-                    <td class="td-ubicacion">
-                        
-                        <select class="form-select select-estado" 
-                            data-obra-id="OB122030"
-                            data-clave="OB"
-                            data-orden="030"
-                            data-nombre="ACONDICIONAMIENTO DE LOS BARRIOS LABORINQUEN Y SOCA" 
-                            data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                            data-original="Finalizada"
-                            data-requiere-doc="false">
-                            
-                            <option value="" >Seleccionar...</option>
-                            <option value="No iniciada">No iniciada</option>
-                            <option value="En ejecución">En ejecución</option>
-                            <option value="Paralizada">Paralizada</option>
-                            <option value="Finalizada" selected>Finalizada</option>
-                            <option value="Desconocido">Desconocido / Sin datos</option>
-                        </select>
-                    </td>
-
-                    <td class="td-ubicacion">
-                        
-                            <div class="form-help" style="font-size: 0.75rem; font-weight: 600;">
-                            No requiere documentación
-                            </div>
-                        
-                    </td>
-                </tr>
-                
-                
-                <tr class="fila-obra">
-                    
-                    <td class="td-ubicacion text-xs" style="font-weight: 500; color: var(--text-secondary);">
                         032
                     </td>
 
@@ -4534,7 +4481,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // --- GESTIÓN DE FILAS PARA OTRAS OBRAS ---
     let contadorNuevas = 0;
     window.agregarFilaNuevaObra = () => {
-        const idTemp = `NUEVA_${Date.now()}`;
+        contadorNuevas++; 
+        const idTemp = `NUEVA_OBRA_${contadorNuevas}`;
         const tbody = document.getElementById('bodyNuevasObras');
         if (!tbody) return;
 
@@ -4725,11 +4673,33 @@ document.addEventListener("DOMContentLoaded", () => {
                 // 1. CREAMOS UNA LISTA PLANA DE TAREAS (Archivos + su ID correspondiente)
                 const listaTareas = [];
                 [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
-                    Object.entries(cola).forEach(([id, listado]) => {
-                        listado.forEach(file => {
-                            listaTareas.push({ file, id });
-                        });
+
+                    Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                        const numReq = parseInt(id) + 1;
+                        listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
                     });
+
+                    archivos.forEach(file => listaTareas.push({ file, id: 'GENERAL' }));
+                    });
+                });
+
+                UIProgress.show(totalTareas);
+            let completados = 0;
+
+            try {
+                // 1. CREAMOS LA LISTA PLANA DE TAREAS (Corrección de bucles)
+                const listaTareas = [];
+
+                // SECCIÓN A: OBRAS (Seguimiento y Nuevas)
+                // El 'id' ya viene como "OBXXXX" o "NUEVA_OBRA_X"
+                Object.entries(colaAdjuntos).forEach(([id, listado]) => {
+                    listado.forEach(file => listaTareas.push({ file, id: id }));
+                });
+
+                // SECCIÓN B: REQUERIMIENTOS (Empezando en 1 y nombre completo)
+                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                    const numReq = parseInt(id) + 1;
+                    listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
                 });
 
                 // 2. SUBIDA POR LOTES DE 3 (Batching)
@@ -4737,7 +4707,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 for (let i = 0; i < listaTareas.length; i += TAMAÑO_LOTE) {
                     const lote = listaTareas.slice(i, i + TAMAÑO_LOTE);
                     
-                    // Ejecuta 3 subidas en paralelo y espera a que terminen
                     await Promise.all(lote.map(async (tarea) => {
                         try {
                             await UploadService.uploadFile(tarea.file, 'obras', window.EIEL_CONFIG.muniCode, tarea.id, idBatch);
@@ -4745,11 +4714,9 @@ document.addEventListener("DOMContentLoaded", () => {
                             UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
                         } catch (e) {
                             console.error(`Error subiendo ${tarea.file.name}:`, e);
-                            // Si uno falla, seguimos con el resto para no bloquear todo el envío
                         }
                     }));
-                    
-                    // Pequeña pausa de 200ms entre lotes para dejar "respirar" al servidor
+
                     if (i + TAMAÑO_LOTE < listaTareas.length) {
                         await new Promise(r => setTimeout(r, 200));
                     }
