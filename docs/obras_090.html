@@ -1702,39 +1702,26 @@ document.addEventListener("DOMContentLoaded", () => {
             let completados = 0;
 
             try {
-                // 1. CREAMOS UNA LISTA PLANA DE TAREAS (Archivos + su ID correspondiente)
-                const listaTareas = [];
-                [colaAdjuntos, colaAdjuntosReq].forEach((cola) => {
-
-                    Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                        const numReq = parseInt(id) + 1;
-                        listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
-                    });
-
-                    archivos.forEach(file => listaTareas.push({ file, id: 'GENERAL' }));
-                    });
-                });
-
-                UIProgress.show(totalTareas);
-            let completados = 0;
-
-            try {
-                // 1. CREAMOS LA LISTA PLANA DE TAREAS (Corrección de bucles)
+                // 1. CREAMOS LA LISTA PLANA DE TAREAS
                 const listaTareas = [];
 
                 // SECCIÓN A: OBRAS (Seguimiento y Nuevas)
-                // El 'id' ya viene como "OBXXXX" o "NUEVA_OBRA_X"
+                // El 'id' ya viene como "OBXXXX" o "NUEVA_OBRA_X" gracias al contador secuencial
                 Object.entries(colaAdjuntos).forEach(([id, listado]) => {
-                    listado.forEach(file => listaTareas.push({ file, id: id }));
+                    listado.forEach(file => {
+                        listaTareas.push({ file, id: id });
+                    });
                 });
 
-                // SECCIÓN B: REQUERIMIENTOS (Empezando en 1 y nombre completo)
+                // SECCIÓN B: REQUERIMIENTOS (Cambiado de 0 a REQUERIMIENTO_1, REQUERIMIENTO_2...)
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    const numReq = parseInt(id) + 1;
-                    listado.forEach(file => listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` }));
+                    const numReq = parseInt(id) + 1; // Conversión a base 1
+                    listado.forEach(file => {
+                        listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` });
+                    });
                 });
 
-                // 2. SUBIDA POR LOTES DE 3 (Batching)
+                // 2. SUBIDA POR LOTES DE 3 (Batching para estabilidad)
                 const TAMAÑO_LOTE = 3;
                 for (let i = 0; i < listaTareas.length; i += TAMAÑO_LOTE) {
                     const lote = listaTareas.slice(i, i + TAMAÑO_LOTE);
@@ -1749,13 +1736,16 @@ document.addEventListener("DOMContentLoaded", () => {
                         }
                     }));
 
+                    // Pausa de 200ms entre lotes para dejar respirar al servidor
                     if (i + TAMAÑO_LOTE < listaTareas.length) {
                         await new Promise(r => setTimeout(r, 200));
                     }
                 }
 
                 // --- RECOLECCIÓN DE DATOS PARA EL PDF ---
-                const estadosObras = Array.from(selects).map(select => ({
+                // (Usamos los selects de la tabla de seguimiento)
+                const selectsEstado = document.querySelectorAll('.fila-obra .select-estado');
+                const estadosObras = Array.from(selectsEstado).map(select => ({
                     obra: select.dataset.obraId, 
                     clave: select.dataset.clave, 
                     orden: select.dataset.orden, 
@@ -1773,7 +1763,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     const inputE = fila.querySelector(".input-nueva-estado");
 
                     if (inputN && inputN.value.trim()) {
-                        const idT = inputN.dataset.tempId; 
+                        const idT = inputN.dataset.tempId; // Id tipo "NUEVA_OBRA_1"
                         nuevasObrasData.push({
                             nombre: inputN.value.trim(),
                             estado: inputE ? inputE.value : "",
@@ -1809,8 +1799,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
-                // Limpieza de campos y variables
-                colaAdjuntos = {}; colaAdjuntosReq = {};
+                // --- LIMPIEZA FINAL ---
+                colaAdjuntos = {}; 
+                colaAdjuntosReq = {};
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
