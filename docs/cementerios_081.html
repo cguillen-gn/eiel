@@ -656,37 +656,44 @@ document.addEventListener("DOMContentLoaded", () => {
                 toggleFormFreeze(false); return;
             }
 
-            // --- C. PROCESO DE ENVÍO Y SUBIDA ---
+            // --- C. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
             const totalTareas = archivos.length + Object.values(colaAdjuntosReq).flat().length;
             let completados = 0;
             UIProgress.show(totalTareas);
 
             try {
-                const tareasSubida = [];
-
-                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    listado.forEach(file => {
-                        tareasSubida.push((async () => {
-                            await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode, 'REQ_' + id, idBatch);
-                            completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                        })());
-                    });
-                });
+                // 1. Unificamos todos los archivos en una lista única de tareas
+                const listaTareas = [];
                 
-                archivos.forEach(file => {
-                    tareasSubida.push((async () => {
-                        await UploadService.uploadFile(file, 'cementerios', window.EIEL_CONFIG.muniCode, 'DOCUMENTACION', idBatch);
-                        completados++; UIProgress.update(completados, totalTareas, `Subiendo: ${file.name}`);
-                    })());
+                // Archivos de Requerimientos (Cambiado a REQUERIMIENTO_1, 2...)
+                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                    const numReq = parseInt(id) + 1;
+                    listado.forEach(file => listaTareas.push({ file, seccion: `REQUERIMIENTO_${numReq}` }));
                 });
 
-                if (tareasSubida.length > 0) await Promise.all(tareasSubida);
+                // Archivos generales (Cambiado de DOCUMENTACION a GENERAL)
+                archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
+
+                // 2. Subida Secuencial (Uno a uno) para máxima estabilidad
+                for (const tarea of listaTareas) {
+                    try {
+                        UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                        await UploadService.uploadFile(tarea.file, 'cementerios', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
+                        completados++;
+                        
+                        // Pequeña pausa de 300ms entre archivos
+                        await new Promise(r => setTimeout(r, 300));
+                    } catch (e) {
+                        console.error("Fallo en subida individual:", e);
+                    }
+                }
 
                 const cementeriosConfig = [{"nombre": "CEMENTERIO MUNICIPAL DE JALON"}];
                 const datosCementerios = cementeriosConfig.map((cem, index) => {
                     const cemIndex = index + 1;
                     const inputs = document.querySelectorAll(`input[data-cem="${cemIndex}"]`);
                     let datos = { nombre: cem.nombre };
+                    
                     inputs.forEach(input => {
                         const tipo = input.dataset.tipo;
                         const val = parseInt(input.value);
@@ -695,7 +702,11 @@ document.addEventListener("DOMContentLoaded", () => {
                     return datos;
                 });
 
-                UIProgress.update(completados, totalTareas, "Generando justificante...");
+                UIProgress.update(completados, totalTareas, "Finalizando registro...");
+
+                // 3. Recolectamos TODOS los nombres de archivos para el PDF
+                const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
+
                 const payload = {
                     tipo_formulario: "cementerios",
                     fase: window.EIEL_CONFIG.fase,
@@ -707,7 +718,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: archivos.map(a => a.name).join("\n"),
+                    archivos_adjuntos: nombresTodosAdjuntos, // Lista unificada completa
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq),
                     cementerios_data: JSON.stringify(datosCementerios)
                 };
@@ -720,6 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 UIProgress.complete();
                 
+                // Limpieza de campos y variables
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
