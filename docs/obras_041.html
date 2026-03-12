@@ -1606,49 +1606,69 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 4. SERVICIOS Y UTILIDADES DE UI
     const UIProgress = {
-    container: document.getElementById("overlayProgress"), 
-    bar: document.getElementById("progressBar"),
-    text: document.getElementById("progressText"),
-    percent: document.getElementById("progressValue"), 
-    maxReached: 0, 
+        container: document.getElementById("overlayProgress"), 
+        bar: document.getElementById("progressBar"),
+        text: document.getElementById("progressText"),
+        percent: document.getElementById("progressValue"), 
+        maxReached: 0, 
 
-    show(totalTasks) {
-        this.maxReached = 0;
-        if (this.container) this.container.classList.remove('hidden');
-        this.update(0, totalTasks, "Iniciando el envío...");
-    },
+        show(totalTasks) {
+            this.maxReached = 0;
+            
+            // [RESETEO] Aseguramos que se vea la carga y no el éxito al empezar
+            const title = document.getElementById("progressTitle");
+            if (title) title.textContent = "Enviando datos...";
+            
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.remove('hidden');
+            
+            const success = document.getElementById("successState");
+            if (success) success.classList.add('hidden');
 
-    update(completed, total, message) {
-        const msg = message.toLowerCase();
+            if (this.container) this.container.classList.remove('hidden');
+            this.update(0, totalTasks, "Iniciando el envío...");
+        },
 
-        const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
-        
-        let targetPercentage = 0;
-        if (total > 0) {
-            const fileWeight = 90 / total;
-            targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
-        } else {
-            targetPercentage = isFinalStep ? 95 : 0;
+        update(completed, total, message) {
+            const msg = message.toLowerCase();
+            // Detecta si estamos en la fase final (PDF) para clavar la barra al 95%
+            const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
+            
+            let targetPercentage = 0;
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                targetPercentage = isFinalStep ? 95 : 0;
+            }
+
+            if (targetPercentage > this.maxReached) {
+                this.maxReached = targetPercentage;
+                if (this.bar) this.bar.style.width = this.maxReached + "%";
+                if (this.percent) this.percent.textContent = this.maxReached + "%";
+            }
+
+            if (this.text && message) this.text.textContent = message;
+        },
+
+        complete() {
+            // 1. Cambiamos el título de la tarjeta
+            const title = document.getElementById("progressTitle");
+            if (title) title.textContent = "¡Envío Finalizado!";
+            
+            // 2. Ocultamos el bloque de PROGRESO (barra, contador de archivos y nota de paciencia)
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.add('hidden');
+            
+            // 3. Mostramos el bloque de ÉXITO (icono, mensaje del PDF y botón Volver)
+            const success = document.getElementById("successState");
+            if (success) success.classList.remove('hidden');
+            
+            // 4. Renderizamos los iconos de Lucide (check y casita)
+            if (window.lucide) {
+                lucide.createIcons();
+            }
         }
-
-        if (targetPercentage > this.maxReached) {
-            this.maxReached = targetPercentage;
-            if (this.bar) this.bar.style.width = this.maxReached + "%";
-            if (this.percent) this.percent.textContent = this.maxReached + "%";
-        }
-
-        if (this.text && message) this.text.textContent = message;
-    },
-
-    complete() {
-        this.maxReached = 100;
-        if (this.bar) {
-            this.bar.style.width = "100%";
-            this.bar.classList.add("progress-success");
-        }
-        if (this.percent) this.percent.textContent = "100%";
-        if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email facilitado";
-    }
     };
 
     const UploadService = {
