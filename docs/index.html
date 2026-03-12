@@ -228,6 +228,11 @@
         ui.login.classList.add('hidden');
         ui.menu.classList.remove('hidden');
         ui.error.style.display = 'none';
+        
+        // ¡Añade esto aquí! Para que Firefox pinte los iconos al entrar
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     function showError(msg) {
@@ -240,33 +245,35 @@
      * Ejecución tras la carga completa del documento.
      */
     document.addEventListener('DOMContentLoaded', () => {
-        // 1. Función robusta para inicializar iconos (maneja retardos de carga de CDN)
+        // 1. Definimos la función de carga con una comprobación más estricta (typeof)
         const refreshIcons = () => {
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
+                console.log("Lucide: Iconos procesados");
             } else {
-                // Reintento breve si el motor de Firefox aún está parseando el script externo
-                setTimeout(refreshIcons, 50);
+                // Si el CDN aún no ha terminado de cargar en Firefox, reintentamos
+                setTimeout(refreshIcons, 100);
             }
         };
-        
-        // Lanzamos la carga inicial
-        refreshIcons();
-            
-        // 2. Gestión de limpieza de sesión
+
+        // 2. Gestión de limpieza (Primero la lógica de datos)
         if (!localStorage.getItem("eiel_muni_code")) {
             localStorage.clear();
         }
 
-        // 3. Verificación de sesión (si existe, cambia la vista al menú)
+        // 3. Verificación de sesión
+        // IMPORTANTE: checkSession() modifica el DOM mostrando el menú.
         checkSession();
 
-        /**
-         * CLAVE PARA FIREFOX:
-         * Al entrar en el menú (vía checkSession), los nuevos iconos pasan a ser visibles.
-         * Forzamos un segundo pase tras un breve parpadeo para asegurar que se rendericen.
-         */
-        setTimeout(refreshIcons, 200);
+        // 4. Lanzamos los iconos DESPUÉS de haber modificado el DOM
+        refreshIcons();
+
+        // 5. REFUERZO FIREFOX: Algunos motores retrasan la renderización de SVGs
+        // si el contenedor estaba oculto (hidden). Forzamos tras carga total.
+        window.addEventListener('load', refreshIcons);
+        
+        // Un último intento de seguridad tras medio segundo
+        setTimeout(refreshIcons, 600);
     });
 </script>
 </body>
