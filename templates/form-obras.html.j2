@@ -622,6 +622,8 @@ document.addEventListener("DOMContentLoaded", () => {
             try {
                 // 1. CREAMOS LA LISTA PLANA DE TAREAS
                 const listaTareas = [];
+                const totalArchivos = listaTareas.length; 
+                let archivosContados = 0;
 
                 // SECCIÓN A: OBRAS (Seguimiento y Nuevas)
                 // El 'id' ya viene como "OBXXXX" o "NUEVA_OBRA_X" gracias al contador secuencial
@@ -647,14 +649,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     await Promise.all(lote.map(async (tarea) => {
                         try {
                             await UploadService.uploadFile(tarea.file, 'obras', window.EIEL_CONFIG.muniCode, tarea.id, idBatch);
+                            
                             completados++;
-                            UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                            
+                            UIProgress.update(
+                                completados, 
+                                totalTareas, 
+                                `Subiendo archivos adjuntos (Subido ${completados} de ${totalTareas} archivos)...`
+                            );
+
                         } catch (e) {
                             console.error(`Error subiendo ${tarea.file.name}:`, e);
                         }
                     }));
 
-                    // Pausa de 200ms entre lotes para dejar respirar al servidor
                     if (i + TAMAÑO_LOTE < listaTareas.length) {
                         await new Promise(r => setTimeout(r, 200));
                     }
@@ -708,6 +716,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     otras_obras_json: JSON.stringify(nuevasObrasData),
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
+                
+                UIProgress.update(95, 100, "Procesando datos y generando justificante...");
 
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST", mode: "no-cors",
