@@ -327,16 +327,6 @@
     </div>
     
 
-    <div id="progressContainer" class="progress-container hidden">
-        <div class="progress-labels">
-            <span id="progressText">Preparando envío...</span>
-            <span id="progressPercentage">0%</span>
-        </div>
-        <div class="progress-track">
-            <div id="progressBar"></div>
-        </div>
-    </div>
-
     <div id="mensaje" class="message hidden"></div>
     
     <button id="btnEnviar" class="btn btn-primary" disabled>
@@ -504,49 +494,59 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 4. SERVICIOS Y UTILIDADES DE UI
     const UIProgress = {
-    container: document.getElementById("progressContainer"),
-    bar: document.getElementById("progressBar"),
-    text: document.getElementById("progressText"),
-    percent: document.getElementById("progressPercentage"),
-    maxReached: 0, 
+        container: document.getElementById("overlayProgress"), 
+        bar: document.getElementById("progressBar"),
+        text: document.getElementById("progressText"),
+        percent: document.getElementById("progressValue"), 
+        maxReached: 0, 
 
-    show(totalTasks) {
-        this.maxReached = 0; 
-        if (this.container) this.container.classList.remove('hidden');
-        this.update(0, totalTasks, "Iniciando envío...");
-    },
+        show(totalTasks) {
+            this.maxReached = 0;
+            const title = document.getElementById("progressTitle");
+            if (title) title.textContent = "Enviando datos...";
+            
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.remove('hidden');
+            
+            const success = document.getElementById("successState");
+            if (success) success.classList.add('hidden');
 
-    update(completed, total, message) {
-        const msg = message.toLowerCase();
-        
-        const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
-        
-        let targetPercentage = 0;
-        if (total > 0) {
-            const fileWeight = 90 / total;
-            targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
-        } else {
-            targetPercentage = isFinalStep ? 95 : 0;
+            if (this.container) this.container.classList.remove('hidden');
+            this.update(0, totalTasks, "Iniciando el envío...");
+        },
+
+        update(completed, total, message) {
+            const msg = message.toLowerCase();
+            const isFinalStep = msg.includes("pdf") || msg.includes("registro") || msg.includes("justificante");
+            
+            let targetPercentage = 0;
+            if (total > 0) {
+                const fileWeight = 90 / total;
+                targetPercentage = isFinalStep ? 95 : Math.round(completed * fileWeight);
+            } else {
+                targetPercentage = isFinalStep ? 95 : 0;
+            }
+
+            if (targetPercentage > this.maxReached) {
+                this.maxReached = targetPercentage;
+                if (this.bar) this.bar.style.width = this.maxReached + "%";
+                if (this.percent) this.percent.textContent = this.maxReached + "%";
+            }
+            if (this.text && message) this.text.textContent = message;
+        },
+
+        complete() {
+            const title = document.getElementById("progressTitle");
+            if (title) title.textContent = "¡Envío Finalizado!";
+            
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.add('hidden');
+            
+            const success = document.getElementById("successState");
+            if (success) success.classList.remove('hidden');
+            
+            if (window.lucide) lucide.createIcons();
         }
-
-        if (targetPercentage > this.maxReached) {
-            this.maxReached = targetPercentage;
-            if (this.bar) this.bar.style.width = this.maxReached + "%";
-            if (this.percent) this.percent.textContent = this.maxReached + "%";
-        }
-        
-        if (this.text && message) this.text.textContent = message;
-    },
-
-    complete() {
-        this.maxReached = 100;
-        if (this.bar) {
-            this.bar.style.width = "100%";
-            this.bar.classList.add("progress-success");
-        }
-        if (this.percent) this.percent.textContent = "100%";
-        if (this.text) this.text.textContent = "✅ ¡Envío completado con éxito! Se ha enviado un justificante al email facilitado";
-    }
     };
 
     const UploadService = {
@@ -756,34 +756,42 @@ document.addEventListener("DOMContentLoaded", () => {
             // --- C. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
             const totalTareas = archivos.length + Object.values(colaAdjuntosReq).flat().length;
             let completados = 0;
+            
+            // 1. Iniciamos el progreso global
             UIProgress.show(totalTareas);
+            UIProgress.update(0, totalTareas, "Iniciando el envío...");
 
             try {
-                // 1. Unificamos todos los archivos en una lista única de tareas
+                // Unificamos tareas
                 const listaTareas = [];
-                
-                // Archivos de Requerimientos (Cambiado a REQUERIMIENTO_1, 2...)
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     const numReq = parseInt(id) + 1;
                     listado.forEach(file => listaTareas.push({ file, seccion: `REQUERIMIENTO_${numReq}` }));
                 });
-
-                // Archivos generales (Cambiado de DOCUMENTACION a GENERAL)
                 archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
 
-                // 2. Subida Secuencial (Uno a uno) para máxima estabilidad
+                // 2. Subida Secuencial (Uno a uno) manteniendo tu lógica original
                 for (const tarea of listaTareas) {
                     try {
-                        UIProgress.update(completados, totalTareas, `Subiendo: ${tarea.file.name}`);
+                        // Actualización del mensaje con contador dinámico "Subido X de Y"
+                        UIProgress.update(
+                            completados, 
+                            totalTareas, 
+                            `Subiendo archivos adjuntos (Subido ${completados} de ${totalTareas} archivos)...`
+                        );
+
                         await UploadService.uploadFile(tarea.file, 'cementerios', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
                         completados++;
                         
-                        // Pequeña pausa de 300ms entre archivos
+                        // Pausa de estabilidad
                         await new Promise(r => setTimeout(r, 300));
                     } catch (e) {
                         console.error("Fallo en subida individual:", e);
                     }
                 }
+
+                // 3. Fase final: Justificante PDF
+                UIProgress.update(completados, totalTareas, "Procesando datos y generando justificante...");
 
                 const cementeriosConfig = [{"nombre": "CEMENTERIO CASES DEL SENYOR"}, {"nombre": "NUESTRA SEÑORA DEL REMEDIO"}];
                 const datosCementerios = cementeriosConfig.map((cem, index) => {
@@ -799,11 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     return datos;
                 });
 
-                UIProgress.update(completados, totalTareas, "Finalizando registro...");
-
-                // 3. Recolectamos TODOS los nombres de archivos para el PDF
                 const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
-
                 const payload = {
                     tipo_formulario: "cementerios",
                     fase: window.EIEL_CONFIG.fase,
@@ -815,7 +819,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     municipio_codigo: window.EIEL_CONFIG.muniCode,
                     municipio_nombre: window.EIEL_CONFIG.muniName,
                     timestamp_envio: new Date().toISOString(),
-                    archivos_adjuntos: nombresTodosAdjuntos, // Lista unificada completa
+                    archivos_adjuntos: nombresTodosAdjuntos,
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq),
                     cementerios_data: JSON.stringify(datosCementerios)
                 };
@@ -826,10 +830,12 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
+                // Finaliza y muestra la pantalla de éxito con el botón de volver
                 UIProgress.complete();
                 
-                // Limpieza de campos y variables
-                archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
+                // Limpieza de campos (Sin cambios)
+                archivos = [];
+                colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {
                    if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
