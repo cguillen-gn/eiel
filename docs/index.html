@@ -240,22 +240,33 @@
      * Ejecución tras la carga completa del documento.
      */
     document.addEventListener('DOMContentLoaded', () => {
-    // Función robusta para inicializar iconos
-    const refreshIcons = () => {
-        if (window.lucide) {
-            lucide.createIcons();
-        } else {
-            // Reintento breve si el CDN de Firefox va lento
-            setTimeout(refreshIcons, 100);
-        }
-    };
-    
-    refreshIcons();
+        // 1. Función robusta para inicializar iconos (maneja retardos de carga de CDN)
+        const refreshIcons = () => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            } else {
+                // Reintento breve si el motor de Firefox aún está parseando el script externo
+                setTimeout(refreshIcons, 50);
+            }
+        };
         
+        // Lanzamos la carga inicial
+        refreshIcons();
+            
+        // 2. Gestión de limpieza de sesión
         if (!localStorage.getItem("eiel_muni_code")) {
             localStorage.clear();
         }
+
+        // 3. Verificación de sesión (si existe, cambia la vista al menú)
         checkSession();
+
+        /**
+         * CLAVE PARA FIREFOX:
+         * Al entrar en el menú (vía checkSession), los nuevos iconos pasan a ser visibles.
+         * Forzamos un segundo pase tras un breve parpadeo para asegurar que se rendericen.
+         */
+        setTimeout(refreshIcons, 200);
     });
 </script>
 </body>
