@@ -18,7 +18,7 @@
             muniName: "Benidorm",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbysrr-_Bfx2XtB3xiVNFGmsBhOsIoVSLsqJ4WwKfCoRpfgUEO8NKFpX5tIpL6PQK8tu/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
             // Verifica si existen avisos personalizados para la validación de observaciones
             hasAvisos: false
@@ -120,7 +120,12 @@
     <ul>
         <li><strong>Estado:</strong> Rellene el estado en todas las obras del listado de seguimiento.</li>
         <li><strong>Documentación:</strong> Adjunte proyecto de cada obra o la información disponible. Si no dispone de documentación, justifíquelo en el apartado final de <strong>Observaciones</strong>.</li>
+        <li style="color: #c2410c; font-weight: 600;">
+            <i data-lucide="alert-triangle" style="width:14px; display:inline-block; vertical-align:middle;"></i> 
+            Límite de archivos: Máximo 35 MB por archivo individual. Si sus archivos son más pesados, utilice herramientas de optimización o compresión antes de adjuntarlos.
+        </li>
     </ul>
+    
 </div>
 
 
@@ -2341,7 +2346,7 @@ document.addEventListener("DOMContentLoaded", () => {
         muniCode: "031",
         muniName: "Benidorm",
         fase: "2026",
-        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbysrr-_Bfx2XtB3xiVNFGmsBhOsIoVSLsqJ4WwKfCoRpfgUEO8NKFpX5tIpL6PQK8tu/exec",
+        urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
         urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
         urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
         hasAvisos: false,
@@ -2482,9 +2487,22 @@ document.addEventListener("DOMContentLoaded", () => {
         inputObras.addEventListener('change', () => {
             const files = Array.from(inputObras.files);
             if (!files.length || !idObraActual) return;
-            if (!colaAdjuntos[idObraActual]) colaAdjuntos[idObraActual] = [];
-            colaAdjuntos[idObraActual].push(...files);
-            renderAdjuntos(idObraActual);
+
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (validos.length > 0) {
+                if (!colaAdjuntos[idObraActual]) colaAdjuntos[idObraActual] = [];
+                colaAdjuntos[idObraActual].push(...validos);
+                renderAdjuntos(idObraActual);
+            }
+            
             inputObras.value = ""; 
             idObraActual = null;
         });
@@ -2589,9 +2607,22 @@ document.addEventListener("DOMContentLoaded", () => {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
             if (!files.length || reqIdActual === null) return;
-            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
-            colaAdjuntosReq[reqIdActual].push(...files);
-            renderColaReq(reqIdActual);
+
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (validos.length > 0) {
+                if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
+                colaAdjuntosReq[reqIdActual].push(...validos);
+                renderColaReq(reqIdActual);
+            }
+          
             inputReq.value = ""; 
             reqIdActual = null;
         });
@@ -2652,8 +2683,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
                 return;
             }
+            
+            // --- B. VALIDACIÓN FINAL DE PESO DE ARCHIVOS ---
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const todosLosArchivos = [
+                ...Object.values(colaAdjuntos).flat(),
+                ...Object.values(colaAdjuntosReq).flat()
+            ];
 
-            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            const archivoExcedido = todosLosArchivos.find(f => f.size > LIMITE_BYTES);
+            if (archivoExcedido) {
+                mostrarMensaje(`⚠️ El archivo "${archivoExcedido.name}" excede los 35 MB permitidos. Por favor, optimícelo antes de enviar.`, "error");
+                return;
+            }
+
+            // --- C. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -2679,7 +2723,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. VALIDACIÓN DE TABLA DE OBRAS ---
+            // --- D. VALIDACIÓN DE TABLA DE OBRAS ---
             const selects = document.querySelectorAll('.fila-obra .select-estado');
             let obrasSinEstado = false;
             selects.forEach(s => { if (!s.value) obrasSinEstado = true; });
@@ -2689,7 +2733,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- D. PROCESO DE ENVÍO Y SUBIDA ---
+            // --- E. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
