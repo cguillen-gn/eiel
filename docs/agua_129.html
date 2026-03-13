@@ -356,7 +356,7 @@
         <div style="font-size: 0.9rem; color: var(--text-secondary); margin: 5px 0;">
             o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span>
         </div>
-        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes, análisis...)</p>
+        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes... Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -659,7 +659,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (fileInput) {
         fileInput.onchange = () => {
-            archivos.push(...Array.from(fileInput.files));
+            const files = Array.from(fileInput.files);
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            archivos.push(...validos);
             renderArchivos();
             fileInput.value = '';
         };
@@ -731,9 +742,22 @@ document.addEventListener("DOMContentLoaded", () => {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
             if (!files.length || reqIdActual === null) return;
-            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
-            colaAdjuntosReq[reqIdActual].push(...files);
-            renderColaReq(reqIdActual);
+
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (validos.length > 0) {
+                if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
+                colaAdjuntosReq[reqIdActual].push(...validos);
+                renderColaReq(reqIdActual);
+            }
+          
             inputReq.value = ""; reqIdActual = null;
         });
     }
@@ -795,8 +819,21 @@ document.addEventListener("DOMContentLoaded", () => {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
                 return;
             }
+            
+            // --- B. VALIDACIÓN FINAL DE PESO DE ARCHIVOS ---
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const todosLosArchivos = [
+                ...archivos,
+                ...Object.values(colaAdjuntosReq).flat()
+            ];
 
-            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            const archivoExcedido = todosLosArchivos.find(f => f.size > LIMITE_BYTES);
+            if (archivoExcedido) {
+                mostrarMensaje(`⚠️ El archivo "${archivoExcedido.name}" excede los 35 MB permitidos. Por favor, optimícelo antes de enviar.`, "error");
+                return;
+            }
+
+            // --- C. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -822,7 +859,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
             
-            // --- C. VALIDACIÓN AÑO DE LIMPIEZA DE DEPÓSITOS ---
+            // --- D. VALIDACIÓN AÑO DE LIMPIEZA DE DEPÓSITOS ---
             const inputsLimpieza = document.querySelectorAll('.input-limpieza');
             const anioFaseMax = parseInt(window.EIEL_CONFIG.fase) + 1;
             let anioInvalido = false;
@@ -844,7 +881,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return; // Detiene el envío por completo
             }
 
-            // --- D. PROCESO DE ENVÍO Y SUBIDA ---
+            // --- E. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;

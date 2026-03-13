@@ -1059,7 +1059,7 @@
         <div style="font-size: 0.9rem; color: var(--text-secondary); margin: 5px 0;">
             o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span>
         </div>
-        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes, análisis...)</p>
+        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes, análisis... Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1349,7 +1349,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (fileInput) {
         fileInput.addEventListener('change', () => {
-            archivos.push(...Array.from(fileInput.files));
+            const files = Array.from(fileInput.files);
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            archivos.push(...validos);
             renderArchivos(); 
             fileInput.value = '';
         });
@@ -1435,6 +1446,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosFila('${idFila}')" title="Adjuntar fotos" style="padding: 6px 10px;">
                         <i data-lucide="paperclip" style="width:14px;"></i> Adjuntar
                     </button>
+                    <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px; white-space: nowrap; font-weight: 500;">
+                        Máx 35 MB / archivo
+                    </div>
                     <button type="button" class="btn-danger-icon" onclick="eliminarFilaNuevoEq('${idFila}')" title="Eliminar fila" style="border:none; background:none; padding: 4px;">
                         <i data-lucide="trash-2" style="width:18px; color: #ef4444;"></i>
                     </button>
@@ -1464,9 +1478,21 @@ document.addEventListener("DOMContentLoaded", () => {
         inputNuevos.addEventListener('change', () => {
             const files = Array.from(inputNuevos.files);
             if (!files.length || !filaActualAdjuntos) return;
-            if (!colaAdjuntosNuevos[filaActualAdjuntos]) colaAdjuntosNuevos[filaActualAdjuntos] = [];
-            colaAdjuntosNuevos[filaActualAdjuntos].push(...files);
-            renderFilaAdjuntos(filaActualAdjuntos);
+
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (validos.length > 0) {
+                if (!colaAdjuntosNuevos[filaActualAdjuntos]) colaAdjuntosNuevos[filaActualAdjuntos] = [];
+                colaAdjuntosNuevos[filaActualAdjuntos].push(...validos);
+                renderFilaAdjuntos(filaActualAdjuntos);
+            }
             inputNuevos.value = ""; 
             filaActualAdjuntos = null;
         });
@@ -1523,10 +1549,23 @@ document.addEventListener("DOMContentLoaded", () => {
         inputReq.addEventListener('change', () => {
             const files = Array.from(inputReq.files);
             if (!files.length || reqIdActual === null) return;
-            if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
-            colaAdjuntosReq[reqIdActual].push(...files);
-            renderColaReq(reqIdActual);
-            inputReq.value = ""; reqIdActual = null;
+
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const validos = files.filter(f => {
+                if (f.size > LIMITE_BYTES) {
+                    alert(`El archivo "${f.name}" supera el límite de 35 MB y no será añadido.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (validos.length > 0) {
+                if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
+                colaAdjuntosReq[reqIdActual].push(...validos);
+                renderColaReq(reqIdActual);
+            }
+            inputReq.value = ""; 
+            reqIdActual = null;
         });
     }
 
@@ -1577,8 +1616,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 mostrarMensaje("⚠️ Verifique que el Email sea válido y coincida en ambos campos.", "error");
                 return;
             }
+            
+            // --- B. VALIDACIÓN FINAL DE PESO DE ARCHIVOS ---
+            const LIMITE_BYTES = 35 * 1024 * 1024;
+            const todosLosArchivos = [
+                ...archivos,
+                ...Object.values(colaAdjuntosReq).flat(),
+                ...Object.values(colaAdjuntosNuevos).flat()
+            ];
 
-            // --- B. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
+            const archivoExcedido = todosLosArchivos.find(f => f.size > LIMITE_BYTES);
+            if (archivoExcedido) {
+                mostrarMensaje(`⚠️ El archivo "${archivoExcedido.name}" excede los 35 MB permitidos. Por favor, optimícelo antes de enviar.`, "error");
+                toggleFormFreeze(false);
+                return;
+            }
+
+            // --- C. VALIDACIÓN 1 A 1 DE REQUERIMIENTOS ---
             const areasReq = document.querySelectorAll('.txt-resp-req');
             let reqIncompletos = false;
             const respuestasReq = [];
@@ -1604,7 +1658,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- C. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
+            // --- D. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
             toggleFormFreeze(true);
             const numGenerales = archivos.length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
