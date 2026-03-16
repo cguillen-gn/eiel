@@ -626,7 +626,6 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
     
-    // --- LÓGICA DRAG & DROP ---
     const dropZone = document.querySelector('.file-upload-area');
     
     if (dropZone) {
@@ -811,35 +810,31 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- D. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
+            // --- D. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
             const totalTareas = numReqFiles + numGenerales;
             
-            // 1. Iniciamos el progreso con los nuevos mensajes
+
             UIProgress.show(totalTareas);
             UIProgress.update(0, totalTareas, "Iniciando el envío...");
             
             let completados = 0;
 
             try {
-                // 1. Unificamos todos los archivos en una lista única de tareas
+
                 const listaTareas = [];
                 
-                // Archivos de Requerimientos
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     const numReq = parseInt(id) + 1;
                     listado.forEach(file => listaTareas.push({ file, seccion: `REQUERIMIENTO_${numReq}` }));
                 });
 
-                // Archivos generales
                 archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
 
-                // 2. Subida Secuencial (Uno a uno) para máxima estabilidad
                 for (const tarea of listaTareas) {
                     try {
-                        // Actualizamos el mensaje con el contador "Subido X de Y"
                         UIProgress.update(
                             completados, 
                             totalTareas, 
@@ -850,18 +845,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         
                         completados++;
                         
-                        // Pequeña pausa de 300ms para dejar que el servidor procese el archivo
                         await new Promise(r => setTimeout(r, 300));
                     } catch (e) {
                         console.error("Fallo en subida individual:", e);
                     }
                 }
 
-                // 3. Fase final: Generación del justificante
-                // Cambiamos el mensaje a "Procesando datos..." para que la barra se quede al 95%
                 UIProgress.update(completados, totalTareas, "Procesando datos y generando justificante...");
 
-                // Recolectamos TODOS los nombres de archivos para el PDF
                 const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
 
                 const payload = {
@@ -891,10 +882,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // Finalizamos el proceso: esto oculta la barra/nota y muestra el éxito con el botón
                 UIProgress.complete();
                 
-                // Limpieza de campos y variables
                 archivos = []; colaAdjuntosReq = {}; renderArchivos(); 
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
                 document.querySelectorAll("input, select, textarea").forEach(el => {

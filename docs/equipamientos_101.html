@@ -3013,7 +3013,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
     
-    // --- LÓGICA DRAG & DROP ---
     const dropZone = document.querySelector('.file-upload-area');
     if (dropZone) {
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => {
@@ -3311,21 +3310,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // --- D. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
+            // --- D. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numGenerales = archivos.length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numNuevosFiles = Object.values(colaAdjuntosNuevos).flat().length;
             const totalTasks = numGenerales + numReqFiles + numNuevosFiles;
             
-            // 1. Iniciamos el progreso global
             UIProgress.show(totalTasks);
             UIProgress.update(0, totalTasks, "Iniciando el envío...");
 
             let completados = 0;
 
             try {
-                // Unificamos tareas
                 const listaTareas = [];
                 archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
@@ -3336,10 +3333,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     listado.forEach(file => listaTareas.push({ file, seccion: id }));
                 });
 
-                // 2. Subida Secuencial (Uno a uno) manteniendo tu lógica original
                 for (const tarea of listaTareas) {
                     try {
-                        // Actualización del mensaje con contador dinámico "Subido X de Y"
                         UIProgress.update(
                             completados, 
                             totalTasks, 
@@ -3349,17 +3344,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         await UploadService.uploadFile(tarea.file, 'equipamientos', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
                         completados++;
                         
-                        // Pausa técnica para estabilidad
                         await new Promise(r => setTimeout(r, 300));
                     } catch (e) {
                         console.error("Fallo en subida individual:", e);
                     }
                 }
 
-                // 3. Fase final: Registro y Justificante PDF
                 UIProgress.update(completados, totalTasks, "Procesando datos y generando justificante...");
 
-                // Recolección de datos de tablas (Sin cambios)
                 const datosEquipamientos = Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
                     const select = tr.querySelector('.select-estado');
                     return {
@@ -3408,10 +3400,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // Finaliza y muestra la pantalla de éxito con el botón de volver
                 UIProgress.complete();
                 
-                // Limpieza de campos (Sin cambios)
                 archivos = [];
                 colaAdjuntosReq = {}; colaAdjuntosNuevos = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");

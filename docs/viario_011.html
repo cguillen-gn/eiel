@@ -580,7 +580,6 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
     
-    // --- LÓGICA DRAG & DROP ---
     const dropZone = document.querySelector('.file-upload-area');
     
     if (dropZone) {
@@ -764,20 +763,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-           // --- D. PROCESO DE ENVÍO Y SUBIDA (MODIFICADO: Nombres y Subida 1 a 1) ---
+           // --- D. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
             const totalTareas = numReqFiles + numGenerales;
             
-            // 1. Iniciamos el progreso global
             UIProgress.show(totalTareas);
             UIProgress.update(0, totalTareas, "Iniciando el envío...");
 
             let completados = 0;
 
             try {
-                // Unificamos tareas
                 const listaTareas = [];
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
                     const numReq = parseInt(id) + 1;
@@ -785,10 +782,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
                 archivos.forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
 
-                // 2. Subida Secuencial (Uno a uno) manteniendo tu lógica original
                 for (const tarea of listaTareas) {
                     try {
-                        // Actualización del mensaje con contador dinámico "Subido X de Y"
                         UIProgress.update(
                             completados, 
                             totalTareas, 
@@ -798,14 +793,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         await UploadService.uploadFile(tarea.file, 'viario', window.EIEL_CONFIG.muniCode, tarea.seccion, idBatch);
                         completados++;
                         
-                        // Pausa técnica para estabilidad
                         await new Promise(r => setTimeout(r, 300));
                     } catch (e) {
                         console.error("Fallo en subida individual de viario:", e);
                     }
                 }
-
-                // 3. Fase final: Procesamiento del justificante
+                
                 UIProgress.update(completados, totalTareas, "Procesando datos y generando justificante...");
 
                 const nombresTodosAdjuntos = listaTareas.map(t => t.file.name).join("\n");
@@ -830,10 +823,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     body: JSON.stringify(payload)
                 });
 
-                // Finaliza: Oculta progreso y muestra éxito con el botón de volver
                 UIProgress.complete();
                 
-                // Limpieza de campos (Sin cambios)
                 archivos = [];
                 colaAdjuntosReq = {}; renderArchivos();
                 document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
