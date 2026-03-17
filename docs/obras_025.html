@@ -1858,6 +1858,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // --- E. PROCESO DE ENVÍO Y SUBIDA ---
             toggleFormFreeze(true);
+
             const numObrasFiles = Object.values(colaAdjuntos).flat().length;
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const totalTareas = numObrasFiles + numReqFiles;
@@ -1866,48 +1867,54 @@ document.addEventListener("DOMContentLoaded", () => {
             let completados = 0;
 
             try {
-
                 const listaTareas = [];
-                const totalArchivos = listaTareas.length; 
-                let archivosContados = 0;
-
 
                 Object.entries(colaAdjuntos).forEach(([id, listado]) => {
                     listado.forEach(file => {
-                        listaTareas.push({ file, id: id });
+                        listaTareas.push({ file, id: id, tipo: 'obras' });
                     });
                 });
 
                 Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
-                    const numReq = parseInt(id) + 1; // Conversión a base 1
+                    const numReq = parseInt(id) + 1; 
                     listado.forEach(file => {
-                        listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}` });
+                        listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}`, tipo: 'requerimientos' });
                     });
                 });
 
-                const TAMAÑO_LOTE = 3;
-                for (let i = 0; i < listaTareas.length; i += TAMAÑO_LOTE) {
-                    const lote = listaTareas.slice(i, i + TAMAÑO_LOTE);
-                    
-                    await Promise.all(lote.map(async (tarea) => {
-                        try {
-                            await UploadService.uploadFile(tarea.file, 'obras', window.EIEL_CONFIG.muniCode, tarea.id, idBatch);
-                            
-                            completados++;
-                            
-                            UIProgress.update(
-                                completados, 
-                                totalTareas, 
-                                `Subiendo archivos adjuntos (Subido ${completados} de ${totalTareas} archivos)...`
-                            );
+                for (const tarea of listaTareas) {
+                    try {
+                        UIProgress.update(
+                            completados, 
+                            totalTareas, 
+                            `Subiendo archivos adjuntos (Subido ${completados} de ${totalTareas} archivos)...`
+                        );
 
-                        } catch (e) {
-                            console.error(`Error subiendo ${tarea.file.name}:`, e);
+                        let exitoSubida = false;
+                        for (let intento = 1; intento <= 2; intento++) {
+                            try {
+                                await UploadService.uploadFile(
+                                    tarea.file, 
+                                    tarea.tipo, 
+                                    window.EIEL_CONFIG.muniCode, 
+                                    tarea.id, 
+                                    idBatch
+                                );
+                                exitoSubida = true;
+                                break; 
+                            } catch (e) {
+                                if (intento === 2) throw e;
+                                await new Promise(r => setTimeout(r, 1000));
+                            }
                         }
-                    }));
 
-                    if (i + TAMAÑO_LOTE < listaTareas.length) {
-                        await new Promise(r => setTimeout(r, 200));
+                        if (exitoSubida) {
+                            completados++;
+                            await new Promise(r => setTimeout(r, 300));
+                        }
+                    } catch (e) {
+                        console.error(`Error subiendo ${tarea.file.name}:`, e);
+                        throw new Error(`No se pudo subir el archivo: ${tarea.file.name}`);
                     }
                 }
 
@@ -1928,7 +1935,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     const inputN = fila.querySelector(".input-nueva-nombre");
                     const inputO = fila.querySelector(".input-nueva-obs");
                     const inputE = fila.querySelector(".input-nueva-estado");
-
                     if (inputN && inputN.value.trim()) {
                         const idT = inputN.dataset.tempId;
                         nuevasObrasData.push({
@@ -1940,8 +1946,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 });
 
-                UIProgress.update(completados, totalTareas, "Generando justificante...");
-                
+                UIProgress.update(completados, totalTareas, "Procesando datos y generando justificante...");
+
                 const payload = {
                     tipo_formulario: "obras",
                     fase: window.EIEL_CONFIG.fase,
@@ -1957,8 +1963,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     otras_obras_json: JSON.stringify(nuevasObrasData),
                     respuestas_requerimientos_json: JSON.stringify(respuestasReq)
                 };
-                
-                UIProgress.update(95, 100, "Procesando datos y generando justificante...");
 
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
                     method: "POST", mode: "no-cors",
@@ -1967,7 +1971,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 UIProgress.complete();
-                
 
                 colaAdjuntos = {}; 
                 colaAdjuntosReq = {};
