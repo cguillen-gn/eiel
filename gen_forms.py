@@ -165,7 +165,7 @@ def obtener_obras(conn, mun):
             SELECT clave, mun, orden, nombre, plan_obra, estado, proyecto,
             CASE WHEN estado = 'FI' THEN 2 ELSE 0 END as cond
             FROM geonet_obras
-            WHERE fase = (SELECT max(fase) FROM geonet_fase) 
+            WHERE fase = (SELECT max(fase) FROM geonet_fase)
             AND mun = %s
             AND (
                 (equipamientos IS NULL OR equipamientos = 'SI') OR
@@ -173,15 +173,20 @@ def obtener_obras(conn, mun):
                 (infra_viaria IS NULL OR infra_viaria = 'SI') OR
                 (abastecimiento IS NULL OR abastecimiento = 'SI') OR
                 (saneamiento IS NULL OR saneamiento = 'SI')
-            )
+            ) 
             -- Se descartan las anuladas
             AND (estado IS NULL OR estado <> 'AN') 
-            -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
-            AND (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
-            -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
-            AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
-            -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
-            AND (subvencion IS NULL OR subvencion <> 'DICH')
+            AND (
+                mun IN ('') -- Municipios en los que no se desea filtrar obras por algun motivo.
+                OR (
+                    -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
+                    (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
+                    -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
+                    AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
+                    -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
+                    AND (subvencion IS NULL OR subvencion <> 'DICH')
+                    )
+                )
             ORDER BY orden;
         """
         cur.execute(sql, (mun,))
