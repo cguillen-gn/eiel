@@ -180,22 +180,37 @@
     <div class="card card-info">
         <h4><i data-lucide="info"></i> Instrucciones</h4>
         <ul>
-            <li><strong>Estado:</strong> Actualice el estado de ejecución de las obras en seguimiento[cite: 1981, 1982].</li>
-            <li><strong>Documentación:</strong> Adjunte al menos memoria y planos por cada actuación[cite: 1982].</li>
+            <li><strong>Estado:</strong> Actualice el estado de ejecución de las obras en seguimiento.</li>
+            <li><strong>Documentación:</strong> Adjunte al menos memoria y planos por cada actuación.</li>
         </ul>
     </div>
 
     
     <div class="card">
         <h2 class="section-title"><i data-lucide="list-checks"></i> Obras en Seguimiento</h2>
-        
-        
-        
-        <p class="sin-uso-intro">ℹ️ No hay obras en seguimiento registradas para este municipio.</p>
-        
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th>Denominación de la Obra</th>
+                        <th style="width: 200px;">Estado Actual</th>
+                        <th style="width: 120px;">Adjuntos</th>
+                    </tr>
+                </thead>
+               <tbody>
+                    
+                        <tr>
+                            <td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-secondary); font-style: italic;">
+                                No hay obras en seguimiento registradas para este municipio.
+                            </td>
+                        </tr>
+                    
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    
     
     
 
@@ -358,8 +373,99 @@
     </div>
 
     
+<script>
+// --- [1] ESTADO LOCAL DE ARCHIVOS ---
+let archivosGenerales = [];
+let archivosPorObra = {}; // Diccionario: { id_obra: [File, File...] }
+
+document.addEventListener("DOMContentLoaded", () => {
     
-    
+    // -- Manejo de adjuntos específicos por obra --
+    document.querySelectorAll('.input-adjunto-obra').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idObra = e.target.dataset.id;
+            const nuevos = Array.from(e.target.files);
+            archivosPorObra[idObra] = [...(archivosPorObra[idObra] || []), ...nuevos];
+            document.getElementById(`count_${idObra}`).textContent = archivosPorObra[idObra].length;
+        });
+    });
+
+    // -- Manejo de adjuntos generales (vía Macro) --
+    const fileInputGral = document.getElementById('fileInput');
+    fileInputGral.addEventListener('change', () => {
+        archivosGenerales = [...archivosGenerales, ...Array.from(fileInputGral.files)];
+        const listGral = document.getElementById('fileList');
+        listGral.innerHTML = archivosGenerales.map((f, i) => `
+            <div class="file-item">
+                <span>${f.name}</span>
+                <button type="button" class="btn-remove" onclick="archivosGenerales.splice(${i},1); document.dispatchEvent(new Event('DOMContentLoaded'));">Eliminar</button>
+            </div>`).join('');
+    });
+
+    // -- ENVÍO DE DATOS --
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConf = document.getElementById("checkConformidad");
+    checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+
+    btnEnviar.addEventListener("click", async () => {
+        const idBatch = "OBRAS_" + Date.now();
+        
+        toggleFormFreeze(true);
+
+        // A. PREPARAR LISTA TOTAL DE TAREAS PARA EL MOTOR
+        const listaTareas = [];
+        
+        // 1. Añadir generales
+        archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
+        
+        // 2. Añadir por obra
+        Object.entries(archivosPorObra).forEach(([id, files]) => {
+            files.forEach(f => listaTareas.push({ file: f, seccion: `OBRA_${id}` }));
+        });
+
+        UIProgress.show(listaTareas.length);
+
+        try {
+            // B. SUBIDA POR LOTES (Concurrencia = 3)
+            // Aquí es donde aplicamos la potencia para Obras
+            await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
+
+            UIProgress.update(listaTareas.length, listaTareas.length, "Registrando estados y generando PDF...");
+
+            // C. PAYLOAD FINAL
+            const payload = {
+                tipo: "obras",
+                id_envio: idBatch,
+                municipio: window.EIEL_CONFIG.muniCode,
+                seguimiento: Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
+                    id: s.dataset.id,
+                    estado: s.value
+                })),
+                observaciones: document.getElementById("observaciones").value,
+                contacto: {
+                    nombre: document.getElementById("contactoNombre").value,
+                    email: document.getElementById("contactoEmail").value
+                }
+            };
+
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
+                method: "POST", 
+                mode: "no-cors", 
+                body: JSON.stringify(payload) 
+            });
+
+            UIProgress.complete();
+            if (window.lucide) lucide.createIcons();
+
+        } catch (error) {
+            console.error(error);
+            Swal.fire("Error", "Fallo al enviar los datos de obras.", "error");
+            toggleFormFreeze(false);
+        }
+    });
+});
+</script>
+
 
     
     <script>
