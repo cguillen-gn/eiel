@@ -20,11 +20,10 @@
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
             urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
-            // Verifica si existen avisos personalizados para la validación de observaciones
             hasAvisos: true
         };
-        
-        // 2. SERVICIO DE PROGRESO (Gestiona la interfaz de envío)
+
+        // 2. SERVICIO DE PROGRESO (Interfaz de envío)
         const UIProgress = {
             get el() { return {
                 bar: document.getElementById("progressBar"),
@@ -41,7 +40,7 @@
                 this.update(0, total, "Iniciando envío...");
             },
             update(completed, total, msg) {
-                const perc = total > 0 ? Math.round((completed / total) * 90) : 0; // Hasta 90% por archivos
+                const perc = total > 0 ? Math.round((completed / total) * 90) : 0;
                 this.el.bar.style.width = perc + "%";
                 this.el.percent.textContent = perc + "%";
                 this.el.text.textContent = msg;
@@ -55,7 +54,7 @@
             }
         };
 
-        // 3. SERVICIO DE SUBIDA (Motor híbrido para archivos)
+        // 3. SERVICIO DE SUBIDA (Motor por lotes)
         const UploadService = {
             async uploadFiles(tareas, tipo, muni, idBatch, concurrency = 1) {
                 for (let i = 0; i < tareas.length; i += concurrency) {
@@ -87,43 +86,24 @@
             })
         };
 
-        // 4. FUNCIONES GLOBALES (Accesibles desde el HTML)
+        // 4. FUNCIONES GLOBALES
         function logout() {
-            // Limpia toda la sesión y datos del técnico por seguridad
-            localStorage.clear(); 
+            localStorage.clear();
             window.location.href = "index.html";
         }
         
-        // 5. FUNCIÓN DE BLOQUEO DE FORMULARIO
         function toggleFormFreeze(isFrozen) {
-            const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
-            const elements = document.querySelectorAll(selectors);
-            
+            const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add');
             elements.forEach(el => {
                 el.disabled = isFrozen;
-                // Efecto visual de "congelado"
                 el.style.opacity = isFrozen ? "0.6" : "1";
-                if (isFrozen) {
-                    el.style.pointerEvents = "none"; 
-                } else {
-                    el.style.pointerEvents = "auto";
-                }
+                el.style.pointerEvents = isFrozen ? "none" : "auto";
             });
-
-            // Ajuste específico para el botón enviar para mantener el cursor de espera
-            const btnEnviar = document.getElementById('btnEnviar');
-            if (btnEnviar && isFrozen) {
-                btnEnviar.style.cursor = "wait";
-            } else if (btnEnviar) {
-                btnEnviar.style.cursor = "pointer";
-            }
         }
         
-        // 6. MODAL DE IMAGEN
         window.abrirVisorImagen = (src) => {
-            let modal = document.getElementById('visorImagenGlobal');
-            if (!modal) {
-                modal = document.createElement('div');
+            let modal = document.getElementById('visorImagenGlobal') || document.createElement('div');
+            if (!document.getElementById('visorImagenGlobal')) {
                 modal.id = 'visorImagenGlobal';
                 modal.className = 'modal-img';
                 modal.innerHTML = `<img src="" id="imgVisor">`;
@@ -133,21 +113,15 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
-        
     </script>
-   
-    
 </head>
 <body class="theme-saneamiento">
     <header class="site-header">
         <div class="header-content">
             <div class="logo-area">
                 <h1>EIEL</h1>
-                <span class="badge-fase">
-                    Fase --
-                </span>
+                <span class="badge-fase">Fase 2026</span>
             </div>
-        
             <div class="user-area">
                 <span id="headerMuniName" class="user-email">...</span>
                 <button onclick="logout()" class="btn-logout">Salir</button>
@@ -157,23 +131,18 @@
 
     <nav class="breadcrumb-nav">
         <div class="container">
-            <a href="index.html" class="back-link">
-                ⭠ Volver al listado de formularios
-            </a>
+            <a href="index.html" class="back-link">⭠ Volver al listado</a>
         </div>
     </nav>
 
     <main class="main-container">
         <div class="form-header">
-            <div class="icon-header">
-                <i data-lucide="test-tube"></i>
-            </div>
+            <div class="icon-header"><i data-lucide="test-tube"></i></div>
             <div class="title-header">
                 <h2>SANEAMIENTO Y DEPURACIÓN</h2>
-                <p class="subtitle">Algorfa (Código: 012)</p>
+                <p class="subtitle">Algorfa (012)</p>
             </div>
         </div>
-
         
 <form id="formSaneamiento">
     
@@ -218,7 +187,7 @@
             <div id="campos_gestion_otro" class="hidden shadow-inner-bg">
                 <div class="form-group">
                     <label class="form-label" for="nombre_gestor">Gestor:</label>
-                    <input type="text" class="form-input" id="nombre_gestor" placeholder="Especifique el gestor del servicio...">
+                    <input type="text" class="form-input" id="nombre_gestor" placeholder="Especifique el gestor del servicio..."
                 </div>
             </div>
         </div>
@@ -282,16 +251,10 @@
 <div class="card">
     <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
     <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
-        <div class="upload-icon">
-            <i data-lucide="upload-cloud" style="width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.7;"></i>
-        </div>
-        <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">
-            Arrastra y suelta archivos aquí
-        </div>
-        <div style="font-size: 0.9rem; color: var(--text-secondary); margin: 5px 0;">
-            o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span>
-        </div>
-        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes... Máx 35 MB / archivo)</p>
+        <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
+        <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
+        <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -325,10 +288,7 @@
     <div class="conformidad-box">
         <label class="check-label">
             <input type="checkbox" id="checkConformidad" class="check-input">
-            <span class="check-text">
-                <strong>Declaración de veracidad:</strong> Como responsable, 
-                confirmo que los datos introducidos son correctos y actualizados.
-            </span>
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
         </label>
     </div>
     <div id="mensaje" class="message hidden"></div>
@@ -343,246 +303,54 @@
         <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
     </footer>
 
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // A. VALIDACIÓN DE SESIÓN DEL MUNICIPIO
-            const muniCode = localStorage.getItem("eiel_muni_code");
-            const muniName = localStorage.getItem("eiel_muni_name");
-
-            if (!muniCode) {
-                console.warn("Acceso no autorizado. Redirigiendo al login...");
-                window.location.href = "index.html";
-                return;
-            }
-
-            // Actualizamos el nombre del municipio en la cabecera
-            const headerName = document.getElementById("headerMuniName");
-            if(headerName) headerName.textContent = muniName || "Municipio";
-
-            // B. AUTOCOMPLETADO Y PERSISTENCIA PROACTIVA
-            const fieldsMap = {
-                "contactoNombre": "eiel_user_name",
-                "contactoEmail": "eiel_user_email",
-                "contactoDepartamento": "eiel_user_dept"
-            };
-
-            // 1. Rellenar campos si ya existen datos guardados
-            Object.keys(fieldsMap).forEach(id => {
-                const savedValue = localStorage.getItem(fieldsMap[id]);
-                const inputEl = document.getElementById(id);
-                
-                if (savedValue && inputEl) {
-                    inputEl.value = savedValue;
-                    // Caso especial: Sincronizar campo de confirmación de email
-                    if (id === "contactoEmail") {
-                        const confirmEl = document.getElementById("contactoEmailConfirm");
-                        if (confirmEl) confirmEl.value = savedValue;
-                    }
-                }
-            });
-
-            // 2. Guardar datos en tiempo real mientras el técnico escribe (Escucha Activa)
-            Object.keys(fieldsMap).forEach(id => {
-                const inputEl = document.getElementById(id);
-                if (inputEl) {
-                    inputEl.addEventListener('input', (e) => {
-                        localStorage.setItem(fieldsMap[id], e.target.value.trim());
-                    });
-                }
-            });
-        });
-    </script>
-    
     <div id="overlayProgress" class="overlay hidden">
         <div class="progress-card">
-            <h3 id="progressTitle" style="margin-bottom: 10px; font-weight: 700; color: #1e293b;">Enviando datos...</h3>
-            
+            <h3 id="progressTitle">Enviando datos...</h3>
             <div id="progressElements">
-                <div class="progress-bar-container">
-                    <div id="progressBar" class="progress-bar" style="width: 0%; height: 100%; background-color: #10b981; transition: width 0.3s ease;"></div>
-                </div>
-                <div class="progress-info">
-                    <span id="progressText">Iniciando...</span>
-                    <span id="progressValue">0%</span>
-                </div>
-                <p id="pacienciaNota" style="margin-top:20px; font-size:0.85em; color:#64748b; font-style:italic; line-height:1.4; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px;">
-                    ⌛ <b>Nota:</b> Este proceso puede tardar <b>varios minutos</b> debido al volumen de información y la generación del certificado oficial. Por favor, <b>no cierre ni refresque la pestaña.</b>
-                </p>
+                <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+                <div class="progress-info"><span id="progressText">Iniciando...</span><span id="progressValue">0%</span></div>
+                <p class="paciencia-nota">⌛ No cierre ni refresque la pestaña durante el proceso.</p>
             </div>
-
-            <div id="successState" class="hidden" style="margin-top: 20px;">
-                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;">
-                    <i data-lucide="check-circle-2" style="width: 60px; height: 60px; margin: 0 auto;"></i>
-                </div>
-                <p style="color: #475569; font-weight: 500; line-height: 1.6; margin-bottom: 25px;">
-                    ¡El envío se ha realizado correctamente!<br>
-                    <span style="color: #1e293b; font-weight: 700;">Se ha enviado un justificante en formato PDF al correo electrónico facilitado.</span>
-                </p>
-                <a href="index.html" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; justify-content: center; width: 100%;">
-                    <i data-lucide="home" style="width: 18px;"></i>
-                    Volver al Listado de Formularios
-                </a>
+            <div id="successState" class="hidden">
+                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;"><i data-lucide="check-circle-2"></i></div>
+                <p>¡Envío realizado correctamente! Se ha enviado un justificante al correo facilitado.</p>
+                <a href="index.html" class="btn btn-primary">Volver al Listado</a>
             </div>
         </div>
     </div>
 
-    
-<script>
-let archivosGenerales = [];
-let colaAdjuntosReq = {};
-let reqIdActual = null;
+    <script>
+        // VALIDACIÓN DE SESIÓN Y PERSISTENCIA
+        document.addEventListener("DOMContentLoaded", () => {
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            if (!muniCode) return window.location.href = "index.html";
+            
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = localStorage.getItem("eiel_muni_name") || "Municipio";
 
-document.addEventListener("DOMContentLoaded", () => {
-    // A. Gestión de visibilidad del Servicio
-    const selectGestion = document.getElementById('tipo_gestion');
-    const divExterno = document.getElementById('campos_gestion_externa');
-    const divOtro = document.getElementById('campos_gestion_otro');
-
-    selectGestion.addEventListener('change', function() {
-        const val = this.value;
-        divExterno.classList.toggle('hidden', val !== 'Indirecta (Concesionaria)');
-        divOtro.classList.toggle('hidden', val !== 'Otro');
-    });
-
-    // B. Manejo de adjuntos (Generales y Requerimientos)
-    const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', () => {
-        archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
-        renderArchivos();
-    });
-
-    const inputReq = document.getElementById('hiddenInputReq');
-    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; inputReq.click(); };
-    inputReq.addEventListener('change', () => {
-        if (!reqIdActual) return;
-        colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
-        renderColaReq(reqIdActual);
-    });
-
-    // C. Lógica de Envío
-    const btnEnviar = document.getElementById("btnEnviar");
-    const checkConf = document.getElementById("checkConformidad");
-    checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
-
-    btnEnviar.addEventListener("click", async () => {
-        const idBatch = "SANEAMIENTO_" + Date.now();
-        
-        // 1. Validaciones mínimas
-        if (document.getElementById("contactoEmail").value !== document.getElementById("contactoEmailConfirm").value) {
-            return Swal.fire("Error", "Los emails de contacto no coinciden.", "error");
-        }
-
-        toggleFormFreeze(true);
-
-        // 2. Preparar tareas de subida
-        const listaTareas = [];
-        archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
-        Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
-            list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }));
+            const fieldsMap = {"contactoNombre": "eiel_user_name", "contactoEmail": "eiel_user_email", "contactoDepartamento": "eiel_user_dept"};
+            Object.keys(fieldsMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = localStorage.getItem(fieldsMap[id]) || "";
+                    el.addEventListener('input', (e) => localStorage.setItem(fieldsMap[id], e.target.value.trim()));
+                }
+            });
         });
 
-        UIProgress.show(listaTareas.length);
-
-        try {
-            // 3. Subida (Secuencial = 1 para Saneamiento)
-            await UploadService.uploadFiles(listaTareas, 'SANEAMIENTO', window.EIEL_CONFIG.muniCode, idBatch, 1);
-
-            UIProgress.update(listaTareas.length, listaTareas.length, "Generando justificante...");
-
-            // 4. Datos técnicos finales
+        // LOGGER Y ICONOS
+        (function() {
+            if (window.location.protocol === 'file:') return;
             const payload = {
-                tipo_formulario: "saneamiento",
-                id_envio: idBatch,
-                municipio: window.EIEL_CONFIG.muniCode,
-                gestion: {
-                    tipo: selectGestion.value,
-                    empresa: document.getElementById("nombre_empresa").value,
-                    gestor_otro: document.getElementById("nombre_gestor").value,
-                    tecnico: document.getElementById("tecnicoNombre").value
-                },
-                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg,
-                    respuesta: area.value
-                })),
-                observaciones: document.getElementById("observaciones").value,
-                contacto: {
-                    nombre: document.getElementById("contactoNombre").value,
-                    email: document.getElementById("contactoEmail").value
-                }
+                municipio: "Algorfa", codigo: "012", fase: "2026",
+                tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+                ua: navigator.userAgent,
+                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
             };
+            if (window.EIEL_CONFIG.urlLogger) fetch(window.EIEL_CONFIG.urlLogger, {method: 'POST', mode: 'no-cors', body: JSON.stringify(payload)});
+        })();
 
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
-            UIProgress.complete();
-
-        } catch (error) {
-            console.error(error);
-            toggleFormFreeze(false);
-            Swal.fire("Error", "Fallo al procesar el envío.", "error");
-        }
-    });
-});
-
-// Funciones de renderizado restauradas (manteniendo estética original)
-function renderArchivos() {
-    const fileList = document.getElementById("fileList");
-    fileList.innerHTML = archivosGenerales.map((f, i) => `
-        <div class="file-item">
-            <span>📄 ${f.name}</span>
-            <button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon">
-                <i data-lucide="trash-2" style="width:18px;"></i>
-            </button>
-        </div>`).join("");
-    if (window.lucide) lucide.createIcons();
-}
-
-function renderColaReq(id) {
-    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
-    contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
-        <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
-            <button type="button" onclick="colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}');" class="btn-danger-icon">
-                <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
-            </button>
-        </div>`).join("");
-    if (window.lucide) lucide.createIcons();
-}
-</script>
-
-
-    
-    <script>
-    (function() {
-        // No registrar accesos si se abre el archivo localmente
-        if (window.location.protocol === 'file:') return;
-
-        const payload = {
-            municipio: "Algorfa",
-            codigo: "012",
-            fase: "2026",
-            // Detecta el tipo de formulario por el nombre del archivo
-            tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
-            ua: navigator.userAgent,
-            contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial (Técnico de " + (localStorage.getItem("eiel_muni_name") || "N/A") + ")",
-            departamento: localStorage.getItem("eiel_user_dept") || "N/A",
-            email: localStorage.getItem("eiel_user_email") || "N/A" 
-        };
-
-        // Envío al Apps Script de Logs si la URL está configurada
-        if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
-            fetch(window.EIEL_CONFIG.urlLogger, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(payload)
-            });
-        }
-    })();
-
-    document.addEventListener("DOMContentLoaded", () => {
-        // Fuerza la creación de iconos Lucide en toda la página (Base + Formulario + Macros)
-        if (window.lucide) {
-            lucide.createIcons();
-        }
-    });
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
     </script>
 </body>
 </html>
