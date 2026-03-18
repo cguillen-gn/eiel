@@ -31,6 +31,16 @@
             window.location.href = "index.html";
         }
         
+        // Aviso de que no abandonar el formulario si hay datos metidos
+        let formSucio = false;
+
+        window.addEventListener('beforeunload', (e) => {
+            if (formSucio) {
+                e.preventDefault();
+                e.returnValue = ''; 
+            }
+        });
+        
         // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
         function toggleFormFreeze(isFrozen) {
             const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
@@ -465,6 +475,13 @@
                     });
                 }
             });
+            
+            // C. Detectar cambios en cualquier campo de entrada de forma global
+            document.addEventListener('change', (e) => {
+                if (e.target.closest('input, select, textarea')) {
+                    formSucio = true;
+                }
+            });
         });
     </script>
     
@@ -663,6 +680,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (fileInput) {
         fileInput.onchange = () => {
+            formSucio = true;
             const files = Array.from(fileInput.files);
             const LIMITE_BYTES = 35 * 1024 * 1024;
             
@@ -701,6 +719,7 @@ document.addEventListener("DOMContentLoaded", () => {
         dropZone.addEventListener('drop', e => {
             const files = Array.from(e.dataTransfer.files);
             if (files.length > 0) {
+                formSucio = true;
                 archivos.push(...files);
                 renderArchivos(); 
             }
@@ -885,6 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             // --- E. PROCESO DE ENVÍO Y SUBIDA ---
+            formSucio = false;
             toggleFormFreeze(true);
             const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
             const numGenerales = archivos.length;
