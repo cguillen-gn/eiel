@@ -138,18 +138,23 @@
 
 {% block scripts %}
 <script>
-let colaAdjuntos = {};
-let colaAdjuntosReq = {};
+// 1. ESTADO GLOBAL DEL FORMULARIO
+window.colaAdjuntos = {};
+window.colaAdjuntosReq = {};
 let idObraActual = null;
 let reqIdActual = null;
 let contadorNuevas = 0;
 
-// 1. FUNCIÓN PARA AÑADIR FILAS DINÁMICAS
-function agregarFilaNuevaObra() {
+// 2. FUNCIÓN PARA AÑADIR FILAS DINÁMICAS (Ahora Global)
+window.agregarFilaNuevaObra = function() {
     contadorNuevas++;
     const idT = `NUEVA_${contadorNuevas}`;
+    const tbody = document.getElementById('bodyNuevasObras');
+    if (!tbody) return;
+
     const tr = document.createElement('tr');
-    tr.id = `fila_${idT}`; tr.className = 'fila-nueva-obra';
+    tr.id = `fila_${idT}`; 
+    tr.className = 'fila-nueva-obra';
     tr.innerHTML = `
         <td><input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Calle Mayor"></td>
         <td><select class="form-select input-nueva-estado"><option value="">Seleccionar...</option><option value="En ejecución">En ejecución</option><option value="Finalizada">Finalizada</option></select></td>
@@ -162,53 +167,68 @@ function agregarFilaNuevaObra() {
         </td>
         <td style="text-align:center;">
             <button type="button" onclick="this.closest('tr').remove()" class="btn-danger-icon">
-                <i data-lucide="trash-2"></i>
+                <i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i>
             </button>
         </td>`;
-    document.getElementById('bodyNuevasObras').appendChild(tr);
+    tbody.appendChild(tr);
     if (window.lucide) lucide.createIcons();
-}
+};
 
-// 2. RENDERIZADO DE ADJUNTOS
+// 3. GESTIÓN DE ADJUNTOS (Ahora Global)
+window.gestionarAdjuntos = function(id) {
+    idObraActual = id;
+    const input = document.getElementById('hiddenFileInput');
+    if (input) input.click();
+};
+
+window.gestionarAdjuntosReq = function(id) {
+    reqIdActual = id;
+    const input = document.getElementById('hiddenInputReq');
+    if (input) input.click();
+};
+
 function renderAdjuntos(id) {
     const contenedor = document.getElementById(`lista_adjuntos_${id}`);
     if (!contenedor) return;
-    contenedor.innerHTML = (colaAdjuntos[id] || []).map(f => `<div class="file-item" style="font-size:0.7rem;"><span>📄 ${f.name.substring(0,10)}...</span></div>`).join("");
+    contenedor.innerHTML = (window.colaAdjuntos[id] || []).map(f => `
+        <div class="file-item" style="font-size:0.7rem;">
+            <span>📄 ${f.name.substring(0,10)}...</span>
+        </div>`).join("");
 }
 
 function renderColaReq(id) {
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
     if (!contenedor) return;
-    contenedor.innerHTML = (colaAdjuntosReq[id] || []).map(f => `<div class="file-item" style="font-size:0.75rem;"><span>📄 ${f.name}</span></div>`).join("");
+    contenedor.innerHTML = (window.colaAdjuntosReq[id] || []).map(f => `
+        <div class="file-item" style="font-size:0.75rem;">
+            <span>📄 ${f.name}</span>
+        </div>`).join("");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // A. Gestión de adjuntos por obra
+    // A. CREAR LA FILA POR DEFECTO INMEDIATAMENTE
+    agregarFilaNuevaObra();
+
+    // B. Configuración de Inputs de Archivos
     const inputObras = document.getElementById('hiddenFileInput');
-    window.gestionarAdjuntos = (id) => { idObraActual = id; inputObras.click(); };
     if (inputObras) {
         inputObras.addEventListener('change', () => {
             if (!idObraActual) return;
-            colaAdjuntos[idObraActual] = [...(colaAdjuntos[idObraActual] || []), ...Array.from(inputObras.files)];
+            window.colaAdjuntos[idObraActual] = [...(window.colaAdjuntos[idObraActual] || []), ...Array.from(inputObras.files)];
             renderAdjuntos(idObraActual);
         });
     }
 
-    // B. Gestión de adjuntos por requerimiento (CON VALIDACIÓN DE SEGURIDAD)
     const inputReq = document.getElementById('hiddenInputReq');
-    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; if(inputReq) inputReq.click(); };
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             if (reqIdActual === null) return;
-            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            window.colaAdjuntosReq[reqIdActual] = [...(window.colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
             renderColaReq(reqIdActual);
         });
     }
 
-    // C. CREAR LA FILA POR DEFECTO AL CARGAR
-    agregarFilaNuevaObra();
-
-    // D. LÓGICA DE ENVÍO
+    // C. LÓGICA DE ENVÍO
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
     if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
@@ -218,14 +238,13 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleFormFreeze(true);
 
         const listaTareas = [];
-        // Preparar archivos por obra y requerimiento (Sección compatible con la base)
-        Object.entries(colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
-        Object.entries(colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
+        Object.entries(window.colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
+        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
 
         UIProgress.show(listaTareas.length);
 
         try {
-            // USAR EL MOTOR GLOBAL DE LA BASE (Concurrencia = 3)
+            // Usamos el motor de la base con concurrencia 3
             await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
 
             const payload = {
