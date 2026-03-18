@@ -34,7 +34,6 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {# Generamos las filas según los tipos de residuos originales #}
                     {% set tipos = [
                         {'id': 'plastico', 'label': '🟡 Plásticos y Envases'},
                         {'id': 'papel', 'label': '🔵 Papel y Cartón'},
@@ -75,7 +74,7 @@
         </div>
     </div>
 
-    {# 5. REQUERIMIENTOS (Información Solicitada con ancho corregido) #}
+    {# 5. REQUERIMIENTOS #}
     {% if avisos_personalizados and avisos_personalizados|length > 0 %}
     <div class="card card-requerimientos">
         <h2 class="section-title"><i data-lucide="circle-plus"></i> Otra información solicitada</h2>
@@ -97,7 +96,7 @@
                 </div>
                 <div style="margin-left: 28px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
                     <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" 
-                              [cite_start]placeholder="Responda aquí..." style="width: 100%; box-sizing: border-box; margin-bottom: 12px; background: white; display: block;"></textarea>
+                              placeholder="Responda aquí..." style="width: 100%; box-sizing: border-box; margin-bottom: 12px; background: white; display: block;"></textarea>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosReq('{{ req_id }}')">
                         <i data-lucide="paperclip"></i> Adjuntar
                     </button>
@@ -110,7 +109,7 @@
     </div>
     {% endif %}
 
-    {# 6. COMPONENTES GLOBALES (Macros) #}
+    {# 6. COMPONENTES GLOBALES #}
     {{ ui.campo_observaciones() }}
     {{ ui.zona_adjuntos() }}
     {{ ui.campo_contacto() }}
@@ -120,11 +119,23 @@
 
 {% block scripts %}
 <script>
+// Variables para acumular archivos
+let archivosGenerales = [];
 let colaAdjuntosReq = {};
 let reqIdActual = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    // A. Manejo de adjuntos para Requerimientos
+    // A. Manejo de archivos generales (Drag & Drop e Input)
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
+            renderArchivos();
+            fileInput.value = ""; // Permite seleccionar el mismo archivo si se borró
+        });
+    }
+
+    // B. Manejo de adjuntos para Requerimientos
     const inputReq = document.getElementById('hiddenInputReq');
     window.gestionarAdjuntosReq = (id) => { reqIdActual = id; if(inputReq) inputReq.click(); };
 
@@ -132,13 +143,13 @@ document.addEventListener("DOMContentLoaded", () => {
         inputReq.addEventListener('change', () => {
             if (reqIdActual === null) return;
             const files = Array.from(inputReq.files);
-            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...files];]
+            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...files];
             renderColaReq(reqIdActual);
             inputReq.value = "";
         });
     }
 
-    // B. Lógica de Envío
+    // C. Lógica de Envío
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
     if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
@@ -146,19 +157,16 @@ document.addEventListener("DOMContentLoaded", () => {
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "RESIDUOS_" + Date.now();
         
-        // Validación de contacto básica
         if (document.getElementById("contactoEmail").value !== document.getElementById("contactoEmailConfirm").value) {
             return Swal.fire("Error", "Los emails de contacto no coinciden.", "error");
         }
 
         toggleFormFreeze(true);
 
-        // Preparar archivos (Generales y de Requerimientos)
         const listaTareas = [];
-        const fileInputGral = document.getElementById('fileInput');
-        if (fileInputGral) {
-            Array.from(fileInputGral.files).forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
-        }
+        // Añadir archivos generales acumulados
+        archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
+        
         Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
             list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }));
         });
@@ -166,12 +174,9 @@ document.addEventListener("DOMContentLoaded", () => {
         UIProgress.show(listaTareas.length);
 
         try {
-            // SUBIDA (Utiliza el motor global de base.html.j2)
             await UploadService.uploadFiles(listaTareas, 'RESIDUOS', window.EIEL_CONFIG.muniCode, idBatch, 1);
-
             UIProgress.update(listaTareas.length, listaTareas.length, "Generando PDF...");
 
-            // Datos técnicos para el PDF
             const payload = {
                 tipo_formulario: "residuos",
                 id_envio: idBatch,
@@ -205,6 +210,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
+// Función para listar archivos generales
+function renderArchivos() {
+    const fileList = document.getElementById("fileList");
+    if (!fileList) return;
+    fileList.innerHTML = archivosGenerales.map((f, i) => `
+        <div class="file-item">
+            <span>📄 ${f.name}</span>
+            <button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon">
+                <i data-lucide="trash-2"></i>
+            </button>
+        </div>`).join("");
+    if (window.lucide) lucide.createIcons();
+}
+
+// Función para listar archivos de requerimientos
 function renderColaReq(id) {
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
     if (!contenedor) return;
