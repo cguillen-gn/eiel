@@ -264,6 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             };
 
+<<<<<<< Updated upstream
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
         } catch (error) {
@@ -272,6 +273,153 @@ document.addEventListener("DOMContentLoaded", () => {
             Swal.fire("Error", "Fallo en el envío.", "error");
         }
     });
+=======
+            if (reqIncompletos) {
+                mostrarMensaje("⚠️ Debe dar una respuesta individualizada (texto o adjunto) a cada uno de los requerimientos del apartado «Otra Información Solicitada».", "error"); 
+                return;
+            }
+
+            // --- D. VALIDACIÓN DE TABLA DE OBRAS ---
+            const selects = document.querySelectorAll('.fila-obra .select-estado');
+            let obrasSinEstado = false;
+            selects.forEach(s => { if (!s.value) obrasSinEstado = true; });
+
+            if (obrasSinEstado) {
+                mostrarMensaje("⚠️ Por favor, indique el estado de todas las obras del listado oficial (puede marcar 'Desconocido').", "error");
+                return;
+            }
+
+            // --- E. PROCESO DE ENVÍO Y SUBIDA ---
+
+            toggleFormFreeze(true);
+
+            const numObrasFiles = Object.values(colaAdjuntos).flat().length;
+            const numReqFiles = Object.values(colaAdjuntosReq).flat().length;
+            const totalTareas = numObrasFiles + numReqFiles;
+
+            UIProgress.show(totalTareas);
+            let completados = 0;
+
+            try {
+                const listaTareas = [];
+
+                Object.entries(colaAdjuntos).forEach(([id, listado]) => {
+                    listado.forEach(file => {
+                        listaTareas.push({ file, id: id, tipo: 'obras' });
+                    });
+                });
+
+                Object.entries(colaAdjuntosReq).forEach(([id, listado]) => {
+                    const numReq = parseInt(id) + 1; // Conversión a base 1
+                    listado.forEach(file => {
+                        listaTareas.push({ file, id: `REQUERIMIENTO_${numReq}`, tipo: 'requerimientos' });
+                    });
+                });
+
+                for (const tarea of listaTareas) {
+
+                    UIProgress.update(
+                        completados, 
+                        totalTareas, 
+                        `Subiendo (${completados + 1}/${totalTareas}): ${tarea.file.name}`
+                    );
+
+                    let exitoSubida = false;
+                    for (let intento = 1; intento <= 2; intento++) {
+                        try {
+                            await UploadService.uploadFile(
+                                tarea.file, 
+                                tarea.tipo, 
+                                window.EIEL_CONFIG.muniCode, 
+                                tarea.id, 
+                                idBatch
+                            );
+                            exitoSubida = true;
+                            break; 
+                        } catch (e) {
+                            console.warn(`Intento ${intento} fallido para ${tarea.file.name}:`, e);
+                            if (intento === 2) throw new Error(`Fallo crítico subiendo "${tarea.file.name}". Revise su conexión e intente de nuevo.`);
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+                    
+                    completados++;
+                    await new Promise(r => setTimeout(r, 500));
+                }
+
+                const selectsEstado = document.querySelectorAll('.fila-obra .select-estado');
+                const estadosObras = Array.from(selectsEstado).map(select => ({
+                    obra: select.dataset.obraId, 
+                    clave: select.dataset.clave, 
+                    orden: select.dataset.orden, 
+                    nombre: select.dataset.nombre, 
+                    plan: select.dataset.plan, 
+                    estado: select.value, 
+                    modificado: select.value !== select.dataset.original,
+                    archivos: (colaAdjuntos[select.dataset.obraId] || []).map(f => f.name).join("; ")
+                }));
+
+                const nuevasObrasData = [];
+                document.querySelectorAll(".fila-nueva-obra").forEach(fila => {
+                    const inputN = fila.querySelector(".input-nueva-nombre");
+                    const inputO = fila.querySelector(".input-nueva-obs");
+                    const inputE = fila.querySelector(".input-nueva-estado");
+
+                    if (inputN && inputN.value.trim()) {
+                        const idT = inputN.dataset.tempId;
+                        nuevasObrasData.push({
+                            nombre: inputN.value.trim(),
+                            estado: inputE ? inputE.value : "",
+                            observaciones: inputO ? inputO.value.trim() : "",
+                            archivos: (colaAdjuntos[idT] || []).map(f => f.name).join("; ")
+                        });
+                    }
+                });
+
+                UIProgress.update(totalTareas, totalTareas, "Generando justificante final...");
+                
+                const payload = {
+                    tipo_formulario: "obras",
+                    fase: window.EIEL_CONFIG.fase,
+                    id_envio: idBatch,
+                    observaciones: document.getElementById("observaciones").value.trim(),
+                    nombre_contacto: nombre,
+                    departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
+                    email_contacto: email,
+                    municipio_codigo: window.EIEL_CONFIG.muniCode,
+                    municipio_nombre: window.EIEL_CONFIG.muniName,
+                    timestamp_envio: new Date().toISOString(),
+                    datos_obras_json: JSON.stringify(estadosObras),
+                    otras_obras_json: JSON.stringify(nuevasObrasData),
+                    respuestas_requerimientos_json: JSON.stringify(respuestasReq)
+                };
+                
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST", mode: "no-cors",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                UIProgress.complete();
+                
+                colaAdjuntos = {}; 
+                colaAdjuntosReq = {};
+                document.querySelectorAll(".file-list-container").forEach(el => el.innerHTML = "");
+                document.querySelectorAll("input, select, textarea").forEach(el => {
+                   if (!['button', 'submit', 'checkbox'].includes(el.type)) el.value = '';
+                   if (el.tagName === 'SELECT') el.selectedIndex = 0;
+                });
+                if (checkConformidad) checkConformidad.checked = false;
+                btnEnviar.disabled = true;
+
+            } catch (error) {
+                console.error(error);
+                mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+                toggleFormFreeze(false);
+            }
+        });
+    }
+>>>>>>> Stashed changes
 });
 </script>
 {% endblock %}
