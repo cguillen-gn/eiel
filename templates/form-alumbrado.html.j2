@@ -14,7 +14,7 @@
     <div class="card card-info">
         <h4><i data-lucide="info"></i> Instrucciones</h4>
         <ul>
-            <li>Rellene los datos requeridos y justifique cualquier dato que no disponga en <strong>Observaciones</strong>.</li>
+            <li>Rellene los datos requeridos y justifique cualquier dato ausente en <strong>Observaciones</strong>.</li>
         </ul>
     </div>
 
@@ -22,7 +22,7 @@
     {% if avisos_personalizados and avisos_personalizados|length > 0 %}
     <div class="card card-requerimientos">
         <h2 class="section-title"><i data-lucide="circle-plus"></i> Información solicitada</h2>
-        <p class="form-help form-help-spacer">Se han detectado incidencias que requieren solución. Responda a cada punto.</p>
+        <p class="form-help form-help-spacer">Responda a cada punto y adjunte documentación si es necesario.</p>
         
         <ul class="requerimientos-list" style="list-style: none; padding: 0; margin: 0;">
             {% for aviso in avisos_personalizados %}
@@ -40,13 +40,13 @@
                     {% endif %}
                 </div>
                 
-                {# Contenedor de Respuesta con ancho 100% CORREGIDO #}
-                <div style="margin-left: 28px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                {# CONTENEDOR BLANCO DE RESPUESTA (OCUPA EL 100%) #}
+                <div style="margin-left: 28px; background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-sizing: border-box; width: calc(100% - 28px);">
                     <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" 
                               placeholder="Responda o aclare este punto aquí..." 
-                              style="width: 100%; box-sizing: border-box; display: block; margin-bottom: 12px; background: white;"></textarea>
+                              style="width: 100% !important; max-width: 100%; box-sizing: border-box; display: block; margin-bottom: 15px; border: 1px solid #cbd5e1;"></textarea>
                     
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosReq('{{ req_id }}')">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntosReq('{{ req_id }}')">
                         <i data-lucide="paperclip"></i> Adjuntar
                     </button>
                     <div id="lista_adjuntos_req_{{ req_id }}" class="file-list-container" style="margin-top: 10px;"></div>
@@ -58,7 +58,7 @@
     </div>
     {% endif %}
 
-    {# 4. COMPONENTES GLOBALES (Macros) #}
+    {# 4. COMPONENTES GLOBALES (Macros)#}
     {{ ui.campo_observaciones() }}
     {{ ui.zona_adjuntos() }}
     {{ ui.campo_contacto() }}
@@ -68,13 +68,13 @@
 
 {% block scripts %}
 <script>
-// Gestión de archivos acumulados
+// Variables locales
 let archivosGenerales = [];
 let colaAdjuntosReq = {};
 let reqIdActual = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    // A. Captura de archivos generales (Arregla el listado del Drag and Drop)
+    // A. Gestión de adjuntos generales (Drag & Drop)
     const fileInput = document.getElementById('fileInput');
     if (fileInput) {
         fileInput.addEventListener('change', () => {
@@ -91,8 +91,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             if (reqIdActual === null) return;
-            const files = Array.from(inputReq.files);
-            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...files];
+            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
             renderColaReq(reqIdActual);
             inputReq.value = "";
         });
@@ -101,11 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // C. Lógica de Envío (Delegada a UploadService de la Base)
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
-    if (checkConf) {
-        checkConf.addEventListener('change', function() {
-            btnEnviar.disabled = !this.checked;
-        });
-    }
+    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
 
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "ALUMBRADO_" + Date.now();
@@ -116,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         toggleFormFreeze(true);
 
-        // Preparar lista de subida unificada
         const listaTareas = [];
         archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
         Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
@@ -126,67 +120,53 @@ document.addEventListener("DOMContentLoaded", () => {
         UIProgress.show(listaTareas.length);
 
         try {
-            // Subida secuencial mediante el motor global
+            // Subida mediante el motor de base.html.j2
             await UploadService.uploadFiles(listaTareas, 'ALUMBRADO', window.EIEL_CONFIG.muniCode, idBatch, 1);
 
-            UIProgress.update(listaTareas.length, listaTareas.length, "Generando justificante...");
+            UIProgress.update(listaTareas.length, listaTareas.length, "Generando PDF...");
 
-            // Payload para el servidor
             const payload = {
                 tipo_formulario: "alumbrado",
-                fase: window.EIEL_CONFIG.fase,
                 id_envio: idBatch,
-                observaciones: document.getElementById("observaciones").value.trim(),
-                nombre_contacto: document.getElementById("contactoNombre").value.trim(),
-                departamento_contacto: document.getElementById("contactoDepartamento").value.trim(),
-                email_contacto: document.getElementById("contactoEmail").value.trim(),
-                municipio_codigo: window.EIEL_CONFIG.muniCode,
-                municipio_nombre: window.EIEL_CONFIG.muniName,
-                timestamp_envio: new Date().toISOString(),
-                archivos_adjuntos: listaTareas.map(t => t.file.name).join("\n"), 
-                respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg, 
-                    respuesta: area.value.trim()
-                })))
+                municipio: window.EIEL_CONFIG.muniCode,
+                observaciones: document.getElementById("observaciones").value,
+                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                    pregunta: area.dataset.msg, respuesta: area.value
+                })),
+                contacto: {
+                    nombre: document.getElementById("contactoNombre").value,
+                    email: document.getElementById("contactoEmail").value
+                }
             };
 
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
-
         } catch (error) {
             console.error(error);
             toggleFormFreeze(false);
-            Swal.fire("Error", "Fallo al procesar el envío de alumbrado.", "error");
+            Swal.fire("Error", "Fallo al procesar el envío.", "error");
         }
     });
 });
 
-// Función para listar archivos generales
 function renderArchivos() {
     const fileList = document.getElementById("fileList");
     if (!fileList) return;
     fileList.innerHTML = archivosGenerales.map((f, i) => `
         <div class="file-item">
             <span>📄 ${f.name}</span>
-            <button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon">
-                <i data-lucide="trash-2"></i>
-            </button>
+            <button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon"><i data-lucide="trash-2"></i></button>
         </div>`).join("");
     if (window.lucide) lucide.createIcons();
 }
 
-// Función para listar archivos de requerimientos
 function renderColaReq(id) {
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
     if (!contenedor) return;
     contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
-        <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
-            <span style="font-size: 0.75rem; display: flex; align-items: center; gap: 4px;">
-                <i data-lucide="paperclip" style="width:12px;"></i> ${f.name}
-            </span>
-            <button type="button" onclick="colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}');" class="btn-danger-icon">
-                <i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i>
-            </button>
+        <div class="file-item" style="margin-bottom:4px; padding:4px 8px; background:#fdfdfd; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name.substring(0,20)}...</span>
+            <button type="button" onclick="colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}');" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
         </div>`).join("");
     if (window.lucide) lucide.createIcons();
 }
