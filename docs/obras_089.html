@@ -1,0 +1,1843 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>EIEL - Seguimiento de Obras</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL
+        window.EIEL_CONFIG = {
+            muniCode: "089",
+            muniName: "Monóvar / Monòver",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+            hasAvisos: false
+        };
+
+        // 2. SERVICIO DE PROGRESO (Interfaz de envío)
+        const UIProgress = {
+            get el() { return {
+                bar: document.getElementById("progressBar"),
+                text: document.getElementById("progressText"),
+                percent: document.getElementById("progressValue"),
+                container: document.getElementById("overlayProgress"),
+                success: document.getElementById("successState"),
+                elements: document.getElementById("progressElements")
+            }},
+            show(total) {
+                this.el.container.classList.remove('hidden');
+                this.el.success.classList.add('hidden');
+                this.el.elements.classList.remove('hidden');
+                this.update(0, total, "Iniciando envío...");
+            },
+            update(completed, total, msg) {
+                const perc = total > 0 ? Math.round((completed / total) * 90) : 0;
+                this.el.bar.style.width = perc + "%";
+                this.el.percent.textContent = perc + "%";
+                this.el.text.textContent = msg;
+            },
+            complete() {
+                this.el.bar.style.width = "100%";
+                this.el.percent.textContent = "100%";
+                this.el.elements.classList.add('hidden');
+                this.el.success.classList.remove('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
+        // 3. SERVICIO DE SUBIDA (Motor por lotes)
+        const UploadService = {
+            async uploadFiles(tareas, tipo, muni, idBatch, concurrency = 1) {
+                for (let i = 0; i < tareas.length; i += concurrency) {
+                    const lote = tareas.slice(i, i + concurrency);
+                    await Promise.all(lote.map(async (t) => {
+                        const base64 = await this._toBase64(t.file);
+                        const payload = {
+                            filename: t.file.name,
+                            mimeType: t.file.type,
+                            bytesBase64: base64,
+                            municipio: muni,
+                            tipo: tipo,
+                            seccion: t.seccion || "GENERAL",
+                            id_envio: idBatch
+                        };
+                        await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                            method: 'POST', mode: 'no-cors',
+                            body: JSON.stringify(payload)
+                        });
+                    }));
+                    UIProgress.update(i + lote.length, tareas.length, `Subiendo archivos...`);
+                }
+            },
+            _toBase64: file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = e => reject(e);
+            })
+        };
+
+        // 4. FUNCIONES GLOBALES
+        function logout() {
+            localStorage.clear();
+            window.location.href = "index.html";
+        }
+        
+        function toggleFormFreeze(isFrozen) {
+            const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add');
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                el.style.pointerEvents = isFrozen ? "none" : "auto";
+            });
+        }
+        
+        window.abrirVisorImagen = (src) => {
+            let modal = document.getElementById('visorImagenGlobal') || document.createElement('div');
+            if (!document.getElementById('visorImagenGlobal')) {
+                modal.id = 'visorImagenGlobal';
+                modal.className = 'modal-img';
+                modal.innerHTML = `<img src="" id="imgVisor">`;
+                modal.onclick = () => modal.style.display = 'none';
+                document.body.appendChild(modal);
+            }
+            modal.querySelector('img').src = src;
+            modal.style.display = 'flex';
+        };
+    </script>
+</head>
+<body class="theme-obras">
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">Fase 2026</span>
+            </div>
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">⭠ Volver al listado</a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header"><i data-lucide="construction"></i></div>
+            <div class="title-header">
+                <h2>SEGUIMIENTO DE OBRAS</h2>
+                <p class="subtitle">Monóvar / Monòver (089)</p>
+            </div>
+        </div>
+        
+<form id="formObras">
+    
+    <div class="card card-info">
+        <h4><i data-lucide="info"></i> Instrucciones</h4>
+        <ul>
+            <li><strong>Estado:</strong> Rellene el estado en todas las obras del listado oficial.</li>
+            <li><strong>Documentación:</strong> Adjunte proyecto, memoria descriptiva y planos por actuación.</li>
+        </ul>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-checks"></i> SEGUIMIENTO DE OBRAS</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;" class="td-ubicacion">Id</th>
+                        <th style="width: 60%;">Denominación</th>
+                        <th style="width: 20%;" class="td-ubicacion">Estado</th>
+                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">015</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPAVIMENTACIÓN Y FORMACIÓN DE PLATAFORMA ÚNICA PARA LA CONCESIÓN IGLESIA-PLAZA DE LA SALA, CALLE MAYOR DE MONÓVAR</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2020-23 BOP: 20/07/2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089015" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">016</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PRIMERA FASE DEL COLECTOR GENERAL SEPARATIVO DE AGUAS PLUVIALES EN CASCO URBANO DE MONÓVAR, CALLES GOYA, RONDA GENERAL VERDÚ Y DEMETRIO POVEDA</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2020-23 BOP: 20/07/2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089016" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089016')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089016" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">017</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACTUACIONES EN MATERIA DE SANEAMIENTO EN COLECTOR DE AGUAS PLUVIALES EN ZONA RAJUELA, CALLE VELÁZQUEZ Y COLECTOR DE SANEAMIENTO EN CALLE RAVAL CUARTEL</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2019</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089017" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089017')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089017" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">019</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REASFALTADO DE CALLES EN CHINORLET</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089019" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089019')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089019" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">033</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REACONDICIONAMIENTO DEL CAMINO DE LOS MOLINOS, CON EL FIN DE ENCAUZAR LAS AGUAS PROVENIENTES DEL NACIMIENTO DE LA RAMBLA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089033" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089033')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089033" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">034</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ASFALTADO DE CAMINOS RURALES</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089034" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089034')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089034" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">035</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DE CAMINOS EN LA ROMANETA Y APARCAMIENTO EN CENTRO DE SALUD DE MONÓVAR</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089035" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089035')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089035" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">036</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS DE REFORMA E INSTALACIÓN DE PARQUE INFANTIL EN EL SALITRE</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089036" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089036')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089036" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">037</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRA DE ARREGLO DEL ASFALTO EN CALLE LUIS CERNUDA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089037" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089037')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089037" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">039</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS DEL CENTRO DE INTERPRETACIÓN L'ESCOLETA DEL MUNICIPIO DE MONÓVAR.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089039" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089039')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089039" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">041</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE REPARACIÓN DE LA RED DE ALCANTARILLADO, ARREGLO DE ACERAS Y ASFALTADO DE LA CALLE CON REPARACIÓN DE LOS PARCHES EXISTENTES EN CALLE PICASSO.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089041" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089041')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089041" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">043</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS DE REFORMA DEL SANEAMIENTO EN CALLE BORRASCA.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089043" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089043')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089043" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">045</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN DE LA PARCELA SITUADA EN C/ NUEVA, Nº 13</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">INVERSIONES EN ZONAS VERDES DE TIT. MUNICIPAL 2021 BOP: 26/7/2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089045" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">048</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REFORMA DEL CENTRO OCUPACIONAL EL MOLINET,</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089048" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">052</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP ESCRIPTOR CANYIS (03011227). ACTUACIONES REFERIDES A MENJADOR, PISTA, ESQUERDA, BANYS, FINESTRES, GIMNAS.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089052" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089052')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089052" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">053</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">EI 1ER CICLE MARE DE DÉU DEL REMEI (03006441). ASEO, REPARACION SUELO AULAS Y CAUCHO PATIO.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089053" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">054</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN DE TALUD PERIMETRAL DEL CAMPO DE FUTBOL SANTA BÁRBARA PARA LA ELIMINACIÓN DE DESPRENDIMIENTOS DE TERRENO Y PIEDRAS SOBRE EL CAMPO DE FUTBOL 1 DE MONÓVAR</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN +DEPORTE 2022 BOP: 21/11/2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089054" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">055</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REHABILITACIÓN DEL DEPÓSITO SANTA BÁRBARA EN EL MUNICIPIO  DE MONÓVAR (ALICANTE)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089055" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">057</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RENOVACIÓN DE INSTALACIONES DE SUMINISTRO DE AGUA Y SANEAMIENTO DEL BARRIO BORRASCA DE MONÓVAR (ALICANTE)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089057" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">058</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PROYECTO DE MEJORA, MODERNIZACIÓN E IMPLANTACION DE INFRAESTRUCTURAS DEL POLIGONO INDUSTRIAL EL PASTORET DE  MONOVAR. (ALICANTE). FASE II2023</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089058" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">060</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">DESCRITAS EN LA MEMORIA VALORADA, ADECUACIÓN, CONSERVACIÓN Y MANTENIMIENTO DEL C.O. EL MOLINET.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089060" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089060')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089060" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">062</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADQ. DE EQUIPAMIENTO DE ALUMBRADO PÚBLICO MEDIANTE EQUIPOS AUTÓNOMOS CON PANEL FOTOVOLTAICO PARA LA MEJORA DE LA SEGURIDAD VIAL DE CAMINO DE TIT. MUNICIPA</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB. <20000 HAB. 2023. BOP: 05/09/2023.</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089062" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089062')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089062" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">063</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">OBRAS DE “REHABILITACIÓN DE LA TORRE DEL RELOJ Y REGENERACIÓN DE SU ENTORNO URBANO”, EN CALLE DE LA TORRE, Nº 20</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089063" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">064</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">NUEVA CONDUCCIÓN DE LA MARGEN IZQUIERDA DEL POSTRASVASE JÚCAR-VINALOPÓ, FASE I</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089064" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">065</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PROYECTO DE MEJORA, MODERNIZACIÓN E IMPLANTACIÓN DE INFRAESTRUCTURAS DEL POLIGONO INDUSTRIAL EL PASTORET DEMONOVAR. (ALICANTE). 2024</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089065" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089065')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089065" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">066</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACTUACIONES DE PLANTACIÓN DE ARBOLADO Y MEJORA DE MOVILIDAD PEATONAL EN LA CALLE GUSTAVO ADOLFO BÉQUER Y ALREDEDORES, T.M. DE MONÓVAR.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">INVERSIONES EN ARBOLADO Y ADAPTACIÓN AL CAMBIO CLIMÁTICO EN ESPACIOS URBANOS DE TIT. MUNICIPAL 2022. BOP: 29/08/2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089066" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">068</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PROYECTO CAMINO DON CIRO MONÓVAR OPTIMIZADO FIRMADO 2</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2024-27 BOP: 14/06/2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089068" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089068')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089068" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">069</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">DEMOLICIÓN DEL EDIFICIO DEL ANTIGUO INSTITUTO Y ADECUACIÓN DE PARCELA PARA USO DOTACIONAL</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2024-27 BOP: 14/06/2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089069" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089069')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089069" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">070</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">INVERSIÓN EN ACONDICIONAMIENTO DEL TRAMO DE CASA DE SANCHIZ DE MONÓVAR</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2024. BOP: 12/7/2024.</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089070" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089070')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089070" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">071</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">SUMINISTRO DE LUMINARIAS SOLARES PARA CAMINO BETIES</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">ADQUISICIÓN DE LUMINARIAS Y ELEM. DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <20000 HAB. 2024. BOP: 19/07/2024.</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089071" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089071')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089071" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">072</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RESTAURACIÓN DE LA TORRE DEL RELOJ Y REGENERACIÓN URBANA DE SU ENTORNO</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">REHAB. PATRIMONIO ARQUITECTÓNICO HISTÓRICO MUNICIPAL POB <75000 HAB 2022 2ª CONVOCATORIA BOP: 13/04/2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089072" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089072')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089072" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">073</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">AMPLIACIÓN DE NICHOS EN EL CEMENTERIO DE MONÓVAR CONSTRUYENDO 56 NICHOS ADICIONALES. 2024.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089073" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089073')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089073" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">074</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ARREGLO CAMINO DE TIERRA SIERRA LA VIEJA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089074" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089074')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089074" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">075</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">SUMINISTRO DE LUMINARIAS PARA CALLE MAYOR Y CALLE PADRE FAUSTINO MIGUEZ</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089075" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089075')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089075" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">076</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPARACIÓN EN CUBIERTA DEL PABELLÓN DEPORTIVO MUNICIPAL DE MONÓVAR.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089076" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089076')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089076" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">077</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PAVIMENTACIÓN DEL CAMINO DE ECO CIUDAD Y DEL CAMINO RAMAL CHINORLA PARA ADAPTARLOS A UN ESTADO ADECUADO</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089077" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089077')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089077" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">078</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAR 9000 M2 DEL PARQUE DEL SALITRE DE MONÓVAR</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089078" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089078')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089078" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">079</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RENOVACIÓN DEL PAVIMENTO ASFÁLTICO EN EL CAMINO DEL FONDÓ A CAÑADA ROJA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089079" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089079')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089079" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">080</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DEL PARQUE ENRIQUE DELTELL 8ALREDEDORES DE JARDINES, ZONAS DE JUEGOS...)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089080" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089080')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089080" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">081</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPARACIÓN DE BACHEADOS Y ASFALTADOS CAMINOS DE TOSCAR, CASA SANCHÍS Y MADARA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089081" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089081')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089081" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">082</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DEL CAMINO DE L'ALQUEBLA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089082" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089082')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089082" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">083</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">AMPLIACIÓN DE ACTUACIONES DE ALCANTARILLADO EN CALLE COLOMER</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089083" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089083')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089083" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">084</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PARCHEO DE CAMINOS EN CTRA. DE NOVELDA Y CENIA-CAÑADA DE LA HARINA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089084" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089084')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089084" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">085</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPARACIÓN DE SOCAVÓN EN LA CALZADA DE LA C/ PABLO PICASSO</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089085" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089085')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089085" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">086</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO EN CAMINOS RURALES DE MONÓVAR</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089086" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089086')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089086" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">087</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">OBRAS PARA DAR ANCHURA DE 3 MTS, EN EL CAMINO PEDRERA DE MONÓVAR 24 METROS CON APORTE DE ZAHORRA CON CENTAURO PARA UNA CAPA DE 0,10 M. EXTENDIDO, REGADO Y COMPACTADO</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089087" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089087')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089087" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">088</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PROYECTO DE MEJORA, MODERNIZACIÓN EIMPLANTACION DE INFRAESTRUCTURAS DELPOLIGONO INDUSTRIAL EL PASTORET DEMONOVAR. (ALICANTE). AÑOS 2025/2026</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2025-2026</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089088" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089088')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089088" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">089</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REFUERZO DE FIRME EN LA CV-834 (LA ROMANA - CV-83), ENTRE EL PK 4+300 Y EL PK 6+300</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PROVINCIAL DE MEJORA DE LA RED VIARIA DE TIT. DE LA DIPUTACIÓN 2025-2026 BOP: 12/05/2025</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089089" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">090</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">OBRAS PROYECTO MODIFICADO II AMPLIACIÓN Y REFORMA CEIP ESCRIPTOR CANYIS (INTERVENCIONES DEL PLAN EDIFICANT PREVISTAS EN EL CEIP ESCRIPTOR CANYIS DE MONÓVAR)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB089090" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB089090')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB089090" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-plus"></i> OTRAS OBRAS DETECTADAS</h2>
+        <div class="table-wrapper" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Denominación</th>
+                        <th style="width: 20%;">Estado</th>
+                        <th style="width: 20%;">Observaciones</th>
+                        <th style="width: 15%; text-align: center;">Documentación</th>
+                        <th style="width: 5%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="bodyNuevasObras"></tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarFilaNuevaObra()" style="margin-top: 1rem;">
+            <i data-lucide="plus"></i> Añadir otra actuación
+        </button>
+    </div>
+
+    
+    
+
+    
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
+        <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
+        <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" class="file-list-container"></div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
+    <div class="grid-2-col">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+        </div>
+    </div>
+</div>
+
+    
+<div class="card">
+    <div class="conformidad-box">
+        <label class="check-label">
+            <input type="checkbox" id="checkConformidad" class="check-input">
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
+        </label>
+    </div>
+    <div id="mensaje" class="message hidden"></div>
+    <button id="btnEnviar" class="btn btn-primary" disabled>Enviar Datos</button>
+</div>
+
+</form>
+<input type="file" id="hiddenFileInput" multiple style="display: none;">
+
+    </main>
+
+    <footer class="site-footer">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
+    </footer>
+
+    <div id="overlayProgress" class="overlay hidden">
+        <div class="progress-card">
+            <h3 id="progressTitle">Enviando datos...</h3>
+            <div id="progressElements">
+                <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+                <div class="progress-info"><span id="progressText">Iniciando...</span><span id="progressValue">0%</span></div>
+                <p class="paciencia-nota">⌛ No cierre ni refresque la pestaña durante el proceso.</p>
+            </div>
+            <div id="successState" class="hidden">
+                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;"><i data-lucide="check-circle-2"></i></div>
+                <p>¡Envío realizado correctamente! Se ha enviado un justificante al correo facilitado.</p>
+                <a href="index.html" class="btn btn-primary">Volver al Listado</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // VALIDACIÓN DE SESIÓN Y PERSISTENCIA
+        document.addEventListener("DOMContentLoaded", () => {
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            if (!muniCode) return window.location.href = "index.html";
+            
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = localStorage.getItem("eiel_muni_name") || "Municipio";
+
+            const fieldsMap = {"contactoNombre": "eiel_user_name", "contactoEmail": "eiel_user_email", "contactoDepartamento": "eiel_user_dept"};
+            Object.keys(fieldsMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = localStorage.getItem(fieldsMap[id]) || "";
+                    el.addEventListener('input', (e) => localStorage.setItem(fieldsMap[id], e.target.value.trim()));
+                }
+            });
+        });
+
+        // LOGGER Y ICONOS
+        (function() {
+            if (window.location.protocol === 'file:') return;
+            const payload = {
+                municipio: "Monóvar / Monòver", codigo: "089", fase: "2026",
+                tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+                ua: navigator.userAgent,
+                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
+            };
+            if (window.EIEL_CONFIG.urlLogger) fetch(window.EIEL_CONFIG.urlLogger, {method: 'POST', mode: 'no-cors', body: JSON.stringify(payload)});
+        })();
+
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
+    </script>
+</body>
+</html>

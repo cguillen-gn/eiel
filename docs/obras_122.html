@@ -1,0 +1,2558 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>EIEL - Seguimiento de Obras</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL
+        window.EIEL_CONFIG = {
+            muniCode: "122",
+            muniName: "San Vicente del Raspeig / Sant Vicent del Raspeig",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+            hasAvisos: false
+        };
+
+        // 2. SERVICIO DE PROGRESO (Interfaz de envío)
+        const UIProgress = {
+            get el() { return {
+                bar: document.getElementById("progressBar"),
+                text: document.getElementById("progressText"),
+                percent: document.getElementById("progressValue"),
+                container: document.getElementById("overlayProgress"),
+                success: document.getElementById("successState"),
+                elements: document.getElementById("progressElements")
+            }},
+            show(total) {
+                this.el.container.classList.remove('hidden');
+                this.el.success.classList.add('hidden');
+                this.el.elements.classList.remove('hidden');
+                this.update(0, total, "Iniciando envío...");
+            },
+            update(completed, total, msg) {
+                const perc = total > 0 ? Math.round((completed / total) * 90) : 0;
+                this.el.bar.style.width = perc + "%";
+                this.el.percent.textContent = perc + "%";
+                this.el.text.textContent = msg;
+            },
+            complete() {
+                this.el.bar.style.width = "100%";
+                this.el.percent.textContent = "100%";
+                this.el.elements.classList.add('hidden');
+                this.el.success.classList.remove('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
+        // 3. SERVICIO DE SUBIDA (Motor por lotes)
+        const UploadService = {
+            async uploadFiles(tareas, tipo, muni, idBatch, concurrency = 1) {
+                for (let i = 0; i < tareas.length; i += concurrency) {
+                    const lote = tareas.slice(i, i + concurrency);
+                    await Promise.all(lote.map(async (t) => {
+                        const base64 = await this._toBase64(t.file);
+                        const payload = {
+                            filename: t.file.name,
+                            mimeType: t.file.type,
+                            bytesBase64: base64,
+                            municipio: muni,
+                            tipo: tipo,
+                            seccion: t.seccion || "GENERAL",
+                            id_envio: idBatch
+                        };
+                        await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                            method: 'POST', mode: 'no-cors',
+                            body: JSON.stringify(payload)
+                        });
+                    }));
+                    UIProgress.update(i + lote.length, tareas.length, `Subiendo archivos...`);
+                }
+            },
+            _toBase64: file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = e => reject(e);
+            })
+        };
+
+        // 4. FUNCIONES GLOBALES
+        function logout() {
+            localStorage.clear();
+            window.location.href = "index.html";
+        }
+        
+        function toggleFormFreeze(isFrozen) {
+            const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add');
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                el.style.pointerEvents = isFrozen ? "none" : "auto";
+            });
+        }
+        
+        window.abrirVisorImagen = (src) => {
+            let modal = document.getElementById('visorImagenGlobal') || document.createElement('div');
+            if (!document.getElementById('visorImagenGlobal')) {
+                modal.id = 'visorImagenGlobal';
+                modal.className = 'modal-img';
+                modal.innerHTML = `<img src="" id="imgVisor">`;
+                modal.onclick = () => modal.style.display = 'none';
+                document.body.appendChild(modal);
+            }
+            modal.querySelector('img').src = src;
+            modal.style.display = 'flex';
+        };
+    </script>
+</head>
+<body class="theme-obras">
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">Fase 2026</span>
+            </div>
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">⭠ Volver al listado</a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header"><i data-lucide="construction"></i></div>
+            <div class="title-header">
+                <h2>SEGUIMIENTO DE OBRAS</h2>
+                <p class="subtitle">San Vicente del Raspeig / Sant Vicent del Raspeig (122)</p>
+            </div>
+        </div>
+        
+<form id="formObras">
+    
+    <div class="card card-info">
+        <h4><i data-lucide="info"></i> Instrucciones</h4>
+        <ul>
+            <li><strong>Estado:</strong> Rellene el estado en todas las obras del listado oficial.</li>
+            <li><strong>Documentación:</strong> Adjunte proyecto, memoria descriptiva y planos por actuación.</li>
+        </ul>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-checks"></i> SEGUIMIENTO DE OBRAS</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;" class="td-ubicacion">Id</th>
+                        <th style="width: 60%;">Denominación</th>
+                        <th style="width: 20%;" class="td-ubicacion">Estado</th>
+                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">004</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">URBANIZACIÓN PARCIAL DE VARIAS CALLES</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2016</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122004" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122004')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122004" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">012</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REFORMA DE LA C/VELÁZQUEZ Y ENTRONQUE CON LA AVDA. PAÍS VALENCIÀ</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2020-23 BOP: 20/07/2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122012" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122012')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122012" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">017</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN Y REPARACIÓN DE COLUMNAS ESCENARIO PARQUE JUAN XXIII</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN +CERCA 2020 BOP: 30/07/2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122017" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122017')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122017" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">024</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RENOVACIÓN DE LA RED DE ALCANTARILLADO Y EBAR EN LA AVDA. BARCELONA DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122024" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">026</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PABELLÓN POLIDEPORTIVO MUNICIPAL DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122026" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">028</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN DE LOCALES EN LA PLANTA BAJA DEL AYUNTAMIENTO PARA DEPENDENCIAS MUNICIPALES</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122028" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">033</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RENOVACIÓN DE ALCANTARILLADO Y EBAR AVENIDA BARCELONA, FASE II</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122033" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">034</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN Y MEJORA ACCESIBILIDAD DE DIFERENTES EDIFICIOS MUNICIPALES INCLUIDOS EN EL PLAN PLANIFICA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122034" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">035</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DE LA CALLE CAMÍ DE LA BAIONA ENTRE LAS CALLES LA HUERTA Y ALTEA DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122035" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">036</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">URBANIZACIÓN POZO SAN ANTONIO EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122036" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">037</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PARA LA RESTAURACIÓN DEL VALLADO DEL PARQUE LO TORRENT DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122037" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">038</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">INSTALACIÓN Y ACONDICIONAMIENTO DE ÁREAS DE JUEGOS INFANTILES EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122038" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">039</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CALMADO DEL TRÁFICO EN LA C/AZORÍN Y REMODELACIÓN DEL CRUCE ENTRE C/AZORÍN Y C/NOVELDA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122039" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">040</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORAS DE POLÍGNOS INDUSTRIALES DE SAN VICENTE DEL RASPEIG, SUBVENCIÓN IVACE 2020</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122040" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">041</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DE PLANTA BAJA PARA VIVIENDA Y ADECUACIÓN DEL CONSULTORIO MÉDICO EN BARRIO SANTA ISABEL</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122041" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">042</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RESTAURACIÓN/REHABILITACIÓN DEL PABELLÓN DE ACCESO AL CEMENTERIO MUNICIPAL DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122042" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">043</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP BEC DE L'ÀGUILA (03010648). CONSTRUCCIÓ GIMNÀS, REFORMA MENJADOR ESCOLAR I AULES ANNEXES. ADEQUACIÓ INSTAL·LACIÓ ELÈCTRICA, CANVI FONT SUBMINISTRAMENT CALEFACCIÓ. ACCESSIBILITAT EN RECORREGUTS I ACCESSOS.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122043" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122043')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122043" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">044</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP L'HORTA (03012116). CONSTRUCCIÓ GIMNÀS, ADEQUACIÓ INSTAL·LACIÓ ELÈCTRICA, CANVI FONT SUBMINISTRAMENT CALEFACCIÓ.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122044" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122044')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122044" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">045</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP RASPEIG (03010651). CONSTRUCCIÓ GIMNÀS, ADEQUACIÓ INSTAL·LACIÓ ELÈCTRICA, CANVI FONT SUBMINISTRAMENT CALEFACCIÓ.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122045" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122045')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122045" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">046</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CIPFP CANASTELL (03010442). CONSTRUCCION AULARIO Y CONSTRUCCION DE NAVE TALLER.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122046" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122046')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122046" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">047</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">IES HAYGÓN (03013352). ADECUAR CASA CONSERJE PARA DEPARTAMENTOS ESCUELA OFICIAL IDIOMAS,CONSTRUIR ALMACEN PARA GIMNASIO.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122047" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122047')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122047" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">048</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">IES NÚMERO 6 (03018192). CONSTRUCCIÓ NOU IES.</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122048" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122048')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122048" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">049</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO CANASTELL 2021</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122049" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122049')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122049" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">050</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO INMEDIACIONES 2021</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122050" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122050')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122050" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">051</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO RODALET 2021</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122051" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122051')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122051" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">052</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO TORREGROSES 2021</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2021</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122052" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122052')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122052" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">053</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO RODALET 2022</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122053" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122053')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122053" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">054</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO CANASTELL 2022</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122054" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122054')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122054" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">055</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO INMEDIACIONES 2022</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122055" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122055')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122055" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">056</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO TORREGROSES 2022</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2022</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122056" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122056')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122056" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">057</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP BEC DE L'ÀGUILA. CONSTRUCCIÓ GIMNÀS, REFORMA MENJADOR ESCOLAR I AULES ANNEXES.ADEQUACIÓ INSTAL·LACIÓ ELÈCTRICA, CANVI FONT SUBMINISTRAMENT. CALEFACCIÓ. ACCESSIBILITAT EN RECORREGUTS I ACCESSOS</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122057" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122057')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122057" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">058</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP JAUME I. INSTALACIÓN SOMBRA PATIO EDUCACIÓN INFANTIL Y PRIMARIA</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122058" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122058')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122058" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">059</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP VICTORIA KENT. CONSTRUCCIÓN GIMNASIO Y REFORMA ASEOS</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122059" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122059')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122059" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">060</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CEIP JUAN RAMÓN JIMÉNEZ. CONSTRUCCION SALA PSICOMOTRICIDAD MULTIFUNCIONAL</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">GVA (PROGRAMA EDIFICANT)</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122060" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122060')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122060" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">061</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO CANASTELL2023</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122061" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122061')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122061" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">062</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO INMEDIACIONES2023</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122062" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122062')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122062" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">063</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO TORREGROSES2023</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122063" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122063')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122063" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">064</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO RODALET2023</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2023</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122064" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122064')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122064" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">065</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">AMPLIACIÓN DEL PARQUE CENTRAL DE BOMBEROS DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122065" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">066</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPARACIÓN DE CUBIERTAS EN LOS MÓDULOS DE NICHOS DE LA CALLE SAN EMILIO EN CEMENTERIO MUNICIPAL</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122066" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">068</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RED SECUNDARIA DE PLUVIALES EN URBANIZACIÓN HAYGÓN EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122068" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">071</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO CANASTELL 2024</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122071" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122071')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122071" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">072</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA SERVICIOS E INFRAESTRUCTURAS DEL POLIGONO RODALET 2024</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122072" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122072')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122072" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">073</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRA PARA LA REHABILITACIÓN DE LA ESTRUCTURA "PARABOLOIDE HIPERBÓLICO" DEL PARQUE JUAN XXIII DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122073" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">075</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA DE LA ACCESIBILIDAD PEATONAL DE LA C/ VILLAFRANQUEZA Y ADYACENTES</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2024-27 BOP: 14/06/2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122075" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">076</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">OBRAS DE LA RED SECUNDARIA DE PLUVIALES EN URBANIZACIÓN HAYGÓN</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">PLAN PLANIFICA 2024-27 BOP: 14/06/2024</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122076" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122076')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122076" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">077</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REMODELACIÓN Y MEJORA DE INSTALACIONES EXISTENTES (2 LOTES)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122077" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">078</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA ALUMBRADO POLÍGONOS INDUSTRIALES (2ª FASE)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122078" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">079</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO DEL PUNTO DE VERTIDO DEL COLECTOR DE PLUVIALES DE SAN VICENTE DEL RASPEIG AL BARRANCO DE LAS OVEJAS</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122079" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">080</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">SUSTITUCIÓN DE RED EN ALTA Ø400 BONNA EN EL TRAMO MUNICIPAL DE LA CARRETERA LA ALCORAYA DESDE C/DAIMIEL HASTA ROTONDA INTERSECCIÓN CON C/POETA MIGUEL HERNÁNDEZ. SAN VICENTE DEL RASPEIG. ALICANTE.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122080" data-original="Finalizada">
+                                <option value="" >Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" selected>Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">081</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ADECUACIÓN DE LA INSTALACIÓN DE ILUMINACIÓN EN EL CAMPO DE FUTBOL MUNICIPAL (DURACIÓN 45 DÍAS)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122081" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122081')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122081" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">082</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS PARA LA SUSTITUCIÓN DE LA RED DE ABASTECIMIENTO DE AGUA POTABLE EN EL RECINTO DEL CEMENTERIO MPAL. (PLAZO EJECUCIÓN 2 MESES)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122082" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122082')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122082" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">083</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR PARA LA RENOVACIÓN DE LA RED DE ALCANTARILLADO EN C/ CAPITÁN TORREGROSA. TRAMO ENTRE C/ SAN ISIDRO Y C/ LABRADORES.</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122083" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122083')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122083" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">084</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS PARA MEJORAS DE LA PISTA DEPORTIVA DE LA CARRETERA DE AGOST CON CALLE ESPRON</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122084" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122084')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122084" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">085</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO MENOR DE OBRAS PARA MEJORA DE ACCESIBILIDAD AL CENTRO SOCIAL DE HAYGÓN (PLAZO DE EJECUCIÓN 1 MES)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122085" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122085')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122085" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">086</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">PEATONALIZACIÓN DE LA CALLE PINTOR PICASSO Y REORDENACIÓN DE ACCESOS AL CENTRO HISTÓRICO DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122086" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">087</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO EN ZONA VERDE SOLAR DE LA FESTA EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122087" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">088</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REURBANIZACIÓN DE LA C/ JAZMINES Y PASEO DE LOS OLIVOS EN LA URBANIZACIÓN HAYGÓN DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122088" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">089</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">EJECUCIÓN DE 128 NICHOS Y 24 COLUMBARIOS EN EL CEMENTERIO DE SAN VICENTE DEL RASPÈIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122089" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">090</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">OBRA DE NUEVA ROTONDA EN LA UNIVERSIDAD DE ALICANTE DESDE EL ACCESO POR LA A-70</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122090" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">091</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO OBRAS DE RENOVACIÓN DE TRAMOS DE LA RED DE ALCANTARILLADO CON PATOLOGÍAS ESTRUCTURALES EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122091" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">092</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">ACONDICIONAMIENTO Y ASFALTADO DE DIVERSOS CAMINOS Y CALLES EN EL TÉRMINO MUNICIPAL DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122092" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">093</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">AMPLIACIÓN DEL CS SAN VICENTE I PERTENECIENTE AL DEPARTAMENTO DE SALUD DE ALICANTE-HOSPITAL</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122093" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">094</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">RENOVACIÓN DEL ALUMBRADO DE LA AVINGUDA DE L'ALMASSERA Y SU ENTORNO</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122094" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">095</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA, SERVICIOS E INFRAESTRUCTURASPOLIGONO INMEDIACIONES</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2025-2026</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122095" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122095')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122095" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">096</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA, SERVICIOS E INFRAESTRUCTURASPOLIGONO TORREGROSES</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2025-2026</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122096" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122096')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122096" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">097</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">MEJORA, SERVICIOS E INFRAESTRUCTURASPOLIGONO RODALET</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem; color: #94a3b8; font-weight: 500;">IVACE: PARQUES EMPRESARIALES 2025-2026</span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122097" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntos('OB122097')">
+                                <i data-lucide="paperclip"></i> Adjuntar
+                            </button>
+                            <div id="lista_adjuntos_OB122097" class="file-list-container" style="margin-top: 5px;"></div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">098</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRAS PARA LA EJECUCIÓN DE LA FASE II DEL CENTRO DEL AGUA. PISCINAS MUNICIPALES EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122098" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">099</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRAS DE ACONDICIONAMIENTO ACCESO SUY Y CALLE MAYOR EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122099" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">100</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRAS PARA LA RESTAURACIÓN DEL VALLADO DEL PARQUE LO TORRENT (FASE II)</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122100" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">101</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRAS DE AMPLIACIÓN DEL APARCAMIENTO EN SUPERFICIE EN EL SOLAR DE MARIALICE DE SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122101" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">102</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE PROYECTOS Y EJECUCIÓN DE OBRAS DE INSTALACIÓN DE ÁREAS DE JUEGOS INFANTILES Y DE ELEMENTOS DEPORTIVOS EN SAN VICENTE DEL RASPEIG</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122102" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs">103</td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONTRATO DE OBRAS PARA ALBERGUE MUNICIPAL DE ANIMALES, SITO EN POLÍGONO 12, PARCELA 39: PARTIDA INMEDIACIONES</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" data-obra-id="OB122103" data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada" >No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <span class="text-xs">No requiere doc.</span>
+                            
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-plus"></i> OTRAS OBRAS DETECTADAS</h2>
+        <div class="table-wrapper" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Denominación</th>
+                        <th style="width: 20%;">Estado</th>
+                        <th style="width: 20%;">Observaciones</th>
+                        <th style="width: 15%; text-align: center;">Documentación</th>
+                        <th style="width: 5%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="bodyNuevasObras"></tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="agregarFilaNuevaObra()" style="margin-top: 1rem;">
+            <i data-lucide="plus"></i> Añadir otra actuación
+        </button>
+    </div>
+
+    
+    
+
+    
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
+        <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
+        <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" class="file-list-container"></div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
+    <div class="grid-2-col">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+        </div>
+    </div>
+</div>
+
+    
+<div class="card">
+    <div class="conformidad-box">
+        <label class="check-label">
+            <input type="checkbox" id="checkConformidad" class="check-input">
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
+        </label>
+    </div>
+    <div id="mensaje" class="message hidden"></div>
+    <button id="btnEnviar" class="btn btn-primary" disabled>Enviar Datos</button>
+</div>
+
+</form>
+<input type="file" id="hiddenFileInput" multiple style="display: none;">
+
+    </main>
+
+    <footer class="site-footer">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
+    </footer>
+
+    <div id="overlayProgress" class="overlay hidden">
+        <div class="progress-card">
+            <h3 id="progressTitle">Enviando datos...</h3>
+            <div id="progressElements">
+                <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+                <div class="progress-info"><span id="progressText">Iniciando...</span><span id="progressValue">0%</span></div>
+                <p class="paciencia-nota">⌛ No cierre ni refresque la pestaña durante el proceso.</p>
+            </div>
+            <div id="successState" class="hidden">
+                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;"><i data-lucide="check-circle-2"></i></div>
+                <p>¡Envío realizado correctamente! Se ha enviado un justificante al correo facilitado.</p>
+                <a href="index.html" class="btn btn-primary">Volver al Listado</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // VALIDACIÓN DE SESIÓN Y PERSISTENCIA
+        document.addEventListener("DOMContentLoaded", () => {
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            if (!muniCode) return window.location.href = "index.html";
+            
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = localStorage.getItem("eiel_muni_name") || "Municipio";
+
+            const fieldsMap = {"contactoNombre": "eiel_user_name", "contactoEmail": "eiel_user_email", "contactoDepartamento": "eiel_user_dept"};
+            Object.keys(fieldsMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = localStorage.getItem(fieldsMap[id]) || "";
+                    el.addEventListener('input', (e) => localStorage.setItem(fieldsMap[id], e.target.value.trim()));
+                }
+            });
+        });
+
+        // LOGGER Y ICONOS
+        (function() {
+            if (window.location.protocol === 'file:') return;
+            const payload = {
+                municipio: "San Vicente del Raspeig / Sant Vicent del Raspeig", codigo: "122", fase: "2026",
+                tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+                ua: navigator.userAgent,
+                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
+            };
+            if (window.EIEL_CONFIG.urlLogger) fetch(window.EIEL_CONFIG.urlLogger, {method: 'POST', mode: 'no-cors', body: JSON.stringify(payload)});
+        })();
+
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
+    </script>
+</body>
+</html>
