@@ -119,12 +119,17 @@
                     </a>
                     {% endif %}
                 </div>
-                <div style="margin-left: 28px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" placeholder="Responda aquí..." style="width: 100%; box-sizing: border-box; margin-bottom: 12px; background: white; display: block;"></textarea>
+                
+                {# CONTENEDOR DE RESPUESTA CORREGIDO (FONDO BLANCO Y ANCHO TOTAL) #}
+                <div style="margin-left: 28px; background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-sizing: border-box; width: calc(100% - 28px);">
+                    <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" 
+                              placeholder="Responda aquí..." 
+                              style="width: 100% !important; box-sizing: border-box; display: block; margin-bottom: 15px; background: white; border: 1px solid #cbd5e1;"></textarea>
+                    
                     <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosReq('{{ req_id }}')">
                         <i data-lucide="paperclip"></i> Adjuntar
                     </button>
-                    <div id="lista_adjuntos_req_{{ req_id }}" class="file-list-container"></div>
+                    <div id="lista_adjuntos_req_{{ req_id }}" class="file-list-container" style="margin-top: 10px;"></div>
                 </div>
             </li>
             {% endfor %}
@@ -133,7 +138,7 @@
     </div>
     {% endif %}
 
-    {# 7. COMPONENTES GLOBALES (Macros) #}
+    {# 7. COMPONENTES GLOBALES #}
     {{ ui.campo_observaciones() }}
     {{ ui.zona_adjuntos() }}
     {{ ui.campo_contacto() }}
@@ -153,31 +158,40 @@ document.addEventListener("DOMContentLoaded", () => {
     const divExterno = document.getElementById('campos_gestion_externa');
     const divOtro = document.getElementById('campos_gestion_otro');
 
-    selectGestion.addEventListener('change', function() {
-        const val = this.value;
-        divExterno.classList.toggle('hidden', val !== 'Indirecta (Concesionaria)');
-        divOtro.classList.toggle('hidden', val !== 'Otro');
-    });
+    if (selectGestion) {
+        selectGestion.addEventListener('change', function() {
+            const val = this.value;
+            divExterno.classList.toggle('hidden', val !== 'Indirecta (Concesionaria)');
+            divOtro.classList.toggle('hidden', val !== 'Otro');
+        });
+    }
 
     // B. Manejo de adjuntos
     const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', () => {
-        archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
-        renderArchivos();
-    });
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
+            renderArchivos();
+            fileInput.value = "";
+        });
+    }
 
     const inputReq = document.getElementById('hiddenInputReq');
-    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; inputReq.click(); };
-    inputReq.addEventListener('change', () => {
-        if (!reqIdActual) return;
-        colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
-        renderColaReq(reqIdActual);
-    });
+    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; if(inputReq) inputReq.click(); };
+
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            if (!reqIdActual) return;
+            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            renderColaReq(reqIdActual);
+            inputReq.value = "";
+        });
+    }
 
     // C. Lógica de Envío
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
-    checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
 
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "AGUA_" + Date.now();
@@ -208,7 +222,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         try {
             await UploadService.uploadFiles(listaTareas, 'AGUA', window.EIEL_CONFIG.muniCode, idBatch, 1);
-
             UIProgress.update(listaTareas.length, listaTareas.length, "Generando PDF...");
 
             const payload = {
@@ -248,6 +261,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function renderArchivos() {
     const fileList = document.getElementById("fileList");
+    if (!fileList) return;
     fileList.innerHTML = archivosGenerales.map((f, i) => `
         <div class="file-item">
             <span>📄 ${f.name}</span>
@@ -258,6 +272,7 @@ function renderArchivos() {
 
 function renderColaReq(id) {
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
     contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
         <div class="file-item" style="margin-bottom:4px; padding:4px 8px; background:#fdfdfd; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
