@@ -1,0 +1,1290 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>EIEL - Equipamientos</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL
+        window.EIEL_CONFIG = {
+            muniCode: "004",
+            muniName: "Aigües",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+            hasAvisos: false
+        };
+
+        // 2. SERVICIO DE PROGRESO (Interfaz de envío)
+        const UIProgress = {
+            get el() { return {
+                bar: document.getElementById("progressBar"),
+                text: document.getElementById("progressText"),
+                percent: document.getElementById("progressValue"),
+                container: document.getElementById("overlayProgress"),
+                success: document.getElementById("successState"),
+                elements: document.getElementById("progressElements")
+            }},
+            show(total) {
+                this.el.container.classList.remove('hidden');
+                this.el.success.classList.add('hidden');
+                this.el.elements.classList.remove('hidden');
+                this.update(0, total, "Iniciando envío...");
+            },
+            update(completed, total, msg) {
+                const perc = total > 0 ? Math.round((completed / total) * 90) : 0;
+                this.el.bar.style.width = perc + "%";
+                this.el.percent.textContent = perc + "%";
+                this.el.text.textContent = msg;
+            },
+            complete() {
+                this.el.bar.style.width = "100%";
+                this.el.percent.textContent = "100%";
+                this.el.elements.classList.add('hidden');
+                this.el.success.classList.remove('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
+        // 3. SERVICIO DE SUBIDA (Motor por lotes)
+        const UploadService = {
+            async uploadFiles(tareas, tipo, muni, idBatch, concurrency = 1) {
+                for (let i = 0; i < tareas.length; i += concurrency) {
+                    const lote = tareas.slice(i, i + concurrency);
+                    await Promise.all(lote.map(async (t) => {
+                        const base64 = await this._toBase64(t.file);
+                        const payload = {
+                            filename: t.file.name,
+                            mimeType: t.file.type,
+                            bytesBase64: base64,
+                            municipio: muni,
+                            tipo: tipo,
+                            seccion: t.seccion || "GENERAL",
+                            id_envio: idBatch
+                        };
+                        await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                            method: 'POST', mode: 'no-cors',
+                            body: JSON.stringify(payload)
+                        });
+                    }));
+                    UIProgress.update(i + lote.length, tareas.length, `Subiendo archivos...`);
+                }
+            },
+            _toBase64: file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = e => reject(e);
+            })
+        };
+
+        // 4. FUNCIONES GLOBALES
+        function logout() {
+            localStorage.clear();
+            window.location.href = "index.html";
+        }
+        
+        function toggleFormFreeze(isFrozen) {
+            const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add');
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                el.style.pointerEvents = isFrozen ? "none" : "auto";
+            });
+        }
+        
+        window.abrirVisorImagen = (src) => {
+            let modal = document.getElementById('visorImagenGlobal') || document.createElement('div');
+            if (!document.getElementById('visorImagenGlobal')) {
+                modal.id = 'visorImagenGlobal';
+                modal.className = 'modal-img';
+                modal.innerHTML = `<img src="" id="imgVisor">`;
+                modal.onclick = () => modal.style.display = 'none';
+                document.body.appendChild(modal);
+            }
+            modal.querySelector('img').src = src;
+            modal.style.display = 'flex';
+        };
+    </script>
+</head>
+<body class="theme-equipamientos">
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">Fase 2026</span>
+            </div>
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">⭠ Volver al listado</a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header"><i data-lucide="building-2"></i></div>
+            <div class="title-header">
+                <h2>EQUIPAMIENTOS</h2>
+                <p class="subtitle">Aigües (004)</p>
+            </div>
+        </div>
+        
+<form id="formEquipamientos">
+    
+    <div class="card card-info">
+        <h4><i data-lucide="info"></i> Instrucciones</h4>
+        <ul>
+            Despliegue cada temática para ver los equipamientos disponibles.
+            <li><strong>Estado:</strong> Seleccione el estado de conservación de cada registro.</li>
+            <li><strong>Observaciones:</strong> Indique cambios de nombre, uso o ceses de servicio.</li>
+        </ul>
+    </div>
+
+    
+    
+    
+
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="landmark" class="acc-icon"></i>
+                        <span>CASA CONSISTORIAL</span>
+                        <span class="acc-badge">(4)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="CC004002">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892049" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3631671444338019&y_lat=38.499265997341105&zoom=19&w=initlayer&layerIds=316" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>CENTRO SOCIAL INTEGRADO</strong><br><small>Cód: CC004002</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="CC004002" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="CC004004">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892068" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36797749495576026&y_lat=38.49806064640113&zoom=19&w=initlayer&layerIds=316" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>CENTRO POLIDEPORTIVO MUNICIPAL</strong><br><small>Cód: CC004004</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="CC004004" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="CC004006">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67892250" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3639526780348245&y_lat=38.50044352086285&zoom=19&w=initlayer&layerIds=316" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>NUEVO AYUNTAMIENTO</strong><br><small>Cód: CC004006</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="CC004006" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="CC004007">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=316&atributo=foto&tipo=image/jpeg;jpg&identificador=67891589" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.362207077500492&y_lat=38.50080586041272&zoom=19&w=initlayer&layerIds=316" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>LAVADERO</strong><br><small>Cód: CC004007</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="CC004007" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="clapperboard" class="acc-icon"></i>
+                        <span>CENTRO CULTURAL</span>
+                        <span class="acc-badge">(1)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="CU004003">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=321&atributo=foto&tipo=image/jpeg;jpg&identificador=67893896" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36316732314965494&y_lat=38.49926577578116&zoom=19&w=initlayer&layerIds=321" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>CASA DE CULTURA</strong><br><small>Cód: CU004003</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="CU004003" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="graduation-cap" class="acc-icon"></i>
+                        <span>CENTRO ENSEÑANZA</span>
+                        <span class="acc-badge">(1)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="EN004001">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=322&atributo=foto&tipo=image/jpeg;jpg&identificador=67898384" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36544676564667034&y_lat=38.50085786924924&zoom=19&w=initlayer&layerIds=322" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>CEIP MIRADOR DE AIGÜES</strong><br><small>Cód: EN004001</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="EN004001" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="hospital" class="acc-icon"></i>
+                        <span>CENTRO SANITARIO</span>
+                        <span class="acc-badge">(1)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="SA004001">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=327&atributo=foto&tipo=image/jpeg;jpg&identificador=67901351" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3675414381183592&y_lat=38.49949289563958&zoom=19&w=initlayer&layerIds=327" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>CONSULTORIO AUXILIAR DE AIGÜES</strong><br><small>Cód: SA004001</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="SA004001" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="shopping-basket" class="acc-icon"></i>
+                        <span>MERCADO/LONJA</span>
+                        <span class="acc-badge">(1)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="LM004001">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=324&atributo=foto&tipo=image/jpeg;jpg&identificador=69137089" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36592698329299744&y_lat=38.499905040356346&zoom=19&w=initlayer&layerIds=324" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>MERCAT MUNICIPAL D'AIGÜES</strong><br><small>Cód: LM004001</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="LM004001" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+    
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="volleyball" class="acc-icon"></i>
+                        <span>INSTALACIÓN DEPORTIVA</span>
+                        <span class="acc-badge">(3)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="ID004001">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132241" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36805615800516817&y_lat=38.49826381453829&zoom=19&w=initlayer&layerIds=323" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>POLIDEPORTIVO MUNICIPAL DE AIGÜES</strong><br><small>Cód: ID004001</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="ID004001" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="ID004002">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69131834" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36558620518719104&y_lat=38.50096914866947&zoom=19&w=initlayer&layerIds=323" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>I.D. CEIP MIRADOR DE AIGÜES</strong><br><small>Cód: ID004002</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="ID004002" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="ID004003">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=323&atributo=foto&tipo=image/jpeg;jpg&identificador=69132039" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.362800725289203&y_lat=38.508654914632416&zoom=19&w=initlayer&layerIds=323" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>URBANIZACIÓN SIERRA MARINA</strong><br><small>Cód: ID004003</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="ID004003" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+        
+            
+            <details class="card-accordion">
+                <summary class="acc-header">
+                    <i data-lucide="chevron-right" class="acc-chevron"></i>
+                    <div class="acc-title-box">
+                        <i data-lucide="tree-pine" class="acc-icon"></i>
+                        <span>PARQUE</span>
+                        <span class="acc-badge">(10)</span>
+                    </div>
+                </summary>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="col-foto">Foto</th>
+                                <th class="col-mapa">Ubicación</th>
+                                <th class="col-deno">Denominación</th>
+                                <th class="col-estado">Estado</th>
+                                <th class="col-obs">Observaciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            
+                            <tr class="fila-equip" data-id="PJ004002">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138382" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3643604773643792&y_lat=38.500113040286976&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE DE LA FUENTE</strong><br><small>Cód: PJ004002</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004002" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004003">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138379" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.37142491817300377&y_lat=38.49736135468439&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>ZONA RECREATIVA VICTORIA DE ROJAS</strong><br><small>Cód: PJ004003</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004003" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004004">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138377" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3701147229038653&y_lat=38.491262498568055&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE EL BALNEARIO I</strong><br><small>Cód: PJ004004</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-regular"></span>
+                                        <select class="form-select select-estado" data-id="PJ004004" data-original="Regular">
+                                            <option value="Bueno" >Bueno</option>
+                                            <option value="Regular" selected>Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004005">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138935" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36572902804349017&y_lat=38.490985126344576&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE EL BALNEARIO II</strong><br><small>Cód: PJ004005</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-malo"></span>
+                                        <select class="form-select select-estado" data-id="PJ004005" data-original="Malo">
+                                            <option value="Bueno" >Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" selected>Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004006">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137991" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.364311150571376&y_lat=38.50034946992022&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PLACETA DEL PINTOR PEPE MAS</strong><br><small>Cód: PJ004006</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004006" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004007">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69137224" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36270445511892&y_lat=38.49890629667583&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE C/ REINA VICTORIA</strong><br><small>Cód: PJ004007</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-regular"></span>
+                                        <select class="form-select select-estado" data-id="PJ004007" data-original="Regular">
+                                            <option value="Bueno" >Bueno</option>
+                                            <option value="Regular" selected>Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004008">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139345" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36280938279450886&y_lat=38.50851936648114&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE INFANTIL URB. SIERRA MARINA</strong><br><small>Cód: PJ004008</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004008" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004009">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138357" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3634578030741538&y_lat=38.50027514413747&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PLAÇA DE L'ESGLÉSIA</strong><br><small>Cód: PJ004009</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004009" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004010">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69138380" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3624424583803191&y_lat=38.50074184382807&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PLAÇA DEL PRACTICANT JUAN SAVAL</strong><br><small>Cód: PJ004010</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004010" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                            <tr class="fila-equip" data-id="PJ004011">
+                                <td class="td-foto">
+                                    
+                                        <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=331&atributo=foto&tipo=image/jpeg;jpg&identificador=69139401" class="img-thumb" onclick="abrirVisorImagen(this.src)" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="no-photo-placeholder" style="display: none;"><i data-lucide="camera-off"></i></div>
+                                    
+                                </td>
+                                <td class="td-ubicacion">
+                                    <a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.36360302757895613&y_lat=38.4994419379926&zoom=19&w=initlayer&layerIds=331" target="_blank" class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1;">
+                                        <i data-lucide="map-pin"></i><span> Mapa</span>
+                                    </a>
+                                </td>
+                                <td><strong>PARQUE CASA DE CULTURA</strong><br><small>Cód: PJ004011</small></td>
+                                <td>
+                                    <div class="estado-wrapper">
+                                        <span class="status-dot dot-bueno"></span>
+                                        <select class="form-select select-estado" data-id="PJ004011" data-original="Bueno">
+                                            <option value="Bueno" selected>Bueno</option>
+                                            <option value="Regular" >Regular</option>
+                                            <option value="Malo" >Malo</option>
+                                            <option value="En ejecución" >En ejecución</option>
+                                        </select>
+                                    </div>
+                                </td>
+                                <td><textarea class="form-input txt-obs-eq" rows="1" placeholder="..."></textarea></td>
+                            </tr>
+                            
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        
+    
+
+    
+    
+    <details class="card-accordion">
+        <summary class="acc-header">
+            <i data-lucide="chevron-right" class="acc-chevron"></i>
+            <div class="acc-title-box">
+                <i data-lucide="door-closed" class="acc-icon"></i>
+                <span>EDIFICIOS PÚBLICOS SIN USO</span>
+                <span class="acc-badge">(1)</span>
+            </div>
+        </summary>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="col-foto">Foto</th>
+                        <th class="col-mapa">Ubicación</th>
+                        <th class="col-deno">Denominación</th>
+                        <th class="col-obs">¿Tiene uso?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    <tr class="fila-sin-uso" data-id="SU004002">
+                        <td class="td-foto">
+                            <img src="https://visoreiel.geonet.es/Manejadores/ObtenerMIME.ashx?entidad=328&atributo=foto&tipo=image/jpeg;jpg&identificador=67919019" class="img-thumb" onclick="abrirVisorImagen(this.src)">
+                        </td>
+                        <td class="td-ubicacion"><a href="https://visoreiel.geonet.es?srs=4326&x_lon=-0.3703925168178365&y_lat=38.491467563561095&zoom=19&w=initlayer&layerIds=328" target="_blank" class="btn btn-secondary btn-sm"><i data-lucide="map-pin"></i></a></td>
+                        <td><strong>ESCUELA INFANTIL AIGÜES</strong><br><small>Cód: SU004002</small></td>
+                        <td>
+                            <select class="form-select select-sin-uso" data-id="SU004002" onchange="const box = document.getElementById('box_uso_SU004002'); this.value === 'SI' ? box.classList.remove('hidden') : box.classList.add('hidden')">
+                                <option value="NO">Sigue sin uso</option>
+                                <option value="SI">Ya tiene uso</option>
+                            </select>
+                            <div id="box_uso_SU004002" class="hidden" style="margin-top: 8px;">
+                                <input type="text" class="form-input txt-nuevo-uso" placeholder="Nuevo uso...">
+                            </div>
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </details>
+    
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-plus"></i>Notificar Nuevo Equipamiento</h2>
+        <div class="table-wrapper" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">DENOMINACIÓN / UBICACIÓN</th>
+                        <th style="width: 32%;">USO(S) / ESTADO</th>
+                        <th style="width: 22%;">OBSERVACIONES</th>
+                        <th style="width: 15%; text-align: center;">DOC.</th>
+                        <th style="width: 5%;"></th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyNuevos"></tbody>
+            </table>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="window.agregarFilaNuevoEquipamiento()" 
+                style="margin-top: 1rem; background: white; border: 1px solid #cbd5e1;">
+            <i data-lucide="plus"></i> Añadir otro
+        </button>
+    </div>
+
+    
+    
+
+    
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
+        <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
+        <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" class="file-list-container"></div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
+    <div class="grid-2-col">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+        </div>
+    </div>
+</div>
+
+    
+<div class="card">
+    <div class="conformidad-box">
+        <label class="check-label">
+            <input type="checkbox" id="checkConformidad" class="check-input">
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
+        </label>
+    </div>
+    <div id="mensaje" class="message hidden"></div>
+    <button id="btnEnviar" class="btn btn-primary" disabled>Enviar Datos</button>
+</div>
+
+</form>
+<input type="file" id="hiddenInputNuevos" multiple style="display: none;">
+
+    </main>
+
+
+    <footer class="site-footer">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
+    </footer>
+
+    
+    <div id="overlayProgress" class="overlay hidden">
+        <div class="progress-card">
+            <h3 id="progressTitle">Enviando datos...</h3>
+            <div id="progressElements">
+                <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+                <div class="progress-info"><span id="progressText">Iniciando...</span><span id="progressValue">0%</span></div>
+                <p class="paciencia-nota">⌛ No cierre ni refresque la pestaña durante el proceso.</p>
+            </div>
+            <div id="successState" class="hidden">
+                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;"><i data-lucide="check-circle-2"></i></div>
+                <p>¡Envío realizado correctamente! Se ha enviado un justificante al correo facilitado.</p>
+                <a href="index.html" class="btn btn-primary">Volver al Listado</a>
+            </div>
+        </div>
+    </div>
+
+    
+    
+<script>
+// Variables de estado
+let archivosGenerales = [];
+let colaAdjuntosReq = {};
+let colaAdjuntosNuevos = {};
+let reqIdActual = null;
+let filaActualAdjuntos = null;
+let contadorNuevosEq = 0;
+
+document.addEventListener("DOMContentLoaded", () => {
+    // A. Gestión de adjuntos generales (Arregla el Drag and Drop)
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
+            renderArchivos();
+            fileInput.value = "";
+        });
+    }
+
+    // B. Gestión de adjuntos para Requerimientos
+    const inputReq = document.getElementById('hiddenInputReq');
+    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; if(inputReq) inputReq.click(); };
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            if (reqIdActual === null) return;
+            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            renderColaReq(reqIdActual);
+            inputReq.value = "";
+        });
+    }
+
+    // C. Gestión de adjuntos para Nuevos Equipamientos
+    const inputNuevos = document.getElementById('hiddenInputNuevos');
+    window.gestionarAdjuntosFila = (idFila) => { filaActualAdjuntos = idFila; if(inputNuevos) inputNuevos.click(); };
+    if (inputNuevos) {
+        inputNuevos.addEventListener('change', () => {
+            if (!filaActualAdjuntos) return;
+            colaAdjuntosNuevos[filaActualAdjuntos] = [...(colaAdjuntosNuevos[filaActualAdjuntos] || []), ...Array.from(inputNuevos.files)];
+            renderFilaAdjuntos(filaActualAdjuntos);
+            inputNuevos.value = "";
+        });
+    }
+
+    // D. Cambio dinámico de puntos de estado
+    document.querySelectorAll('.select-estado').forEach(sel => {
+        sel.addEventListener('change', function() {
+            const dot = this.parentNode.querySelector('.status-dot');
+            if (dot) {
+                dot.className = 'status-dot';
+                const classValue = this.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s/g, "");
+                dot.classList.add('dot-' + classValue);
+            }
+        });
+    });
+
+    // E. Inicializar con una fila de nuevo equipamiento
+    window.agregarFilaNuevoEquipamiento();
+
+    // F. Lógica de Envío
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConf = document.getElementById("checkConformidad");
+    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+
+    btnEnviar.addEventListener("click", async () => {
+        const idBatch = "EQUIP_" + Date.now();
+        if (document.getElementById("contactoEmail").value !== document.getElementById("contactoEmailConfirm").value) {
+            return Swal.fire("Error", "Los emails no coinciden.", "error");
+        }
+        toggleFormFreeze(true);
+
+        const listaTareas = [];
+        archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
+        Object.entries(colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
+        Object.entries(colaAdjuntosNuevos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
+
+        UIProgress.show(listaTareas.length);
+        try {
+            await UploadService.uploadFiles(listaTareas, 'EQUIPAMIENTOS', window.EIEL_CONFIG.muniCode, idBatch, 1);
+            
+            const payload = {
+                tipo_formulario: "equipamientos",
+                id_envio: idBatch,
+                datos_equipamientos: Array.from(document.querySelectorAll('.fila-equip')).map(tr => ({
+                    id: tr.dataset.id, estado: tr.querySelector('.select-estado').value, obs: tr.querySelector('.txt-obs-eq').value.trim()
+                })),
+                nuevos_equipamientos: Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(f => ({
+                    nombre: f.querySelector('.new-deno').value, uso: f.querySelector('.new-uso').value, estado: f.querySelector('.new-estado').value
+                })),
+                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                    pregunta: area.dataset.msg, respuesta: area.value
+                })),
+                contacto: { nombre: document.getElementById("contactoNombre").value, email: document.getElementById("contactoEmail").value }
+            };
+
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            UIProgress.complete();
+        } catch (error) {
+            console.error(error); toggleFormFreeze(false);
+            Swal.fire("Error", "Fallo al enviar los datos.", "error");
+        }
+    });
+});
+
+// --- FUNCIONES DE RENDERIZADO ---
+function renderArchivos() {
+    const fileList = document.getElementById("fileList");
+    if (!fileList) return;
+    fileList.innerHTML = archivosGenerales.map((f, i) => `<div class="file-item"><span>📄 ${f.name}</span><button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon"><i data-lucide="trash-2"></i></button></div>`).join("");
+    if (window.lucide) lucide.createIcons();
+}
+
+function renderColaReq(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
+    contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `<div class="file-item" style="font-size:0.75rem; border:1px solid #e2e8f0; border-radius:6px; padding:4px 8px; display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><span>📄 ${f.name}</span><button type="button" onclick="colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}');" class="btn-danger-icon"><i data-lucide="trash-2" style="width:14px; color:#ef4444;"></i></button></div>`).join("");
+}
+
+function renderFilaAdjuntos(idFila) {
+    const contenedor = document.getElementById(`lista_adjuntos_${idFila}`);
+    if (!contenedor) return;
+    contenedor.innerHTML = (colaAdjuntosNuevos[idFila] || []).map((f, i) => `<div class="file-item" style="font-size:0.7rem; border:1px solid #e2e8f0; margin-bottom:2px; padding:2px; display:flex; justify-content:space-between;"><span>📄 ${f.name.substring(0,12)}...</span><button type="button" onclick="colaAdjuntosNuevos['${idFila}'].splice(${i},1); renderFilaAdjuntos('${idFila}');" class="btn-danger-icon"><i data-lucide="trash-2" style="width:10px;"></i></button></div>`).join("");
+    if (window.lucide) lucide.createIcons();
+}
+
+window.agregarFilaNuevoEquipamiento = () => {
+    contadorNuevosEq++;
+    const idFila = `NUEVO_EQ_${contadorNuevosEq}`;
+    const tbody = document.getElementById('tbodyNuevos');
+    if (!tbody) return;
+    const tr = document.createElement('tr');
+    tr.id = `fila_${idFila}`; tr.className = 'fila-nuevo-eq';
+    tr.innerHTML = `
+        <td style="vertical-align: top; padding: 12px 8px;"><input type="text" class="form-input new-deno" placeholder="Ej: Edificio Polivalente" style="margin-bottom:8px;"><input type="text" class="form-input new-ubica" placeholder="Ubicación"></td>
+        <td style="vertical-align: top; padding: 12px 8px;"><input type="text" class="form-input new-uso" placeholder="Uso" style="margin-bottom:8px;"><select class="form-select new-estado"><option value="">Seleccionar...</option><option value="Bueno">Bueno</option><option value="Regular">Regular</option><option value="Malo">Malo</option></select></td>
+        <td style="vertical-align: top; padding: 12px 8px;"><textarea class="form-input new-obs-fila" placeholder="..." style="min-height:88px;"></textarea></td>
+        <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntosFila('${idFila}')"
+                    style="background: white; border: 1px solid #cbd5e1;">
+                <i data-lucide="paperclip"></i> Adjuntar
+            </button>
+            <div id="lista_adjuntos_${idFila}" class="file-list-container" style="margin-top:8px;"></div>
+        </td>
+        <td style="text-align: center; vertical-align: top; padding: 12px 8px;"><button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];"><i data-lucide="trash-2"></i></button></td>`;
+    tbody.appendChild(tr);
+    if (window.lucide) lucide.createIcons();
+};
+</script>
+
+
+    <script>
+        // VALIDACIÓN DE SESIÓN Y PERSISTENCIA
+        document.addEventListener("DOMContentLoaded", () => {
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            if (!muniCode) return window.location.href = "index.html";
+            
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = localStorage.getItem("eiel_muni_name") || "Municipio";
+
+            const fieldsMap = {"contactoNombre": "eiel_user_name", "contactoEmail": "eiel_user_email", "contactoDepartamento": "eiel_user_dept"};
+            Object.keys(fieldsMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = localStorage.getItem(fieldsMap[id]) || "";
+                    el.addEventListener('input', (e) => localStorage.setItem(fieldsMap[id], e.target.value.trim()));
+                }
+            });
+        });
+
+        // LOGGER Y ICONOS
+        (function() {
+            if (window.location.protocol === 'file:') return;
+            const payload = {
+                municipio: "Aigües", codigo: "004", fase: "2026",
+                tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+                ua: navigator.userAgent,
+                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
+            };
+            if (window.EIEL_CONFIG.urlLogger) fetch(window.EIEL_CONFIG.urlLogger, {method: 'POST', mode: 'no-cors', body: JSON.stringify(payload)});
+        })();
+
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
+    </script>
+</body>
+</html>
