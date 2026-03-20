@@ -10,7 +10,7 @@
 
 {% block content %}
 <form id="formSaneamiento">
-    {# 2. INSTRUCCIONES #}
+    {# 2. INSTRUCCIONES [cite: 549-550] #}
     <div class="card card-info">
         <h4><i data-lucide="info"></i> Instrucciones</h4>
         <ul>
@@ -19,7 +19,7 @@
         </ul>
     </div>
 
-    {# 3. GESTIÓN DEL SERVICIO #}
+    {# 3. GESTIÓN DEL SERVICIO [cite: 551-556] #}
     <div class="card">
         <h2 class="section-title"><i data-lucide="briefcase-business"></i> Gestión del Servicio</h2>
         <div class="card-body">
@@ -52,13 +52,13 @@
             <div id="campos_gestion_otro" class="hidden shadow-inner-bg">
                 <div class="form-group">
                     <label class="form-label" for="nombre_gestor">Gestor:</label>
-                    <input type="text" class="form-input" id="nombre_gestor" placeholder="Especifique el gestor del servicio..."
+                    <input type="text" class="form-input" id="nombre_gestor" placeholder="Especifique el gestor del servicio...">
                 </div>
             </div>
         </div>
     </div>
 
-    {# 4. REQUERIMIENTOS TÉCNICOS #}
+    {# 4. REQUERIMIENTOS TÉCNICOS - DISEÑO CORREGIDO [cite: 557-571] #}
     {% if avisos_personalizados and avisos_personalizados|length > 0 %}
     <div class="card card-requerimientos">
         <h2 class="section-title"><i data-lucide="circle-plus"></i> Información solicitada</h2>
@@ -68,30 +68,28 @@
             {% set req_id = loop.index0 %}
             <li class="aviso-item" style="display: flex; flex-direction: column; gap: 15px; padding: 20px 0; border-bottom: 1px dashed #e2e8f0;">
                 
-                {# Cabecera: Icono, Mensaje y Botón Mapa #}
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 15px; width: 100%;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div class="status-dot {{ 'dot-alta' if aviso.prioridad == 'Alta' else 'dot-media' }}"></div>
                         <span style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary);">{{ aviso.mensaje }}</span>
                     </div>
                     {% if aviso.url %}
-                    <a href="{{ aviso.url if 'http' in aviso.url else 'https://' ~ aviso.url }}" target="_blank" class="btn btn-secondary btn-sm" style="flex-shrink: 0;">
-                        <i data-lucide="map"></i> Mapa
+                    <a href="{{ aviso.url if 'http' in aviso.url else 'https://' ~ aviso.url }}" target="_blank" 
+                       class="btn btn-secondary btn-sm" style="background: white; border: 1px solid #cbd5e1; display: flex; align-items: center; gap: 5px;">
+                        <i data-lucide="map" style="width: 14px; height: 14px;"></i> Mapa
                     </a>
                     {% endif %}
                 </div>
 
-                {# Contenedor de Respuesta (Corregido: ahora ocupa todo el ancho) #}
-                <div style="margin-left: 28px; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; display: block; width: auto;">
-                    <textarea class="form-input txt-resp-req" 
-                              data-msg="{{ aviso.mensaje }}" 
-                              data-id="{{ req_id }}" 
-                              rows="3" 
+                {# Contenedor de Respuesta (FONDO BLANCO Y ANCHO TOTAL) #}
+                <div style="margin-left: 28px; background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-sizing: border-box; width: calc(100% - 28px);">
+                    <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" 
                               placeholder="Responda aquí..." 
-                              style="width: 100%; box-sizing: border-box; margin-bottom: 12px; background: white; display: block;"></textarea>
+                              style="width: 100% !important; box-sizing: border-box; display: block; margin-bottom: 15px; background: white; border: 1px solid #cbd5e1;"></textarea>
                     
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="gestionarAdjuntosReq('{{ req_id }}')">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntosReq('{{ req_id }}')"
+                                style="background: white; border: 1px solid #cbd5e1;">
                             <i data-lucide="paperclip"></i> Adjuntar
                         </button>
                         <span style="font-size: 0.7rem; color: #94a3b8;">Máx 35 MB / archivo</span>
@@ -106,7 +104,7 @@
     </div>
     {% endif %}
 
-    {# 5. COMPONENTES GLOBALES (Macros) #}
+    {# 5. COMPONENTES GLOBALES [cite: 572] #}
     {{ ui.campo_observaciones() }}
     {{ ui.zona_adjuntos() }}
     {{ ui.campo_contacto() }}
@@ -121,48 +119,56 @@ let colaAdjuntosReq = {};
 let reqIdActual = null;
 
 document.addEventListener("DOMContentLoaded", () => {
-    // A. Gestión de visibilidad del Servicio
+    // A. Gestión de visibilidad del Servicio [cite: 572-573]
     const selectGestion = document.getElementById('tipo_gestion');
     const divExterno = document.getElementById('campos_gestion_externa');
     const divOtro = document.getElementById('campos_gestion_otro');
 
-    selectGestion.addEventListener('change', function() {
-        const val = this.value;
-        divExterno.classList.toggle('hidden', val !== 'Indirecta (Concesionaria)');
-        divOtro.classList.toggle('hidden', val !== 'Otro');
-    });
+    if (selectGestion) {
+        selectGestion.addEventListener('change', function() {
+            const val = this.value;
+            divExterno.classList.toggle('hidden', val !== 'Indirecta (Concesionaria)');
+            divOtro.classList.toggle('hidden', val !== 'Otro');
+        });
+    }
 
-    // B. Manejo de adjuntos (Generales y Requerimientos)
+    // B. Manejo de adjuntos generales [cite: 574, 588-590]
     const fileInput = document.getElementById('fileInput');
-    fileInput.addEventListener('change', () => {
-        archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
-        renderArchivos();
-    });
+    if (fileInput) {
+        fileInput.addEventListener('change', () => {
+            archivosGenerales = [...archivosGenerales, ...Array.from(fileInput.files)];
+            renderArchivos();
+            fileInput.value = "";
+        });
+    }
 
+    // C. Manejo de adjuntos para Requerimientos [cite: 575-576]
     const inputReq = document.getElementById('hiddenInputReq');
-    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; inputReq.click(); };
-    inputReq.addEventListener('change', () => {
-        if (!reqIdActual) return;
-        colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
-        renderColaReq(reqIdActual);
-    });
+    window.gestionarAdjuntosReq = (id) => { reqIdActual = id; if(inputReq) inputReq.click(); };
 
-    // C. Lógica de Envío
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            if (!reqIdActual) return;
+            colaAdjuntosReq[reqIdActual] = [...(colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            renderColaReq(reqIdActual);
+            inputReq.value = "";
+        });
+    }
+
+    // D. Lógica de Envío [cite: 577-587]
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
-    checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
 
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "SANEAMIENTO_" + Date.now();
         
-        // 1. Validaciones mínimas
         if (document.getElementById("contactoEmail").value !== document.getElementById("contactoEmailConfirm").value) {
             return Swal.fire("Error", "Los emails de contacto no coinciden.", "error");
         }
 
         toggleFormFreeze(true);
 
-        // 2. Preparar tareas de subida
         const listaTareas = [];
         archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
         Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
@@ -172,12 +178,10 @@ document.addEventListener("DOMContentLoaded", () => {
         UIProgress.show(listaTareas.length);
 
         try {
-            // 3. Subida (Secuencial = 1 para Saneamiento)
+            // Subida mediante el motor de base.html.j2 [cite: 72-79]
             await UploadService.uploadFiles(listaTareas, 'SANEAMIENTO', window.EIEL_CONFIG.muniCode, idBatch, 1);
-
             UIProgress.update(listaTareas.length, listaTareas.length, "Generando justificante...");
 
-            // 4. Datos técnicos finales
             const payload = {
                 tipo_formulario: "saneamiento",
                 id_envio: idBatch,
@@ -189,8 +193,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     tecnico: document.getElementById("tecnicoNombre").value
                 },
                 requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg,
-                    respuesta: area.value
+                    pregunta: area.dataset.msg, respuesta: area.value
                 })),
                 observaciones: document.getElementById("observaciones").value,
                 contacto: {
@@ -210,9 +213,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Funciones de renderizado restauradas (manteniendo estética original)
-function renderArchivos() {
+function renderArchivos() { [cite: 588-590]
     const fileList = document.getElementById("fileList");
+    if (!fileList) return;
     fileList.innerHTML = archivosGenerales.map((f, i) => `
         <div class="file-item">
             <span>📄 ${f.name}</span>
@@ -223,8 +226,9 @@ function renderArchivos() {
     if (window.lucide) lucide.createIcons();
 }
 
-function renderColaReq(id) {
+function renderColaReq(id) { [cite: 591-592]
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
     contenedor.innerHTML = (colaAdjuntosReq[id] || []).map((f, i) => `
         <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
             <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
