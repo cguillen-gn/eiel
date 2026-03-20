@@ -1,0 +1,525 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>EIEL - Obras</title>
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        // 1. CONFIGURACIÓN GLOBAL
+        window.EIEL_CONFIG = {
+            muniCode: "030",
+            muniName: "Benidoleig",
+            fase: "2026",
+            urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwRH7e4yVZk_Cmpf05lWyC_m8bpne1MmcPyBYfvZYdJQKsSvCMGEc9a7Bq6kU_asjNY/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
+            hasAvisos: false
+        };
+
+        // 2. SERVICIO DE PROGRESO (Interfaz de envío)
+        const UIProgress = {
+            get el() { return {
+                bar: document.getElementById("progressBar"),
+                text: document.getElementById("progressText"),
+                percent: document.getElementById("progressValue"),
+                container: document.getElementById("overlayProgress"),
+                success: document.getElementById("successState"),
+                elements: document.getElementById("progressElements")
+            }},
+            show(total) {
+                this.el.container.classList.remove('hidden');
+                this.el.success.classList.add('hidden');
+                this.el.elements.classList.remove('hidden');
+                this.update(0, total, "Iniciando envío...");
+            },
+            update(completed, total, msg) {
+                const perc = total > 0 ? Math.round((completed / total) * 90) : 0;
+                this.el.bar.style.width = perc + "%";
+                this.el.percent.textContent = perc + "%";
+                this.el.text.textContent = msg;
+            },
+            complete() {
+                this.el.bar.style.width = "100%";
+                this.el.percent.textContent = "100%";
+                this.el.elements.classList.add('hidden');
+                this.el.success.classList.remove('hidden');
+                if (window.lucide) lucide.createIcons();
+            }
+        };
+
+        // 3. SERVICIO DE SUBIDA (Motor por lotes)
+        const UploadService = {
+            async uploadFiles(tareas, tipo, muni, idBatch, concurrency = 1) {
+                for (let i = 0; i < tareas.length; i += concurrency) {
+                    const lote = tareas.slice(i, i + concurrency);
+                    await Promise.all(lote.map(async (t) => {
+                        const base64 = await this._toBase64(t.file);
+                        const payload = {
+                            filename: t.file.name,
+                            mimeType: t.file.type,
+                            bytesBase64: base64,
+                            municipio: muni,
+                            tipo: tipo,
+                            seccion: t.seccion || "GENERAL",
+                            id_envio: idBatch
+                        };
+                        await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                            method: 'POST', mode: 'no-cors',
+                            body: JSON.stringify(payload)
+                        });
+                    }));
+                    UIProgress.update(i + lote.length, tareas.length, `Subiendo archivos...`);
+                }
+            },
+            _toBase64: file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = e => reject(e);
+            })
+        };
+
+        // 4. FUNCIONES GLOBALES
+        function logout() {
+            localStorage.clear();
+            window.location.href = "index.html";
+        }
+        
+        function toggleFormFreeze(isFrozen) {
+            const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add');
+            elements.forEach(el => {
+                el.disabled = isFrozen;
+                el.style.opacity = isFrozen ? "0.6" : "1";
+                el.style.pointerEvents = isFrozen ? "none" : "auto";
+            });
+        }
+        
+        window.abrirVisorImagen = (src) => {
+            let modal = document.getElementById('visorImagenGlobal') || document.createElement('div');
+            if (!document.getElementById('visorImagenGlobal')) {
+                modal.id = 'visorImagenGlobal';
+                modal.className = 'modal-img';
+                modal.innerHTML = `<img src="" id="imgVisor">`;
+                modal.onclick = () => modal.style.display = 'none';
+                document.body.appendChild(modal);
+            }
+            modal.querySelector('img').src = src;
+            modal.style.display = 'flex';
+        };
+    </script>
+</head>
+<body class="theme-obras">
+    <header class="site-header">
+        <div class="header-content">
+            <div class="logo-area">
+                <h1>EIEL</h1>
+                <span class="badge-fase">Fase 2026</span>
+            </div>
+            <div class="user-area">
+                <span id="headerMuniName" class="user-email">...</span>
+                <button onclick="logout()" class="btn-logout">Salir</button>
+            </div>
+        </div>
+    </header>
+
+    <nav class="breadcrumb-nav">
+        <div class="container">
+            <a href="index.html" class="back-link">⭠ Volver al listado</a>
+        </div>
+    </nav>
+
+    <main class="main-container">
+        <div class="form-header">
+            <div class="icon-header"><i data-lucide="construction"></i></div>
+            <div class="title-header">
+                <h2>OBRAS</h2>
+                <p class="subtitle">Benidoleig (030)</p>
+            </div>
+        </div>
+        
+<form id="formObras">
+    
+    <div class="card card-info">
+        <h4><i data-lucide="info"></i> Instrucciones</h4>
+        <ul>
+            <li><strong>Estado:</strong> Rellene el estado en todas las obras del listado de seguimiento. </li>
+            <li><strong>Documentación:</strong> Adjunte el proyecto de cada obra o la documentación disponible.</li>
+        </ul>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-checks"></i> SEGUIMIENTO DE OBRAS</h2>
+        <div class="table-wrapper table-margin-reset">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 5%;" class="td-ubicacion">Id</th>
+                        <th style="width: 60%;">Denominación</th>
+                        <th style="width: 20%;" class="td-ubicacion">Estado</th>
+                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs" style="font-weight: 500; color: var(--text-secondary);">
+                            035
+                        </td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">REPARACIÓN CAMÍ CASA DURÁ</span>
+                                
+                                <div class="obra-details-row">
+                                    <span class="subvencion-badge">SUBVENCIÓN</span>
+                                    <span class="header-plan" style="font-size: 0.8rem !important; color: #94a3b8 !important; font-weight: 500;">
+                                        REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2024 LÍNEAS 1 Y 2. BOP: 18/07/2024
+                                    </span>
+                                </div>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" 
+                                    data-obra-id="OB030035"
+                                    data-clave="OB"
+                                    data-orden="035"
+                                    data-nombre="REPARACIÓN CAMÍ CASA DURÁ" 
+                                    data-plan="REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2024 LÍNEAS 1 Y 2. BOP: 18/07/2024"
+                                    [cite_start]data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada">No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                                <div class="form-help" style="font-size: 0.75rem; font-weight: 600;">No requiere documentación</div>
+                            
+                        </td>
+                    </tr>
+                    
+                    
+                    <tr class="fila-obra">
+                        <td class="td-ubicacion text-xs" style="font-weight: 500; color: var(--text-secondary);">
+                            036
+                        </td>
+                        <td>
+                            <div class="obra-column-container">
+                                <span class="item-title">CONSERVACIÓN Y MANTENIMIENTO DEL CENTRO DE SALUD DEBENIDOLEIG EN CONCRETO EN PLAZA PAÍS VALENCIA</span>
+                                
+                            </div>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                            <select class="form-select select-estado-obra" 
+                                    data-obra-id="OB030036"
+                                    data-clave="OB"
+                                    data-orden="036"
+                                    data-nombre="CONSERVACIÓN Y MANTENIMIENTO DEL CENTRO DE SALUD DEBENIDOLEIG EN CONCRETO EN PLAZA PAÍS VALENCIA" 
+                                    data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
+                                    [cite_start]data-original="">
+                                <option value="" selected>Seleccionar...</option>
+                                <option value="No iniciada">No iniciada</option>
+                                <option value="En ejecución">En ejecución</option>
+                                <option value="Paralizada">Paralizada</option>
+                                <option value="Finalizada" >Finalizada</option>
+                                <option value="Desconocido">Desconocido / Sin datos</option>
+                            </select>
+                        </td>
+                        <td class="td-ubicacion">
+                            
+                                <div class="form-help" style="font-size: 0.75rem; font-weight: 600;">No requiere documentación</div>
+                            
+                        </td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-plus"></i> OTRAS OBRAS DETECTADAS</h2>
+        <div class="card-body">
+            <p class="form-help" style="margin-bottom: 1.5rem;">Añada filas para registrar obras ejecutadas o a ejecutar por el ayuntamiento.</p>
+            <div class="table-wrapper" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%;">Denominación de la Obra</th>
+                            <th style="width: 20%;">Estado</th>
+                            <th style="width: 20%;">Observaciones</th>
+                            <th style="width: 15%; text-align: center;">Documentación</th>
+                            <th style="width: 5%;"></th> 
+                        </tr>
+                    </thead>
+                    <tbody id="bodyNuevasObras"></tbody>
+                </table>
+            </div>
+            <div style="margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="window.agregarFilaNuevaObra()" style="background: white;">
+                    <i data-lucide="plus"></i> Añadir otra obra
+                </button>
+            </div>
+        </div>
+    </div>
+
+    
+    
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
+    <div class="grid-2-col">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+        </div>
+    </div>
+</div>
+
+    
+<div class="card">
+    <div class="conformidad-box">
+        <label class="check-label">
+            <input type="checkbox" id="checkConformidad" class="check-input">
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
+        </label>
+    </div>
+    <div id="mensaje" class="message hidden"></div>
+    <button id="btnEnviar" class="btn btn-primary" disabled>Enviar Datos</button>
+</div>
+
+</form>
+
+<input type="file" id="hiddenFileInput" multiple style="display: none;">
+
+    </main>
+
+
+    <footer class="site-footer">
+        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
+    </footer>
+
+    
+    <div id="overlayProgress" class="overlay hidden">
+        <div class="progress-card">
+            <h3 id="progressTitle">Enviando datos...</h3>
+            <div id="progressElements">
+                <div class="progress-bar-container"><div id="progressBar" class="progress-bar"></div></div>
+                <div class="progress-info"><span id="progressText">Iniciando...</span><span id="progressValue">0%</span></div>
+                <p class="paciencia-nota">⌛ No cierre ni refresque la pestaña durante el proceso.</p>
+            </div>
+            <div id="successState" class="hidden">
+                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;"><i data-lucide="check-circle-2"></i></div>
+                <p>¡Envío realizado correctamente! Se ha enviado un justificante al correo facilitado.</p>
+                <a href="index.html" class="btn btn-primary">Volver al Listado</a>
+            </div>
+        </div>
+    </div>
+
+    
+    
+<script>
+// 1. ESTADO GLOBAL
+window.colaAdjuntos = {};
+window.colaAdjuntosReq = {};
+let idObraActual = null;
+let reqIdActual = null;
+let contadorNuevas = 0;
+
+// 2. FUNCIONES GLOBALES (Expuestas a window para los botones onclick)
+window.agregarFilaNuevaObra = function() {
+    const tbody = document.getElementById('bodyNuevasObras');
+    if (!tbody) return;
+
+    contadorNuevas++;
+    const idT = `NUEVA_${contadorNuevas}`;
+    const tr = document.createElement('tr');
+    tr.id = `fila_${idT}`; tr.className = 'fila-nueva-obra';
+    tr.innerHTML = `
+        <td><input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Calle Mayor"></td>
+        <td><select class="form-select input-nueva-estado"><option value="">Seleccionar...</option><option value="No iniciada">No iniciada</option><option value="En ejecución">En ejecución</option><option value="Paralizada">Paralizada</option><option value="Finalizada">Finalizada</option></select></td>
+        <td><textarea class="form-input" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
+        <td style="text-align:center;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('${idT}')"><i data-lucide="paperclip"></i> Adjuntar</button>
+            <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500;">Máx 35 MB / archivo</div>
+            <div id="lista_adjuntos_${idT}" class="file-list-container" style="margin-top: 5px;"></div>
+        </td>
+        <td style="text-align:center;">
+            <button type="button" onclick="this.closest('tr').remove()" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
+        </td>`;
+    tbody.appendChild(tr);
+    if (window.lucide) lucide.createIcons();
+};
+
+window.gestionarAdjuntos = function(id) {
+    idObraActual = id;
+    const input = document.getElementById('hiddenFileInput');
+    if (input) input.click();
+};
+
+window.gestionarAdjuntosReq = function(id) {
+    reqIdActual = id;
+    const input = document.getElementById('hiddenInputReq');
+    if (input) input.click();
+};
+
+function renderAdjuntos(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_${id}`);
+    if (!contenedor) return;
+    contenedor.innerHTML = (window.colaAdjuntos[id] || []).map(f => `
+        <div class="file-item" style="font-size:0.7rem; border:1px solid #e2e8f0; margin-bottom:2px; padding:2px; border-radius:4px; display:flex; justify-content:space-between;">
+            <span>📄 ${f.name.substring(0,12)}...</span>
+        </div>`).join("");
+}
+
+function renderColaReq(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
+    contenedor.innerHTML = (window.colaAdjuntosReq[id] || []).map(f => `
+        <div class="file-item" style="font-size:0.75rem; padding:4px; border:1px solid #e2e8f0; border-radius:6px;">
+            <span>📄 ${f.name}</span>
+        </div>`).join("");
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    // A. INICIALIZACIÓN: Crear fila por defecto inmediatamente 
+    window.agregarFilaNuevaObra();
+
+    // B. CONFIGURACIÓN DE INPUTS
+    const inputObras = document.getElementById('hiddenFileInput');
+    if (inputObras) {
+        inputObras.addEventListener('change', () => {
+            if (!idObraActual) return;
+            window.colaAdjuntos[idObraActual] = [...(window.colaAdjuntos[idObraActual] || []), ...Array.from(inputObras.files)];
+            renderAdjuntos(idObraActual);
+        });
+    }
+
+    const inputReq = document.getElementById('hiddenInputReq');
+    if (inputReq) {
+        inputReq.addEventListener('change', () => {
+            if (reqIdActual === null) return;
+            window.colaAdjuntosReq[reqIdActual] = [...(window.colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            renderColaReq(reqIdActual);
+        });
+    }
+
+    // C. ENVÍO
+    const btnEnviar = document.getElementById("btnEnviar");
+    const checkConf = document.getElementById("checkConformidad");
+    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+
+    btnEnviar.addEventListener("click", async () => {
+        const idBatch = "OBRAS_" + Date.now();
+        toggleFormFreeze(true);
+
+        const listaTareas = [];
+        Object.entries(window.colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
+        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
+
+        UIProgress.show(listaTareas.length);
+
+        try {
+            // USAR MOTOR DE LA BASE (concurrencia 3)
+            await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
+
+            const payload = {
+                tipo_formulario: "obras",
+                id_envio: idBatch,
+                datos_obras: Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
+                    obra: s.dataset.obraId, estado: s.value
+                })),
+                otras_obras: Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
+                    nombre: f.querySelector('.input-nueva-nombre').value,
+                    estado: f.querySelector('.input-nueva-estado').value
+                })),
+                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                    pregunta: area.dataset.msg, respuesta: area.value
+                })),
+                contacto: { nombre: document.getElementById("contactoNombre").value, email: document.getElementById("contactoEmail").value }
+            };
+
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            UIProgress.complete();
+        } catch (error) {
+            console.error(error);
+            toggleFormFreeze(false);
+            Swal.fire("Error", "Fallo en el envío.", "error");
+        }
+    });
+});
+</script>
+
+
+    <script>
+        // VALIDACIÓN DE SESIÓN Y PERSISTENCIA
+        document.addEventListener("DOMContentLoaded", () => {
+            const muniCode = localStorage.getItem("eiel_muni_code");
+            if (!muniCode) return window.location.href = "index.html";
+            
+            const headerName = document.getElementById("headerMuniName");
+            if(headerName) headerName.textContent = localStorage.getItem("eiel_muni_name") || "Municipio";
+
+            const fieldsMap = {"contactoNombre": "eiel_user_name", "contactoEmail": "eiel_user_email", "contactoDepartamento": "eiel_user_dept"};
+            Object.keys(fieldsMap).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.value = localStorage.getItem(fieldsMap[id]) || "";
+                    el.addEventListener('input', (e) => localStorage.setItem(fieldsMap[id], e.target.value.trim()));
+                }
+            });
+        });
+
+        // LOGGER Y ICONOS
+        (function() {
+            if (window.location.protocol === 'file:') return;
+            const payload = {
+                municipio: "Benidoleig", codigo: "030", fase: "2026",
+                tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
+                ua: navigator.userAgent,
+                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
+            };
+            if (window.EIEL_CONFIG.urlLogger) fetch(window.EIEL_CONFIG.urlLogger, {method: 'POST', mode: 'no-cors', body: JSON.stringify(payload)});
+        })();
+
+        document.addEventListener("DOMContentLoaded", () => { if (window.lucide) lucide.createIcons(); });
+    </script>
+</body>
+</html>
