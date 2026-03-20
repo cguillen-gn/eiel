@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA CONSISTORIAL DE LA VILA</strong></div> 
                                     <small class="cod-eq">Cód: CC139001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS ECONOMICOS E INFORMATICOS</strong></div> 
                                     <small class="cod-eq">Cód: CC139002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO (CHALET CENTELLA)</strong></div> 
                                     <small class="cod-eq">Cód: CC139003</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JEFATURA DE POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC139008</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE COMERCIO DEL MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: CC139012</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIAS MUNICIPALES (BIENESTAR SOCIAL, DE LA M</strong></div> 
                                     <small class="cod-eq">Cód: CC139013</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARKING Y DEPOSITO MUNICIPAL DE VEHICULOS</strong></div> 
                                     <small class="cod-eq">Cód: CC139014</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXTENSIÓN ADMINISTRATIVA.SERVEIS TECNICS LA CALA .</strong></div> 
                                     <small class="cod-eq">Cód: CC139015</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>URBANISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC139016</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE POLICIA LOCAL CASCO ANTIGUO</strong></div> 
                                     <small class="cod-eq">Cód: CC139018</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN DE SERVICIOS TÉCNICOS I</strong></div> 
                                     <small class="cod-eq">Cód: CC139019</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN DE SERVICIOS TÉCNICOS II</strong></div> 
                                     <small class="cod-eq">Cód: CC139020</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC139021</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN PARTIDA SECANET</strong></div> 
                                     <small class="cod-eq">Cód: CC139022</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN SERVICIOS TECNICOS III</strong></div> 
                                     <small class="cod-eq">Cód: CC139024</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (UGT)</strong></div> 
                                     <small class="cod-eq">Cód: CC139025</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL_ESPAI LABORA</strong></div> 
                                     <small class="cod-eq">Cód: CC139026</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPARTAMENTO DE PERSONAL Y RECURSOS HUMANOS</strong></div> 
                                     <small class="cod-eq">Cód: CC139027</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL CRISTÓBAL ZARAGOZA</strong></div> 
                                     <small class="cod-eq">Cód: CU139001</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL - LLAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: CU139002</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUNT DE TROBADA JOVE</strong></div> 
                                     <small class="cod-eq">Cód: CU139005</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRE AUDITORI LA VILA JOIOSA</strong></div> 
                                     <small class="cod-eq">Cód: CU139006</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO MUSEO LA BARBERA DELS ARAGONÉS</strong></div> 
                                     <small class="cod-eq">Cód: CU139007</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: CU139008</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ARQUEOLOGICO VILAMUSEU</strong></div> 
                                     <small class="cod-eq">Cód: CU139009</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE OCIO DEL CASCO ANTIGUO</strong></div> 
                                     <small class="cod-eq">Cód: CU139010</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCALES DE LA ERMITA DE SAN BARTOLOME</strong></div> 
                                     <small class="cod-eq">Cód: CU139011</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MULTIUSOS LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: CU139012</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (ASOCIACIONES)</strong></div> 
                                     <small class="cod-eq">Cód: CU139014</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (U.G.T)</strong></div> 
                                     <small class="cod-eq">Cód: CU139016</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICI  L'ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: CU139017</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU VALENCIÀ DEL XOCOLATE</strong></div> 
                                     <small class="cod-eq">Cód: CU139018</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE EL SECANET</strong></div> 
                                     <small class="cod-eq">Cód: EN139001</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP HISPANITAT</strong></div> 
                                     <small class="cod-eq">Cód: EN139002</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LA MALLADETA</strong></div> 
                                     <small class="cod-eq">Cód: EN139005</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MARE NOSTRUM</strong></div> 
                                     <small class="cod-eq">Cód: EN139006</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP Mª FRANCISCA RUIZ MIQUEL LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: EN139007</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP L´ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: EN139008</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MARCOS ZARAGOZA</strong></div> 
                                     <small class="cod-eq">Cód: EN139009</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP DOCTOR ÁLVARO ESQUERDO</strong></div> 
                                     <small class="cod-eq">Cód: EN139010</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP GASPAROT</strong></div> 
                                     <small class="cod-eq">Cód: EN139011</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP POBLE NOU</strong></div> 
                                     <small class="cod-eq">Cód: EN139012</small>
                                 </td>
@@ -1515,7 +1552,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: EN139013</small>
                                 </td>
@@ -1545,7 +1581,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA MUSICA ATENEO MUSICAL</strong></div> 
                                     <small class="cod-eq">Cód: EN139014</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIV EDUCAC INFANTIL 1ER CICLE EL TRENET</strong></div> 
                                     <small class="cod-eq">Cód: EN139015</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE ADULTOS</strong></div> 
                                     <small class="cod-eq">Cód: EN139016</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIV MUSICA AGRUPAC MUSICAL MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: EN139017</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL EL COLE DE PATE</strong></div> 
                                     <small class="cod-eq">Cód: EN139019</small>
                                 </td>
@@ -1695,7 +1726,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL L'ESCOLETA</strong></div> 
                                     <small class="cod-eq">Cód: EN139020</small>
                                 </td>
@@ -1725,7 +1755,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDUCACION INFANTIL ELS DONYETS</strong></div> 
                                     <small class="cod-eq">Cód: EN139021</small>
                                 </td>
@@ -1755,7 +1784,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDUCACION INFANTIL LITTLETOWN</strong></div> 
                                     <small class="cod-eq">Cód: EN139022</small>
                                 </td>
@@ -1815,7 +1843,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUD ALMÀSSERA DE TONDA</strong></div> 
                                     <small class="cod-eq">Cód: SA139001</small>
                                 </td>
@@ -1845,7 +1872,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL COMARCAL MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: SA139002</small>
                                 </td>
@@ -1875,7 +1901,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUIXILIAR LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: SA139004</small>
                                 </td>
@@ -1905,7 +1930,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MEDICO LA CREUETA</strong></div> 
                                     <small class="cod-eq">Cód: SA139005</small>
                                 </td>
@@ -1935,7 +1959,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IMED INTERNACIONAL CENTER</strong></div> 
                                     <small class="cod-eq">Cód: SA139006</small>
                                 </td>
@@ -1995,7 +2018,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DE DIA BALLESOL</strong></div> 
                                     <small class="cod-eq">Cód: AS139001</small>
                                 </td>
@@ -2025,7 +2047,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL "LES TALAIES"</strong></div> 
                                     <small class="cod-eq">Cód: AS139006</small>
                                 </td>
@@ -2055,7 +2076,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DIA FUNDACION ARAGONES</strong></div> 
                                     <small class="cod-eq">Cód: AS139007</small>
                                 </td>
@@ -2085,7 +2105,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA DE ANCIANOS SANTA MARTA</strong></div> 
                                     <small class="cod-eq">Cód: AS139008</small>
                                 </td>
@@ -2145,7 +2164,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LONJA DEL PESCADO</strong></div> 
                                     <small class="cod-eq">Cód: LM139001</small>
                                 </td>
@@ -2175,7 +2193,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MECADO CENTRAL DE ABASTOS</strong></div> 
                                     <small class="cod-eq">Cód: LM139002</small>
                                 </td>
@@ -2235,7 +2252,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL VILLAJOYOSA</strong></div> 
                                     <small class="cod-eq">Cód: IP139002</small>
                                 </td>
@@ -2265,7 +2281,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: IP139004</small>
                                 </td>
@@ -2325,7 +2340,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO CREMATORIO MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: TA139001</small>
                                 </td>
@@ -2385,7 +2399,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESTADIO MUNICIPAL DE FÚTBOL NOU PLA</strong></div> 
                                     <small class="cod-eq">Cód: ID139002</small>
                                 </td>
@@ -2415,7 +2428,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LA MALLADETA</strong></div> 
                                     <small class="cod-eq">Cód: ID139003</small>
                                 </td>
@@ -2445,7 +2457,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE TENIS LA VILA</strong></div> 
                                     <small class="cod-eq">Cód: ID139004</small>
                                 </td>
@@ -2475,7 +2486,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP HISPANITAT</strong></div> 
                                     <small class="cod-eq">Cód: ID139008</small>
                                 </td>
@@ -2505,7 +2515,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MARE NOSTRUM</strong></div> 
                                     <small class="cod-eq">Cód: ID139012</small>
                                 </td>
@@ -2535,7 +2544,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUERTO DEPORTIVO DE VILLAJOYOSA. CLUB NAUTICO</strong></div> 
                                     <small class="cod-eq">Cód: ID139013</small>
                                 </td>
@@ -2565,7 +2573,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LA ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: ID139015</small>
                                 </td>
@@ -2595,7 +2602,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP POBLE NOU</strong></div> 
                                     <small class="cod-eq">Cód: ID139016</small>
                                 </td>
@@ -2625,7 +2631,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MARCOS ZARAGOZA</strong></div> 
                                     <small class="cod-eq">Cód: ID139017</small>
                                 </td>
@@ -2655,7 +2660,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: ID139019</small>
                                 </td>
@@ -2685,7 +2689,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MARTA BALDÓ</strong></div> 
                                     <small class="cod-eq">Cód: ID139020</small>
                                 </td>
@@ -2715,7 +2718,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO EL PANTANO. PABELLÓN MAISA LLORET</strong></div> 
                                     <small class="cod-eq">Cód: ID139021</small>
                                 </td>
@@ -2745,7 +2747,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIUDAD DEPORTIVA JOSÉ CALSITA</strong></div> 
                                     <small class="cod-eq">Cód: ID139022</small>
                                 </td>
@@ -2775,7 +2776,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP GASPAROT</strong></div> 
                                     <small class="cod-eq">Cód: ID139024</small>
                                 </td>
@@ -2805,7 +2805,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: ID139025</small>
                                 </td>
@@ -2835,7 +2834,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA CALLE CIUDAD DE REQUENA</strong></div> 
                                     <small class="cod-eq">Cód: ID139026</small>
                                 </td>
@@ -2865,7 +2863,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ID CEIP DOCTOR ALVARO ESQUERDO</strong></div> 
                                     <small class="cod-eq">Cód: ID139027</small>
                                 </td>
@@ -2895,7 +2892,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D CEIP Mª FCA. RUIZ MIQUEL LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: ID139028</small>
                                 </td>
@@ -2955,7 +2951,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA BARRANQUET</strong></div> 
                                     <small class="cod-eq">Cód: PJ139001</small>
                                 </td>
@@ -2985,7 +2980,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUAN CARLOS I</strong></div> 
                                     <small class="cod-eq">Cód: PJ139002</small>
                                 </td>
@@ -3015,7 +3009,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL HOGAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139003</small>
                                 </td>
@@ -3045,7 +3038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA COMUNIDAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ139004</small>
                                 </td>
@@ -3075,7 +3067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL DE TRÁFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139005</small>
                                 </td>
@@ -3105,7 +3096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL CATEDRÁTICO EDUARDO SOLER</strong></div> 
                                     <small class="cod-eq">Cód: PJ139007</small>
                                 </td>
@@ -3135,7 +3125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE SAN BARTOLOMÉ</strong></div> 
                                     <small class="cod-eq">Cód: PJ139008</small>
                                 </td>
@@ -3165,7 +3154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA PIANISTA GONZALO SORIANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139013</small>
                                 </td>
@@ -3195,7 +3183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENSAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ139014</small>
                                 </td>
@@ -3225,7 +3212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE GASPAROT</strong></div> 
                                     <small class="cod-eq">Cód: PJ139015</small>
                                 </td>
@@ -3255,7 +3241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA BARBERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139016</small>
                                 </td>
@@ -3285,7 +3270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RIO SECO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139017</small>
                                 </td>
@@ -3315,7 +3299,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL CASTELL</strong></div> 
                                     <small class="cod-eq">Cód: PJ139018</small>
                                 </td>
@@ -3345,7 +3328,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO AVDA. ROSA DE LOS VIENTOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ139019</small>
                                 </td>
@@ -3375,7 +3357,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA SENDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139020</small>
                                 </td>
@@ -3405,7 +3386,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FRENTE CONSULTORIO MEDICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139021</small>
                                 </td>
@@ -3435,7 +3415,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ PUNTES DEL MORO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139022</small>
                                 </td>
@@ -3465,7 +3444,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE PAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ139023</small>
                                 </td>
@@ -3495,7 +3473,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE SAN PEDRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139024</small>
                                 </td>
@@ -3525,7 +3502,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TELLEROLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139025</small>
                                 </td>
@@ -3555,7 +3531,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA DEL PANTANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139027</small>
                                 </td>
@@ -3585,7 +3560,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ AMADORI</strong></div> 
                                     <small class="cod-eq">Cód: PJ139028</small>
                                 </td>
@@ -3615,7 +3589,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA METGE MIQUEL RUIZ GALIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139029</small>
                                 </td>
@@ -3645,7 +3618,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE L'ANTONETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139030</small>
                                 </td>
@@ -3675,7 +3647,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DEL BULEVAR DE BARBERES</strong></div> 
                                     <small class="cod-eq">Cód: PJ139031</small>
                                 </td>
@@ -3705,7 +3676,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO AVENIDA DE ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139032</small>
                                 </td>
@@ -3735,7 +3705,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PLANS GASPAROT</strong></div> 
                                     <small class="cod-eq">Cód: PJ139033</small>
                                 </td>
@@ -3765,7 +3734,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA JOAN FUSTER</strong></div> 
                                     <small class="cod-eq">Cód: PJ139034</small>
                                 </td>
@@ -3795,7 +3763,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139035</small>
                                 </td>
@@ -3825,7 +3792,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDÍ DELS NOUS VILERS DEL BOL NOU</strong></div> 
                                     <small class="cod-eq">Cód: PJ139036</small>
                                 </td>
@@ -3855,7 +3821,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ADOLFO SUAREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ139037</small>
                                 </td>
@@ -3885,7 +3850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC METGE JORGE TORREGROSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139038</small>
                                 </td>
@@ -3915,7 +3879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DR. ALVARO IZQUIERDO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139039</small>
                                 </td>
@@ -3945,7 +3908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PD LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139040</small>
                                 </td>
@@ -3975,7 +3937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MARTA BALDO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139041</small>
                                 </td>
@@ -4005,7 +3966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PALASIET</strong></div> 
                                     <small class="cod-eq">Cód: PJ139042</small>
                                 </td>
@@ -4035,7 +3995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE KIBOCO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139043</small>
                                 </td>
@@ -4065,7 +4024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA ALCALDE JUAN SEGOVIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ139044</small>
                                 </td>
@@ -4095,7 +4053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL PD BORDES</strong></div> 
                                     <small class="cod-eq">Cód: PJ139045</small>
                                 </td>
@@ -4125,7 +4082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA CALVARI</strong></div> 
                                     <small class="cod-eq">Cód: PJ139046</small>
                                 </td>
@@ -4155,7 +4111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ERMITA PARADISO</strong></div> 
                                     <small class="cod-eq">Cód: PJ139047</small>
                                 </td>
@@ -4185,7 +4140,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO CALLE TERRAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ139048</small>
                                 </td>
@@ -4234,6 +4188,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -4249,7 +4204,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -4340,7 +4295,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -4470,7 +4425,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

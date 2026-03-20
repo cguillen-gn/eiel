@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC070004</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC070012</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIOCULTURAL LOS PALACIOS</strong></div> 
                                     <small class="cod-eq">Cód: CC070013</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUA AULA DE FORMACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: CC070014</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA POLIVALENTE</strong></div> 
                                     <small class="cod-eq">Cód: CC070015</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN BRIGADA MANTENIMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC070016</small>
                                 </td>
@@ -405,7 +478,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIOCULTURAL 3ª EDAD SAN MIGUEL</strong></div> 
                                     <small class="cod-eq">Cód: CU070002</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU070006</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIOCULTURAL SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: CU070008</small>
                                 </td>
@@ -525,7 +595,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JUAN CARLOS I</strong></div> 
                                     <small class="cod-eq">Cód: EN070001</small>
                                 </td>
@@ -555,7 +624,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>E.I. PRIMER CICLO MUNICIPAL LOS DUENDES</strong></div> 
                                     <small class="cod-eq">Cód: EN070002</small>
                                 </td>
@@ -585,7 +653,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA PÚBLICA DE DANZA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN070003</small>
                                 </td>
@@ -645,7 +712,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR FORMENTERA SEGURA</strong></div> 
                                     <small class="cod-eq">Cód: SA070002</small>
                                 </td>
@@ -675,7 +741,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO LOCAL LOS PALACIOS</strong></div> 
                                     <small class="cod-eq">Cód: SA070003</small>
                                 </td>
@@ -735,7 +800,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA 3ª EDAD MEDITERRÁNEO</strong></div> 
                                     <small class="cod-eq">Cód: AS070001</small>
                                 </td>
@@ -801,7 +865,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JUAN CARLOS I</strong></div> 
                                     <small class="cod-eq">Cód: ID070001</small>
                                 </td>
@@ -831,7 +894,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO EL MOLINO</strong></div> 
                                     <small class="cod-eq">Cód: ID070002</small>
                                 </td>
@@ -861,7 +923,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA PALACIOS</strong></div> 
                                     <small class="cod-eq">Cód: ID070004</small>
                                 </td>
@@ -891,7 +952,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA PALACIOS</strong></div> 
                                     <small class="cod-eq">Cód: ID070005</small>
                                 </td>
@@ -921,7 +981,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA FINCAS DE LA VEGA</strong></div> 
                                     <small class="cod-eq">Cód: ID070006</small>
                                 </td>
@@ -951,7 +1010,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DEPORTIVO LA RAQUETA</strong></div> 
                                     <small class="cod-eq">Cód: ID070007</small>
                                 </td>
@@ -981,7 +1039,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCUITO PUMP TRACK</strong></div> 
                                     <small class="cod-eq">Cód: ID070008</small>
                                 </td>
@@ -1041,7 +1098,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ070002</small>
                                 </td>
@@ -1071,7 +1127,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO MALECÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ070003</small>
                                 </td>
@@ -1101,7 +1156,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARAJE NATURAL EL MOLINO</strong></div> 
                                     <small class="cod-eq">Cód: PJ070004</small>
                                 </td>
@@ -1131,7 +1185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DÑA. AURORA RUBÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ070005</small>
                                 </td>
@@ -1161,7 +1214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL SECANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ070007</small>
                                 </td>
@@ -1191,7 +1243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FINCAS DE LA VEGA I</strong></div> 
                                     <small class="cod-eq">Cód: PJ070008</small>
                                 </td>
@@ -1221,7 +1272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ070009</small>
                                 </td>
@@ -1251,7 +1301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA FORMENTEROS AUSENTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ070010</small>
                                 </td>
@@ -1281,7 +1330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA 3 DE ABRIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ070011</small>
                                 </td>
@@ -1311,7 +1359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DÑA. ISABEL MTEZ. TEMPRANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ070012</small>
                                 </td>
@@ -1341,7 +1388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA INFANTA LEONOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ070013</small>
                                 </td>
@@ -1371,7 +1417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA D. SABINO FERNÁNDEZ CAMPO</strong></div> 
                                     <small class="cod-eq">Cód: PJ070014</small>
                                 </td>
@@ -1401,7 +1446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FINCAS DE LA VEGA II</strong></div> 
                                     <small class="cod-eq">Cód: PJ070015</small>
                                 </td>
@@ -1431,7 +1475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FINCAS DE LA VEGA III</strong></div> 
                                     <small class="cod-eq">Cód: PJ070016</small>
                                 </td>
@@ -1461,7 +1504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA SEÑORITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ070017</small>
                                 </td>
@@ -1491,7 +1533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO COOOPERATIVA</strong></div> 
                                     <small class="cod-eq">Cód: PJ070018</small>
                                 </td>
@@ -1521,7 +1562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE POLIGONO INDUSTRIAL LOS NAZARIOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ070019</small>
                                 </td>
@@ -1570,6 +1610,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1585,7 +1626,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1676,7 +1717,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1806,7 +1847,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

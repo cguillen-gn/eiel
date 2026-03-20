@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS GENERALES DEL AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC083001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS MUNICIPALES CALLE MARCEL MIRA</strong></div> 
                                     <small class="cod-eq">Cód: CC083003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE XIXONA</strong></div> 
                                     <small class="cod-eq">Cód: CC083004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL AVENIDA DEL INSTITUTO</strong></div> 
                                     <small class="cod-eq">Cód: CC083008</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC083012</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL CARRER CORTS VALENCIANES</strong></div> 
                                     <small class="cod-eq">Cód: CC083013</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC083014</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU083001</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CINE DE DALT</strong></div> 
                                     <small class="cod-eq">Cód: CU083002</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE LA TERCERA EDAD</strong></div> 
                                     <small class="cod-eq">Cód: CU083003</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPACIO JOVEN CASA DE EL CUARNERO</strong></div> 
                                     <small class="cod-eq">Cód: CU083004</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL TURRÓN</strong></div> 
                                     <small class="cod-eq">Cód: CU083006</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA MUSICA</strong></div> 
                                     <small class="cod-eq">Cód: CU083007</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRET</strong></div> 
                                     <small class="cod-eq">Cód: CU083008</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL EN PLAÇA CONVENT</strong></div> 
                                     <small class="cod-eq">Cód: CU083009</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO PARQUE DEL BARRANC DE LA FONT</strong></div> 
                                     <small class="cod-eq">Cód: CU083010</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA ROVIRA-BIBLIOTECA FERNANDO GALIANA</strong></div> 
                                     <small class="cod-eq">Cód: CU083011</small>
                                 </td>
@@ -765,7 +827,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ELOY COLOMA</strong></div> 
                                     <small class="cod-eq">Cód: EN083001</small>
                                 </td>
@@ -795,7 +856,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SAGRADA FAMILIA</strong></div> 
                                     <small class="cod-eq">Cód: EN083002</small>
                                 </td>
@@ -825,7 +885,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CRISTÒFOL COLOM</strong></div> 
                                     <small class="cod-eq">Cód: EN083003</small>
                                 </td>
@@ -855,7 +914,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES DE XIXONA</strong></div> 
                                     <small class="cod-eq">Cód: EN083004</small>
                                 </td>
@@ -885,7 +943,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA MUNICIPAL DE EDUCACIÓN DE ADULTOS</strong></div> 
                                     <small class="cod-eq">Cód: EN083005</small>
                                 </td>
@@ -915,7 +972,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLO ANGELES CUSTODIOS</strong></div> 
                                     <small class="cod-eq">Cód: EN083006</small>
                                 </td>
@@ -975,7 +1031,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE XIXONA</strong></div> 
                                     <small class="cod-eq">Cód: SA083001</small>
                                 </td>
@@ -1035,7 +1090,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL</strong></div> 
                                     <small class="cod-eq">Cód: AS083001</small>
                                 </td>
@@ -1065,7 +1119,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN A.F.A Y CENTRO DE DÍA</strong></div> 
                                     <small class="cod-eq">Cód: AS083003</small>
                                 </td>
@@ -1127,7 +1180,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASETA DE VIGILANCIA FORESTAL</strong></div> 
                                     <small class="cod-eq">Cód: IP083003</small>
                                 </td>
@@ -1187,7 +1239,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GRUPO ASV SERVICIOS FUNERARIOS</strong></div> 
                                     <small class="cod-eq">Cód: TA083001</small>
                                 </td>
@@ -1247,7 +1298,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ELOY COLOMA</strong></div> 
                                     <small class="cod-eq">Cód: ID083001</small>
                                 </td>
@@ -1277,7 +1327,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE FÚTBOL SAN SEBASTIÁN</strong></div> 
                                     <small class="cod-eq">Cód: ID083003</small>
                                 </td>
@@ -1307,7 +1356,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL DE JIJONA</strong></div> 
                                     <small class="cod-eq">Cód: ID083004</small>
                                 </td>
@@ -1337,7 +1385,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CRISTÒFOL COLOM</strong></div> 
                                     <small class="cod-eq">Cód: ID083005</small>
                                 </td>
@@ -1367,7 +1414,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES DE XIXONA</strong></div> 
                                     <small class="cod-eq">Cód: ID083006</small>
                                 </td>
@@ -1397,7 +1443,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>L'ALMARX</strong></div> 
                                     <small class="cod-eq">Cód: ID083007</small>
                                 </td>
@@ -1427,7 +1472,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I. D. CEIP SAGRADA FAMILIA</strong></div> 
                                     <small class="cod-eq">Cód: ID083008</small>
                                 </td>
@@ -1457,7 +1501,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. PARQUE DE LA MANDOLA</strong></div> 
                                     <small class="cod-eq">Cód: ID083009</small>
                                 </td>
@@ -1517,7 +1560,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL CUARNERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ083004</small>
                                 </td>
@@ -1547,7 +1589,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BARRANC DE LA FONT</strong></div> 
                                     <small class="cod-eq">Cód: PJ083007</small>
                                 </td>
@@ -1577,7 +1618,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE DEL SAFAREIG</strong></div> 
                                     <small class="cod-eq">Cód: PJ083010</small>
                                 </td>
@@ -1607,7 +1647,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL POLIDEPORTIVO</strong></div> 
                                     <small class="cod-eq">Cód: PJ083013</small>
                                 </td>
@@ -1637,7 +1676,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE SAN ANTONIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ083018</small>
                                 </td>
@@ -1667,7 +1705,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ROGER DE LLÚRIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ083019</small>
                                 </td>
@@ -1697,7 +1734,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DE SAN SEBASTIÁN</strong></div> 
                                     <small class="cod-eq">Cód: PJ083021</small>
                                 </td>
@@ -1727,7 +1763,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL BETLEMET</strong></div> 
                                     <small class="cod-eq">Cód: PJ083022</small>
                                 </td>
@@ -1757,7 +1792,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXPLANADA DEL CASTILLO</strong></div> 
                                     <small class="cod-eq">Cód: PJ083023</small>
                                 </td>
@@ -1787,7 +1821,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE L'ALMARX</strong></div> 
                                     <small class="cod-eq">Cód: PJ083024</small>
                                 </td>
@@ -1817,7 +1850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JUNTO C.E.I.P. CRISTÒFOL COLOM</strong></div> 
                                     <small class="cod-eq">Cód: PJ083025</small>
                                 </td>
@@ -1847,7 +1879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ JOAN FUSTER</strong></div> 
                                     <small class="cod-eq">Cód: PJ083026</small>
                                 </td>
@@ -1877,7 +1908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CAMI DEL SAFAREIG</strong></div> 
                                     <small class="cod-eq">Cód: PJ083027</small>
                                 </td>
@@ -1907,7 +1937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR PUERTO DE LA CARRASQUETA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ083028</small>
                                 </td>
@@ -1937,7 +1966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PUENTE DE ALCOY</strong></div> 
                                     <small class="cod-eq">Cód: PJ083029</small>
                                 </td>
@@ -1967,7 +1995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE L. J. RICARD AYELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ083030</small>
                                 </td>
@@ -1997,7 +2024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA MANDOLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ083031</small>
                                 </td>
@@ -2027,7 +2053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE TRAVESSIA FONT D'ALECUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ083032</small>
                                 </td>
@@ -2057,7 +2082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL TRAVESSIA FONT DE NUTXES</strong></div> 
                                     <small class="cod-eq">Cód: PJ083033</small>
                                 </td>
@@ -2087,7 +2111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CARRER NOU</strong></div> 
                                     <small class="cod-eq">Cód: PJ083034</small>
                                 </td>
@@ -2136,6 +2159,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2151,7 +2175,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2242,7 +2266,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2372,7 +2396,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

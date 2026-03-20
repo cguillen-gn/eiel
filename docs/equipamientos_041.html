@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: CC041001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA TECNICA DEL AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC041002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CREAMA</strong></div> 
                                     <small class="cod-eq">Cód: CC041004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL EDIFICIO MIRADOR</strong></div> 
                                     <small class="cod-eq">Cód: CC041005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN Y COCHERAS MUNICIPALES COSTERA DEL POBIL</strong></div> 
                                     <small class="cod-eq">Cód: CC041006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO ADMINISTRATIVO COSTERA DEL POBIL</strong></div> 
                                     <small class="cod-eq">Cód: CC041007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TURISMO I , ASOCIACION AMAS CASA Y MOROS Y CRISTIA</strong></div> 
                                     <small class="cod-eq">Cód: CC041009</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACION Y TURISMO DE LA COSTA</strong></div> 
                                     <small class="cod-eq">Cód: CC041010</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DEL POU D'AVALL</strong></div> 
                                     <small class="cod-eq">Cód: CC041011</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE SANTA ANA</strong></div> 
                                     <small class="cod-eq">Cód: CC041012</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO D'ORXELLES</strong></div> 
                                     <small class="cod-eq">Cód: CC041013</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE NUSOLS</strong></div> 
                                     <small class="cod-eq">Cód: CC041014</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL PLAYA</strong></div> 
                                     <small class="cod-eq">Cód: CC041015</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC Y OAC</strong></div> 
                                     <small class="cod-eq">Cód: CC041016</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC041017</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUZGADO DE PAZ. REGISTRO CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: CC041018</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE ATENCION AL EXTRANJERO</strong></div> 
                                     <small class="cod-eq">Cód: CC041019</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: CC041020</small>
                                 </td>
@@ -735,7 +796,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE DE LOS PADRES FRANCISCANOS</strong></div> 
                                     <small class="cod-eq">Cód: CC041021</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL CASA DE JUAN VIVES</strong></div> 
                                     <small class="cod-eq">Cód: CU041001</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL DELS JOVES</strong></div> 
                                     <small class="cod-eq">Cód: CU041002</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO HISTORICO EN CARRER PURISSIMA</strong></div> 
                                     <small class="cod-eq">Cód: CU041004</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL BERNIA</strong></div> 
                                     <small class="cod-eq">Cód: CU041005</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEU UNIVERSITARIA DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: CU041012</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE ARTE TALLER D'IVARS</strong></div> 
                                     <small class="cod-eq">Cód: CU041014</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPAI CULTURAL LES CASES DEL BATLE</strong></div> 
                                     <small class="cod-eq">Cód: CU041016</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA  DE NUEVAS TECNOLOGIAS.</strong></div> 
                                     <small class="cod-eq">Cód: CU041017</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUAS ESCUELAS DE PEDRALAMA</strong></div> 
                                     <small class="cod-eq">Cód: CU041018</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANEXO A LA ERMITA DE LLEUS</strong></div> 
                                     <small class="cod-eq">Cód: CU041019</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANEXO A  LA ERMITA DE PINOS</strong></div> 
                                     <small class="cod-eq">Cód: CU041020</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MULTIUSOS AULA DE LA MAR</strong></div> 
                                     <small class="cod-eq">Cód: CU041021</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL DE ASSOCIACIONS Y  F.P.A</strong></div> 
                                     <small class="cod-eq">Cód: CU041022</small>
                                 </td>
@@ -1185,7 +1232,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA MUSEU DELS ABARGUES</strong></div> 
                                     <small class="cod-eq">Cód: CU041023</small>
                                 </td>
@@ -1215,7 +1261,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA DEL CONSELL</strong></div> 
                                     <small class="cod-eq">Cód: CU041024</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MANUEL BRU</strong></div> 
                                     <small class="cod-eq">Cód: EN041001</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PADRE MELCHOR</strong></div> 
                                     <small class="cod-eq">Cód: EN041002</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES JOSEP IBORRA</strong></div> 
                                     <small class="cod-eq">Cód: EN041003</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE EDUCACIO INFANTIL LA PURISIMA</strong></div> 
                                     <small class="cod-eq">Cód: EN041004</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PUBLICA MUSICA I DANSA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN041005</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A MUNICIPAL BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: EN041006</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PADRE MELCHOR (INFANTIL)</strong></div> 
                                     <small class="cod-eq">Cód: EN041007</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE GARGASINDI</strong></div> 
                                     <small class="cod-eq">Cód: EN041008</small>
                                 </td>
@@ -1545,7 +1582,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: SA041001</small>
                                 </td>
@@ -1575,7 +1611,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE TEMP. LA FUSTERA</strong></div> 
                                     <small class="cod-eq">Cód: SA041002</small>
                                 </td>
@@ -1635,7 +1670,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUDACIÓN NTRA SRA DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: AS041001</small>
                                 </td>
@@ -1665,7 +1699,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GUARDERIA INFANTIL BAMBI EVOLUTION</strong></div> 
                                     <small class="cod-eq">Cód: AS041003</small>
                                 </td>
@@ -1695,7 +1728,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE MUNICIPAL PARTIDA PINÓS</strong></div> 
                                     <small class="cod-eq">Cód: AS041005</small>
                                 </td>
@@ -1755,7 +1787,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: LM041001</small>
                                 </td>
@@ -1815,7 +1846,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BOMBEROS BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: IP041001</small>
                                 </td>
@@ -1845,7 +1875,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCIÓN CIVIL BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: IP041002</small>
                                 </td>
@@ -1875,7 +1904,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC D'EMERGÈNCIES</strong></div> 
                                     <small class="cod-eq">Cód: IP041003</small>
                                 </td>
@@ -1905,7 +1933,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALVAMENTO FUSTERA</strong></div> 
                                     <small class="cod-eq">Cód: IP041004</small>
                                 </td>
@@ -1965,7 +1992,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO-CREMATORIO DE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: TA041001</small>
                                 </td>
@@ -1995,7 +2021,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO HERMANOS FEMENÍA-PINEDA</strong></div> 
                                     <small class="cod-eq">Cód: TA041002</small>
                                 </td>
@@ -2055,7 +2080,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE FÚTBOL LA COSTA</strong></div> 
                                     <small class="cod-eq">Cód: ID041001</small>
                                 </td>
@@ -2085,7 +2109,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALAU SANT PERE</strong></div> 
                                     <small class="cod-eq">Cód: ID041002</small>
                                 </td>
@@ -2115,7 +2138,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE TENIS Y PISCINA EL COLLAO</strong></div> 
                                     <small class="cod-eq">Cód: ID041003</small>
                                 </td>
@@ -2145,7 +2167,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE GOLF IFACH</strong></div> 
                                     <small class="cod-eq">Cód: ID041004</small>
                                 </td>
@@ -2175,7 +2196,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE HIPICA BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: ID041005</small>
                                 </td>
@@ -2205,7 +2225,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB NAUTICO LES BASSETES</strong></div> 
                                     <small class="cod-eq">Cód: ID041006</small>
                                 </td>
@@ -2235,7 +2254,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TRINQUET</strong></div> 
                                     <small class="cod-eq">Cód: ID041007</small>
                                 </td>
@@ -2265,7 +2283,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. MANUEL BRU</strong></div> 
                                     <small class="cod-eq">Cód: ID041008</small>
                                 </td>
@@ -2295,7 +2312,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP PADRE MELCHOR</strong></div> 
                                     <small class="cod-eq">Cód: ID041009</small>
                                 </td>
@@ -2325,7 +2341,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES JOSEP IBORRA</strong></div> 
                                     <small class="cod-eq">Cód: ID041010</small>
                                 </td>
@@ -2355,7 +2370,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA MUNICIPAL LA COSTA</strong></div> 
                                     <small class="cod-eq">Cód: ID041011</small>
                                 </td>
@@ -2385,7 +2399,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DE ATLETISMO</strong></div> 
                                     <small class="cod-eq">Cód: ID041012</small>
                                 </td>
@@ -2415,7 +2428,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE TENIS BONAVISTA</strong></div> 
                                     <small class="cod-eq">Cód: ID041013</small>
                                 </td>
@@ -2445,7 +2457,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DE PÁDEL</strong></div> 
                                     <small class="cod-eq">Cód: ID041014</small>
                                 </td>
@@ -2475,7 +2486,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA LA CAPELLA</strong></div> 
                                     <small class="cod-eq">Cód: ID041015</small>
                                 </td>
@@ -2505,7 +2515,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MINI ESTADI SALVADOR BAIDAL</strong></div> 
                                     <small class="cod-eq">Cód: ID041016</small>
                                 </td>
@@ -2535,7 +2544,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DEPORTIVAS EN CAMINO BENIVER</strong></div> 
                                     <small class="cod-eq">Cód: ID041017</small>
                                 </td>
@@ -2565,7 +2573,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ROCODROMO MUNICIPAL BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: ID041018</small>
                                 </td>
@@ -2625,7 +2632,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DOLORES PIERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041001</small>
                                 </td>
@@ -2655,7 +2661,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE FANADIX</strong></div> 
                                     <small class="cod-eq">Cód: PJ041002</small>
                                 </td>
@@ -2685,7 +2690,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA DE DORA HAUT I HANS KEISER</strong></div> 
                                     <small class="cod-eq">Cód: PJ041005</small>
                                 </td>
@@ -2715,7 +2719,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CONVENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ041006</small>
                                 </td>
@@ -2745,7 +2748,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC CAPELLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041007</small>
                                 </td>
@@ -2775,7 +2777,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DEL RECTOR SALVADOR FUSTER</strong></div> 
                                     <small class="cod-eq">Cód: PJ041008</small>
                                 </td>
@@ -2805,7 +2806,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GERMANS IVARS</strong></div> 
                                     <small class="cod-eq">Cód: PJ041009</small>
                                 </td>
@@ -2835,7 +2835,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>9 DE OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: PJ041010</small>
                                 </td>
@@ -2865,7 +2864,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COMARE ANGELINA ORTOLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041012</small>
                                 </td>
@@ -2895,7 +2893,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA DE L'ESGLESIA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041013</small>
                                 </td>
@@ -2925,7 +2922,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMÌ CANOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ041014</small>
                                 </td>
@@ -2955,7 +2951,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC BELLITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041015</small>
                                 </td>
@@ -2985,7 +2980,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALTAMIRA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041017</small>
                                 </td>
@@ -3015,7 +3009,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RACÒ DE GALENO</strong></div> 
                                     <small class="cod-eq">Cód: PJ041018</small>
                                 </td>
@@ -3045,7 +3038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA FUSTERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041019</small>
                                 </td>
@@ -3075,7 +3067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA LLOBELLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041020</small>
                                 </td>
@@ -3105,7 +3096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MAGRANER</strong></div> 
                                     <small class="cod-eq">Cód: PJ041021</small>
                                 </td>
@@ -3135,7 +3125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOS ALMENDROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ041022</small>
                                 </td>
@@ -3165,7 +3154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BALADRAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ041023</small>
                                 </td>
@@ -3195,7 +3183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MONTEMAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ041024</small>
                                 </td>
@@ -3225,7 +3212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO Y ZONA RECREATIVA BASSETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ041025</small>
                                 </td>
@@ -3255,7 +3241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL CENTRO DE SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ041026</small>
                                 </td>
@@ -3285,7 +3270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA REY JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: PJ041027</small>
                                 </td>
@@ -3315,7 +3299,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: PJ041028</small>
                                 </td>
@@ -3345,7 +3328,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DELS INTERNACIONALS</strong></div> 
                                     <small class="cod-eq">Cód: PJ041029</small>
                                 </td>
@@ -3375,7 +3357,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC MARIA IBARS</strong></div> 
                                     <small class="cod-eq">Cód: PJ041030</small>
                                 </td>
@@ -3405,7 +3386,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE CASTELLÓ DE LA PLANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041031</small>
                                 </td>
@@ -3435,7 +3415,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE BENZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ041032</small>
                                 </td>
@@ -3465,7 +3444,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR DELS MOLINS</strong></div> 
                                     <small class="cod-eq">Cód: PJ041033</small>
                                 </td>
@@ -3495,7 +3473,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA BENIVER</strong></div> 
                                     <small class="cod-eq">Cód: PJ041034</small>
                                 </td>
@@ -3525,7 +3502,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA CIUDAD DEPORTIVA</strong></div> 
                                     <small class="cod-eq">Cód: PJ041035</small>
                                 </td>
@@ -3574,6 +3550,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -3589,7 +3566,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -3680,7 +3657,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -3810,7 +3787,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

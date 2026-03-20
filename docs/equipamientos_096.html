@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: CC096001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN BRIGADA OBRAS II</strong></div> 
                                     <small class="cod-eq">Cód: CC096008</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC096011</small>
                                 </td>
@@ -315,7 +391,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL ONIL</strong></div> 
                                     <small class="cod-eq">Cód: CU096001</small>
                                 </td>
@@ -345,7 +420,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL POLIVALENTE</strong></div> 
                                     <small class="cod-eq">Cód: CU096003</small>
                                 </td>
@@ -375,7 +449,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA MUSEO DE LAS MUÑECAS</strong></div> 
                                     <small class="cod-eq">Cód: CU096005</small>
                                 </td>
@@ -405,7 +478,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALACIO FORTALEZA MARQUÉS DE DOS AGUAS</strong></div> 
                                     <small class="cod-eq">Cód: CU096007</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL ACEITE DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: CU096008</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EL POUET</strong></div> 
                                     <small class="cod-eq">Cód: CU096009</small>
                                 </td>
@@ -525,7 +595,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO EL BARRANQUET</strong></div> 
                                     <small class="cod-eq">Cód: EN096001</small>
                                 </td>
@@ -555,7 +624,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MARE DE DÉU DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: EN096002</small>
                                 </td>
@@ -585,7 +653,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: EN096003</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LA CREUETA</strong></div> 
                                     <small class="cod-eq">Cód: EN096004</small>
                                 </td>
@@ -645,7 +711,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA Y DANSA CIMO</strong></div> 
                                     <small class="cod-eq">Cód: EN096007</small>
                                 </td>
@@ -675,7 +740,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PÚBLICA DE MÚSICA I DANSA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN096008</small>
                                 </td>
@@ -735,7 +799,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: SA096001</small>
                                 </td>
@@ -795,7 +858,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DE DIA P.M.D. DE ONI</strong></div> 
                                     <small class="cod-eq">Cód: AS096002</small>
                                 </td>
@@ -825,7 +887,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE SERVICIOS SOCIALES Y ASOCIACIÓN LUZ</strong></div> 
                                     <small class="cod-eq">Cód: AS096003</small>
                                 </td>
@@ -855,7 +916,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ATENCIÓN TEMPRANA INFANTA ELENA</strong></div> 
                                     <small class="cod-eq">Cód: AS096004</small>
                                 </td>
@@ -917,7 +977,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE EMERGENCIAS EMILIO ABARGUES</strong></div> 
                                     <small class="cod-eq">Cód: IP096001</small>
                                 </td>
@@ -979,7 +1038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: ID096001</small>
                                 </td>
@@ -1009,7 +1067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: ID096002</small>
                                 </td>
@@ -1039,7 +1096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO MUNICIPAL DE FÚTBOL</strong></div> 
                                     <small class="cod-eq">Cód: ID096003</small>
                                 </td>
@@ -1069,7 +1125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: ID096004</small>
                                 </td>
@@ -1099,7 +1154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: ID096005</small>
                                 </td>
@@ -1129,7 +1183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LA CREUETA</strong></div> 
                                     <small class="cod-eq">Cód: ID096006</small>
                                 </td>
@@ -1159,7 +1212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FRONTÓN Y ROCODROMO</strong></div> 
                                     <small class="cod-eq">Cód: ID096007</small>
                                 </td>
@@ -1189,7 +1241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCUITO RADIO CONTROL ONIL</strong></div> 
                                     <small class="cod-eq">Cód: ID096008</small>
                                 </td>
@@ -1249,7 +1300,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC COTO ESCOLAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ096001</small>
                                 </td>
@@ -1279,7 +1329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ERMITA VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ096002</small>
                                 </td>
@@ -1309,7 +1358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA SANTA ANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096003</small>
                                 </td>
@@ -1339,7 +1387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BALCÓ DE LA FOIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096004</small>
                                 </td>
@@ -1369,7 +1416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FELIX RODRÍGUEZ DE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ096006</small>
                                 </td>
@@ -1399,7 +1445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LABERINTO CASA TAPENA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096007</small>
                                 </td>
@@ -1429,7 +1474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BOTÀNIC CABANILLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ096008</small>
                                 </td>
@@ -1459,7 +1503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE REYES MAGOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ096009</small>
                                 </td>
@@ -1489,7 +1532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA CREUETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096010</small>
                                 </td>
@@ -1519,7 +1561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BUENAVISTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096011</small>
                                 </td>
@@ -1549,7 +1590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDINES COLEGIO SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: PJ096012</small>
                                 </td>
@@ -1579,7 +1619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDÍN PLAZA DEL CONVENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ096013</small>
                                 </td>
@@ -1609,7 +1648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LAS ACACIAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ096015</small>
                                 </td>
@@ -1639,7 +1677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE TRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ096016</small>
                                 </td>
@@ -1669,7 +1706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096017</small>
                                 </td>
@@ -1699,7 +1735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA TÁPENA</strong></div> 
                                     <small class="cod-eq">Cód: PJ096018</small>
                                 </td>
@@ -1729,7 +1764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CALLE OLMOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ096019</small>
                                 </td>
@@ -1759,7 +1793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INTERIOR CALLE JOAQUIN BLUME</strong></div> 
                                     <small class="cod-eq">Cód: PJ096020</small>
                                 </td>
@@ -1789,7 +1822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEPORTISTAS OLIMPICOS DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ096021</small>
                                 </td>
@@ -1819,7 +1851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE DOCTOR ESQUERDO</strong></div> 
                                     <small class="cod-eq">Cód: PJ096022</small>
                                 </td>
@@ -1849,7 +1880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE RAMON SEMPERE QUILIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ096023</small>
                                 </td>
@@ -1879,7 +1909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇETA DEL CENTRO CULTURAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ096024</small>
                                 </td>
@@ -1909,7 +1938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE APD-8</strong></div> 
                                     <small class="cod-eq">Cód: PJ096025</small>
                                 </td>
@@ -1958,6 +1986,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1973,7 +2002,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2064,7 +2093,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2194,7 +2223,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

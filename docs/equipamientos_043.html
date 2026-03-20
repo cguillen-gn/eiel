@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA CONSISTORIAL DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: CC043001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA TECNICA</strong></div> 
                                     <small class="cod-eq">Cód: CC043002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUO MATADERO</strong></div> 
                                     <small class="cod-eq">Cód: CC043005</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO</strong></div> 
                                     <small class="cod-eq">Cód: CC043006</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL I</strong></div> 
                                     <small class="cod-eq">Cód: CC043007</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL II</strong></div> 
                                     <small class="cod-eq">Cód: CC043008</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE POLICIA LOCAL BIAR</strong></div> 
                                     <small class="cod-eq">Cód: CC043009</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL CALLE SANTO TOMÁS</strong></div> 
                                     <small class="cod-eq">Cód: CC043010</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO JUVENIL Y ASOCIACIONES</strong></div> 
                                     <small class="cod-eq">Cód: CU043001</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA. SEDE UNIVERSITARIA</strong></div> 
                                     <small class="cod-eq">Cód: CU043002</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ETNOGRÁFICO MIGUEL MAESTRE CASTELL</strong></div> 
                                     <small class="cod-eq">Cód: CU043003</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU043004</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTILLO DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: CU043005</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DE SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: CU043006</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DE LORETO</strong></div> 
                                     <small class="cod-eq">Cód: CU043007</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DE SANTA LUCÍA</strong></div> 
                                     <small class="cod-eq">Cód: CU043008</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DE EL ROSER Y SAN RAMÓN</strong></div> 
                                     <small class="cod-eq">Cód: CU043009</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA SANTOS DE LA PIEDRA</strong></div> 
                                     <small class="cod-eq">Cód: CU043010</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POU DE LA NEU</strong></div> 
                                     <small class="cod-eq">Cód: CU043011</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE JOVE</strong></div> 
                                     <small class="cod-eq">Cód: CU043012</small>
                                 </td>
@@ -855,7 +914,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP NUESTRA SEÑORA DE GRACIA I</strong></div> 
                                     <small class="cod-eq">Cód: EN043001</small>
                                 </td>
@@ -885,7 +943,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP NUESTRA SEÑORA DE GRACIA II</strong></div> 
                                     <small class="cod-eq">Cód: EN043002</small>
                                 </td>
@@ -915,7 +972,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: EN043003</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE FPA MUNICIPAL DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: EN043004</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA DE LA SOCIETAT UNIO MUSIC</strong></div> 
                                     <small class="cod-eq">Cód: EN043005</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN043007</small>
                                 </td>
@@ -1065,7 +1118,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: SA043001</small>
                                 </td>
@@ -1129,7 +1181,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCIÓN CIVIL BIAR</strong></div> 
                                     <small class="cod-eq">Cód: IP043001</small>
                                 </td>
@@ -1159,7 +1210,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CREU ROJA ESPANYOLA</strong></div> 
                                     <small class="cod-eq">Cód: IP043002</small>
                                 </td>
@@ -1221,7 +1271,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: ID043001</small>
                                 </td>
@@ -1251,7 +1300,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP NUESTRA SEÑORA DE GRACIA I</strong></div> 
                                     <small class="cod-eq">Cód: ID043002</small>
                                 </td>
@@ -1281,7 +1329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP NUESTRA SEÑORA DE GRACIA II</strong></div> 
                                     <small class="cod-eq">Cód: ID043003</small>
                                 </td>
@@ -1311,7 +1358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES DE BIAR</strong></div> 
                                     <small class="cod-eq">Cód: ID043004</small>
                                 </td>
@@ -1341,7 +1387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA CAMINO DE LA VIRGEN</strong></div> 
                                     <small class="cod-eq">Cód: ID043005</small>
                                 </td>
@@ -1401,7 +1446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL PLATANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ043001</small>
                                 </td>
@@ -1431,7 +1475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIRGEN DE GRACIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ043004</small>
                                 </td>
@@ -1461,7 +1504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COVA NEGRA</strong></div> 
                                     <small class="cod-eq">Cód: PJ043005</small>
                                 </td>
@@ -1491,7 +1533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BUENOS AIRES-LOMAS DE JARA</strong></div> 
                                     <small class="cod-eq">Cód: PJ043008</small>
                                 </td>
@@ -1521,7 +1562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CONVENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ043009</small>
                                 </td>
@@ -1551,7 +1591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BOTÁNICO CAVANILLAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ043010</small>
                                 </td>
@@ -1581,7 +1620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUENTE DE LA PEROLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ043011</small>
                                 </td>
@@ -1611,7 +1649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL  LAVADERO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ043012</small>
                                 </td>
@@ -1641,7 +1678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ043013</small>
                                 </td>
@@ -1671,7 +1707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANIZACIÓN EL FIGUERAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ043014</small>
                                 </td>
@@ -1701,7 +1736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SANTA ANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ043015</small>
                                 </td>
@@ -1750,6 +1784,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1765,7 +1800,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1856,7 +1891,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1986,7 +2021,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

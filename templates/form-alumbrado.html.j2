@@ -40,7 +40,6 @@
                     {% endif %}
                 </div>
                 
-                {# CONTENEDOR BLANCO DE RESPUESTA (OCUPA EL 100%) #}
                 <div style="margin-left: 28px; background: white; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0; box-sizing: border-box; width: calc(100% - 28px);">
                     <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="3" 
                               placeholder="Responda o aclare este punto aquí..." 
@@ -59,12 +58,14 @@
     </div>
     {% endif %}
 
-    {# 4. COMPONENTES GLOBALES (Macros)#}
+    {# 4. COMPONENTES GLOBALES #}
     {{ ui.campo_observaciones() }}
     {{ ui.zona_adjuntos() }}
     {{ ui.campo_contacto() }}
     {{ ui.declaracion_veracidad() }}
 </form>
+
+{{ ui.barra_fija_envio() }}
 {% endblock %}
 
 {% block scripts %}
@@ -98,10 +99,47 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // C. Lógica de Envío (Delegada a UploadService de la Base)
+    //  LÓGICA DE AUTOGUARDADO Y RECUPERACIÓN
+    
+    // 1. Activar escuchadores para guardar automáticamente ante cualquier cambio
+    const form = document.getElementById('formAlumbrado'); // Asegúrate que el ID coincida
+    if (form) {
+        form.addEventListener('input', () => AutoSave.save());
+        form.addEventListener('change', () => AutoSave.save());
+    }
+
+    // 2. Al cargar, comprobar si existe un borrador previo en este navegador
+    if (localStorage.getItem(AutoSave.getStorageKey())) {
+        Swal.fire({
+            title: '¿Continuar trabajo anterior?',
+            text: 'Hemos encontrado datos sin enviar de su última sesión en este equipo.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, recuperar',
+            cancelButtonText: 'No, empezar de cero',
+            confirmButtonColor: 'var(--primary)',
+            cancelButtonColor: '#94a3b8'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                AutoSave.restore(); // Recupera los datos
+            } else {
+                AutoSave.clear();   // Borra el borrador para empezar limpio
+            }
+        });
+    }
+
+    // C. Lógica de Envío (Sincronizada con la Barra Fija)
     const btnEnviar = document.getElementById("btnEnviar");
+    const btnBarra = document.getElementById("btnEnviarBarra"); // Botón de la barra fija inferior
     const checkConf = document.getElementById("checkConformidad");
-    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+    
+    if (checkConf) {
+        checkConf.addEventListener('change', () => {
+            const isChecked = checkConf.checked;
+            btnEnviar.disabled = !isChecked;
+            if (btnBarra) btnBarra.disabled = !isChecked; // Habilita/Deshabilita ambos botones
+        });
+    }
 
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "ALUMBRADO_" + Date.now();
@@ -121,7 +159,6 @@ document.addEventListener("DOMContentLoaded", () => {
         UIProgress.show(listaTareas.length);
 
         try {
-            // Subida mediante el motor de base.html.j2
             await UploadService.uploadFiles(listaTareas, 'ALUMBRADO', window.EIEL_CONFIG.muniCode, idBatch, 1);
 
             UIProgress.update(listaTareas.length, listaTareas.length, "Generando PDF...");
@@ -141,6 +178,10 @@ document.addEventListener("DOMContentLoaded", () => {
             };
 
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            
+            // IMPORTANTE: Limpiar el autoguardado una vez el envío ha sido exitoso
+            AutoSave.clear();
+            
             UIProgress.complete();
         } catch (error) {
             console.error(error);

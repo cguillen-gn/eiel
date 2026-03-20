@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT L'ALFAS DEL PI</strong></div> 
                                     <small class="cod-eq">Cód: CC011002</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL DE VIAS Y OBRAS</strong></div> 
                                     <small class="cod-eq">Cód: CC011006</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC011007</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CC011010</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS MUNICIPALES (ASOCIACIÓN VOLUNTARIADO)</strong></div> 
                                     <small class="cod-eq">Cód: CC011012</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUZGADO DE PAZ. VOLUNTARIADO.</strong></div> 
                                     <small class="cod-eq">Cód: CC011014</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TOURIST INFO ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: CC011015</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS MUNICIPALES L'ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: CC011016</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE SERVICIOS SOCIALES Y OFICINA AMICS</strong></div> 
                                     <small class="cod-eq">Cód: CC011018</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL(ASOCIACIÓN DE AMAS DE CASA)</strong></div> 
                                     <small class="cod-eq">Cód: CC011019</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVEIS TECNICS</strong></div> 
                                     <small class="cod-eq">Cód: CC011020</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA CULTURA DE ALFAZ DEL PI</strong></div> 
                                     <small class="cod-eq">Cód: CU011001</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU PEDRO DELSO</strong></div> 
                                     <small class="cod-eq">Cód: CU011002</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: CU011003</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL,FORMATIVO Y DE OCIO DEL AL</strong></div> 
                                     <small class="cod-eq">Cód: CU011006</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO VILLA ROMANA</strong></div> 
                                     <small class="cod-eq">Cód: CU011007</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE INTERPRETACIÓN FARO DE L'ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: CU011008</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL NORUEGO</strong></div> 
                                     <small class="cod-eq">Cód: CU011010</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO EDUCACIÓN AMBIENTAL LOS CARABINER</strong></div> 
                                     <small class="cod-eq">Cód: CU011011</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPACI CULTURAL ESCOLES VELLES TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CU011012</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO L'ALFÀS AMB HISTÒRIA</strong></div> 
                                     <small class="cod-eq">Cód: CU011013</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO INTERPRETACIÓN LOS CARRASCOS</strong></div> 
                                     <small class="cod-eq">Cód: CU011014</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MOLÍ DE MÀNEC</strong></div> 
                                     <small class="cod-eq">Cód: CU011015</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANTISIMO CRISTO DEL BUEN ACIERTO</strong></div> 
                                     <small class="cod-eq">Cód: EN011001</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SIERRA BERNIA SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: EN011002</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP RACÓ DE L'ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: EN011003</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES L'ARABI</strong></div> 
                                     <small class="cod-eq">Cód: EN011004</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA NORUEGA COSTABLANCA</strong></div> 
                                     <small class="cod-eq">Cód: EN011005</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VELES E VENTS</strong></div> 
                                     <small class="cod-eq">Cód: EN011006</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEN NORSKE SKOLEN ALBIR COLEGIO NORUEGO</strong></div> 
                                     <small class="cod-eq">Cód: EN011007</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA DE MUSICA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN011008</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDUCACION INFANTIL PECES DE COLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN011009</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDUCACIN INFANTIL EL NANO</strong></div> 
                                     <small class="cod-eq">Cód: EN011010</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DOCENT PRIVAT ESTRANGER ALTEA INTERNATIONAL</strong></div> 
                                     <small class="cod-eq">Cód: EN011011</small>
                                 </td>
@@ -1305,7 +1350,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE ALFAZ DEL PI</strong></div> 
                                     <small class="cod-eq">Cód: SA011001</small>
                                 </td>
@@ -1335,7 +1379,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR ALFAZ DEL PI ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: SA011003</small>
                                 </td>
@@ -1395,7 +1438,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA MAYORES DEPENDIENTES  ANEKE</strong></div> 
                                     <small class="cod-eq">Cód: AS011003</small>
                                 </td>
@@ -1425,7 +1467,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE FORMACIÓ OCUPACIONAL DE L'ALFA</strong></div> 
                                     <small class="cod-eq">Cód: AS011007</small>
                                 </td>
@@ -1487,7 +1528,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP011001</small>
                                 </td>
@@ -1549,7 +1589,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL ALFAZ DEL PÍ. PABELLÓN PAU</strong></div> 
                                     <small class="cod-eq">Cód: ID011001</small>
                                 </td>
@@ -1579,7 +1618,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANTISIMO CRISTO DEL BUEN ACIERTO</strong></div> 
                                     <small class="cod-eq">Cód: ID011002</small>
                                 </td>
@@ -1609,7 +1647,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE GOLF DEL ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: ID011004</small>
                                 </td>
@@ -1639,7 +1676,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO FÚTBOL LA GUIXA</strong></div> 
                                     <small class="cod-eq">Cód: ID011005</small>
                                 </td>
@@ -1669,7 +1705,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP RACÓ DE L'ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: ID011006</small>
                                 </td>
@@ -1699,7 +1734,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ESCUELA NORUEGA COSTABLANCA</strong></div> 
                                     <small class="cod-eq">Cód: ID011007</small>
                                 </td>
@@ -1729,7 +1763,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES L'ARABI</strong></div> 
                                     <small class="cod-eq">Cód: ID011008</small>
                                 </td>
@@ -1759,7 +1792,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. SIERRA BERNIA SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: ID011009</small>
                                 </td>
@@ -1789,7 +1821,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO POLIDEPORTIVO ALFAZ DEL SOL</strong></div> 
                                     <small class="cod-eq">Cód: ID011010</small>
                                 </td>
@@ -1819,7 +1850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA DEL PARQUE ESCANDINAVIA</strong></div> 
                                     <small class="cod-eq">Cód: ID011011</small>
                                 </td>
@@ -1849,7 +1879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ID CEIP VELES E VENTS</strong></div> 
                                     <small class="cod-eq">Cód: ID011012</small>
                                 </td>
@@ -1879,7 +1908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE FÚTBOL 8</strong></div> 
                                     <small class="cod-eq">Cód: ID011013</small>
                                 </td>
@@ -1939,7 +1967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BULEVAR DE LOS MUSICOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ011002</small>
                                 </td>
@@ -1969,7 +1996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EL PLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011011</small>
                                 </td>
@@ -1999,7 +2025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EUCALIPTUS</strong></div> 
                                     <small class="cod-eq">Cód: PJ011012</small>
                                 </td>
@@ -2029,7 +2054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ESCANDINAVIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011020</small>
                                 </td>
@@ -2059,7 +2083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PLAZA SALVADOR DALÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ011022</small>
                                 </td>
@@ -2089,7 +2112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE L'ARC</strong></div> 
                                     <small class="cod-eq">Cód: PJ011023</small>
                                 </td>
@@ -2119,7 +2141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE L'HORTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011024</small>
                                 </td>
@@ -2149,7 +2170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC MUNICIPAL RACÓ DE L'ALBIR</strong></div> 
                                     <small class="cod-eq">Cód: PJ011025</small>
                                 </td>
@@ -2179,7 +2199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN MUSEO FUNDACIÓN KLEIN-SCHREUDER</strong></div> 
                                     <small class="cod-eq">Cód: PJ011026</small>
                                 </td>
@@ -2209,7 +2228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ LA FIGUERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011027</small>
                                 </td>
@@ -2239,7 +2257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JOHAN GALTUNH</strong></div> 
                                     <small class="cod-eq">Cód: PJ011028</small>
                                 </td>
@@ -2269,7 +2286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE LESCAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ011029</small>
                                 </td>
@@ -2299,7 +2315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE LA CREUETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011030</small>
                                 </td>
@@ -2329,7 +2344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LE ESCOLES VELLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ011031</small>
                                 </td>
@@ -2359,7 +2373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE EDUCACIÓN VIAL SANT PERE</strong></div> 
                                     <small class="cod-eq">Cód: PJ011032</small>
                                 </td>
@@ -2389,7 +2402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JARDÍN DE ALFAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ011033</small>
                                 </td>
@@ -2419,7 +2431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA DE SERRA GELADA</strong></div> 
                                     <small class="cod-eq">Cód: PJ011034</small>
                                 </td>
@@ -2449,7 +2460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PAU GASOL</strong></div> 
                                     <small class="cod-eq">Cód: PJ011035</small>
                                 </td>
@@ -2528,6 +2538,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2543,7 +2554,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2634,7 +2645,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2764,7 +2775,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

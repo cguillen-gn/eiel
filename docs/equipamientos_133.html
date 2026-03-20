@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC133002</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA PROTECCIÓN ANIMAL Y EXTRANJEROS</strong></div> 
                                     <small class="cod-eq">Cód: CC133007</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA NACIONAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133013</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE BIENESTAR SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133032</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO DE URBANISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC133036</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO PLAYA DEL CURA</strong></div> 
                                     <small class="cod-eq">Cód: CC133047</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE EDUCACION</strong></div> 
                                     <small class="cod-eq">Cód: CC133054</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL( AGE CONCERT)</strong></div> 
                                     <small class="cod-eq">Cód: CC133062</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PERRERA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133068</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA DE CENSO ESTADISTICA E INFORMATICA</strong></div> 
                                     <small class="cod-eq">Cód: CC133072</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.D.L (AGENCIA DESARROLLO LOCAL)</strong></div> 
                                     <small class="cod-eq">Cód: CC133075</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACION DEL PARQUE NATURAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133076</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS DE TAXIS Y TRANSPORTE ESCOLAR</strong></div> 
                                     <small class="cod-eq">Cód: CC133078</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133079</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO PERIFERICO LA MATA</strong></div> 
                                     <small class="cod-eq">Cód: CC133080</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TESORERIA SEGURIDAD SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CC133081</small>
                                 </td>
@@ -735,7 +796,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA TURISMO CLUB NAUTICO</strong></div> 
                                     <small class="cod-eq">Cód: CC133082</small>
                                 </td>
@@ -765,7 +825,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL (JUZGADOS)</strong></div> 
                                     <small class="cod-eq">Cód: CC133083</small>
                                 </td>
@@ -795,7 +854,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE PARQUES Y JARDINES</strong></div> 
                                     <small class="cod-eq">Cód: CC133084</small>
                                 </td>
@@ -825,7 +883,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PREVENCIÓN RIESGOS LABORALES</strong></div> 
                                     <small class="cod-eq">Cód: CC133085</small>
                                 </td>
@@ -855,7 +912,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>G.R.O. POLICÍA LOCAL TORREVIEJA.</strong></div> 
                                     <small class="cod-eq">Cód: CC133086</small>
                                 </td>
@@ -885,7 +941,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARKING PUERTO</strong></div> 
                                     <small class="cod-eq">Cód: CC133087</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL MAR Y DE LA SAL</strong></div> 
                                     <small class="cod-eq">Cód: CU133002</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERAS DE LA SAL</strong></div> 
                                     <small class="cod-eq">Cód: CU133004</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL 3ª EDAD PEDRO LORCA</strong></div> 
                                     <small class="cod-eq">Cód: CU133005</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO RICARDO LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: CU133006</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE LA 3ª EDAD ACEQUION(RAFAL-BENI</strong></div> 
                                     <small class="cod-eq">Cód: CU133007</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO TERCERA EDAD C/ SAN PASCUAL</strong></div> 
                                     <small class="cod-eq">Cód: CU133011</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO  POLIVALENTE DE LA MATA.TERCERA</strong></div> 
                                     <small class="cod-eq">Cód: CU133013</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALACIO DE LA MUSICA.</strong></div> 
                                     <small class="cod-eq">Cód: CU133014</small>
                                 </td>
@@ -1185,7 +1232,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA MPAL. DE TEATRO RAUL FERRANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: CU133015</small>
                                 </td>
@@ -1215,7 +1261,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.F.A TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: CU133016</small>
                                 </td>
@@ -1245,7 +1290,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL VIRGEN DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: CU133023</small>
                                 </td>
@@ -1275,7 +1319,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA LOS ALJIBES(JARDIN DE LAS NACIONES)</strong></div> 
                                     <small class="cod-eq">Cód: CU133063</small>
                                 </td>
@@ -1305,7 +1348,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO HISTORIA NATURAL( ANTG. RENFE)</strong></div> 
                                     <small class="cod-eq">Cód: CU133064</small>
                                 </td>
@@ -1335,7 +1377,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO FLOTANTE SUBMARINO DELFIN</strong></div> 
                                     <small class="cod-eq">Cód: CU133065</small>
                                 </td>
@@ -1365,7 +1406,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO FLOTANTE PATRULLERA ALDATROS</strong></div> 
                                     <small class="cod-eq">Cód: CU133066</small>
                                 </td>
@@ -1395,7 +1435,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO SEMANA SANTA Tomás Valcárcel Deza</strong></div> 
                                     <small class="cod-eq">Cód: CU133082</small>
                                 </td>
@@ -1425,7 +1464,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE OCIO MACRODISCOTECA 3ª EDAD</strong></div> 
                                     <small class="cod-eq">Cód: CU133083</small>
                                 </td>
@@ -1455,7 +1493,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE INFORMACION Y ANIMACION JUVENI</strong></div> 
                                     <small class="cod-eq">Cód: CU133084</small>
                                 </td>
@@ -1485,7 +1522,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL CARMEN JALON</strong></div> 
                                     <small class="cod-eq">Cód: CU133088</small>
                                 </td>
@@ -1515,7 +1551,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SOCIEDAD CULTURAL CASINO DE TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: CU133090</small>
                                 </td>
@@ -1545,7 +1580,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA DE EXPOSICIONES VISTA ALEGRE</strong></div> 
                                     <small class="cod-eq">Cód: CU133092</small>
                                 </td>
@@ -1575,7 +1609,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA ACEQUIÓN</strong></div> 
                                     <small class="cod-eq">Cód: CU133093</small>
                                 </td>
@@ -1605,7 +1638,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL DE LA MATA</strong></div> 
                                     <small class="cod-eq">Cód: CU133094</small>
                                 </td>
@@ -1635,7 +1667,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MULTIUSOS MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU133095</small>
                                 </td>
@@ -1665,7 +1696,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO</strong></div> 
                                     <small class="cod-eq">Cód: CU133096</small>
                                 </td>
@@ -1695,7 +1725,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE ORFEON TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: CU133097</small>
                                 </td>
@@ -1725,7 +1754,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRO AUDITORIO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU133098</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ROMUALDO BALLESTER</strong></div> 
                                     <small class="cod-eq">Cód: EN133001</small>
                                 </td>
@@ -1815,7 +1842,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CUBA</strong></div> 
                                     <small class="cod-eq">Cód: EN133002</small>
                                 </td>
@@ -1845,7 +1871,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES Nº 1 LIBERTAS</strong></div> 
                                     <small class="cod-eq">Cód: EN133003</small>
                                 </td>
@@ -1875,7 +1900,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MARE NOSTRUM</strong></div> 
                                     <small class="cod-eq">Cód: EN133004</small>
                                 </td>
@@ -1905,7 +1929,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP EL ACEQUIÓN</strong></div> 
                                     <small class="cod-eq">Cód: EN133005</small>
                                 </td>
@@ -1935,7 +1958,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP INMACULADA CONCEPCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: EN133006</small>
                                 </td>
@@ -1965,7 +1987,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LAS LAGUNAS</strong></div> 
                                     <small class="cod-eq">Cód: EN133007</small>
                                 </td>
@@ -1995,7 +2016,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MAESTRO SALVADOR RUSO</strong></div> 
                                     <small class="cod-eq">Cód: EN133008</small>
                                 </td>
@@ -2025,7 +2045,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: EN133009</small>
                                 </td>
@@ -2055,7 +2074,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LAS CULTURAS</strong></div> 
                                     <small class="cod-eq">Cód: EN133010</small>
                                 </td>
@@ -2085,7 +2103,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA PURISIMA</strong></div> 
                                     <small class="cod-eq">Cód: EN133012</small>
                                 </td>
@@ -2115,7 +2132,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE ALPE</strong></div> 
                                     <small class="cod-eq">Cód: EN133013</small>
                                 </td>
@@ -2145,7 +2161,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PÚBLICO FPA</strong></div> 
                                     <small class="cod-eq">Cód: EN133014</small>
                                 </td>
@@ -2175,7 +2190,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP NUESTRA SEÑORA DEL ROSARIO</strong></div> 
                                     <small class="cod-eq">Cód: EN133015</small>
                                 </td>
@@ -2205,7 +2219,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO PROFESIONAL DE MÚSICA FCO.CASANOVA</strong></div> 
                                     <small class="cod-eq">Cód: EN133017</small>
                                 </td>
@@ -2235,7 +2248,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA OFICIAL DE IDIOMAS</strong></div> 
                                     <small class="cod-eq">Cód: EN133018</small>
                                 </td>
@@ -2265,7 +2277,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: EN133021</small>
                                 </td>
@@ -2295,7 +2306,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AMANECER</strong></div> 
                                     <small class="cod-eq">Cód: EN133023</small>
                                 </td>
@@ -2325,7 +2335,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CIUDAD DEL MAR</strong></div> 
                                     <small class="cod-eq">Cód: EN133024</small>
                                 </td>
@@ -2355,7 +2364,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES TORREVIGIA</strong></div> 
                                     <small class="cod-eq">Cód: EN133026</small>
                                 </td>
@@ -2385,7 +2393,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA MUNICIPAL DE DANZA</strong></div> 
                                     <small class="cod-eq">Cód: EN133027</small>
                                 </td>
@@ -2415,7 +2422,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP HABANERAS</strong></div> 
                                     <small class="cod-eq">Cód: EN133028</small>
                                 </td>
@@ -2445,7 +2451,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO DE PREESCOLAR NIÑO JESUS</strong></div> 
                                     <small class="cod-eq">Cód: EN133029</small>
                                 </td>
@@ -2475,7 +2480,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO ED. INFANTIL PICCOLO</strong></div> 
                                     <small class="cod-eq">Cód: EN133031</small>
                                 </td>
@@ -2505,7 +2509,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.D.T (CENTRO DESARROLLO TURISTICO)</strong></div> 
                                     <small class="cod-eq">Cód: EN133032</small>
                                 </td>
@@ -2535,7 +2538,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA CASITA BILINGUAL SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: EN133033</small>
                                 </td>
@@ -2565,7 +2567,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA UNION MUSICAL TORREVEJENSE</strong></div> 
                                     <small class="cod-eq">Cód: EN133034</small>
                                 </td>
@@ -2595,7 +2596,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO DE EDUCACIÓN INFANTIL DE PRIMER CIC</strong></div> 
                                     <small class="cod-eq">Cód: EN133035</small>
                                 </td>
@@ -2625,7 +2625,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA PRIVADA DE MÚSICA LOS SALEROSOS</strong></div> 
                                     <small class="cod-eq">Cód: EN133036</small>
                                 </td>
@@ -2655,7 +2654,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECCIÓN DELEGADA IES TORREVIGÍA</strong></div> 
                                     <small class="cod-eq">Cód: EN133037</small>
                                 </td>
@@ -2685,7 +2683,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP Nº 15</strong></div> 
                                     <small class="cod-eq">Cód: EN133038</small>
                                 </td>
@@ -2715,7 +2712,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP Nº 14</strong></div> 
                                     <small class="cod-eq">Cód: EN133039</small>
                                 </td>
@@ -2775,7 +2771,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD TORREVIEJA 1 (LA LOMA)</strong></div> 
                                     <small class="cod-eq">Cód: SA133002</small>
                                 </td>
@@ -2805,7 +2800,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD LA MATA</strong></div> 
                                     <small class="cod-eq">Cód: SA133003</small>
                                 </td>
@@ -2835,7 +2829,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SALUD 2 TORREVIEJA (EL ACEQUION)</strong></div> 
                                     <small class="cod-eq">Cód: SA133004</small>
                                 </td>
@@ -2865,7 +2858,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL QUIRONSALUD TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: SA133005</small>
                                 </td>
@@ -2895,7 +2887,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: SA133010</small>
                                 </td>
@@ -2925,7 +2916,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ATENCION PRIMARIA SAN LUIS-LA SIE</strong></div> 
                                     <small class="cod-eq">Cód: SA133011</small>
                                 </td>
@@ -2955,7 +2945,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORREVIEJA CENTRO C/ PATRICIO PEREZ</strong></div> 
                                     <small class="cod-eq">Cód: SA133013</small>
                                 </td>
@@ -2985,7 +2974,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUTUA UNIVERSAL TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: SA133014</small>
                                 </td>
@@ -3015,7 +3003,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IMED TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: SA133015</small>
                                 </td>
@@ -3045,7 +3032,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UCA CTRO. UNID. CONDUCTAS ADICTIVAS</strong></div> 
                                     <small class="cod-eq">Cód: SA133016</small>
                                 </td>
@@ -3105,7 +3091,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD LA INMACULADA</strong></div> 
                                     <small class="cod-eq">Cód: AS133003</small>
                                 </td>
@@ -3135,7 +3120,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD DE TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: AS133092</small>
                                 </td>
@@ -3165,7 +3149,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD MAR DE LEVANTE</strong></div> 
                                     <small class="cod-eq">Cód: AS133094</small>
                                 </td>
@@ -3195,7 +3178,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRIS TORREVIEJA( REHABILITACION E INTEGR</strong></div> 
                                     <small class="cod-eq">Cód: AS133095</small>
                                 </td>
@@ -3225,7 +3207,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD MARBELLA</strong></div> 
                                     <small class="cod-eq">Cód: AS133096</small>
                                 </td>
@@ -3255,7 +3236,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD LOS JARDINES DE CLARA</strong></div> 
                                     <small class="cod-eq">Cód: AS133097</small>
                                 </td>
@@ -3285,7 +3265,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CTRO ASISTENCIAL IBERMUTUA</strong></div> 
                                     <small class="cod-eq">Cód: AS133098</small>
                                 </td>
@@ -3315,7 +3294,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CTRO. DISMINUIDOS PSIQUICOS</strong></div> 
                                     <small class="cod-eq">Cód: AS133099</small>
                                 </td>
@@ -3345,7 +3323,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO AISTENCIAL UMIVALE</strong></div> 
                                     <small class="cod-eq">Cód: AS133100</small>
                                 </td>
@@ -3375,7 +3352,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CTRO. DÍA TORRENOVA</strong></div> 
                                     <small class="cod-eq">Cód: AS133101</small>
                                 </td>
@@ -3435,7 +3411,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO LA PLAZA</strong></div> 
                                     <small class="cod-eq">Cód: LM133041</small>
                                 </td>
@@ -3465,7 +3440,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RECINTO DE FERIA</strong></div> 
                                     <small class="cod-eq">Cód: LM133042</small>
                                 </td>
@@ -3495,7 +3469,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RECINTO DE MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: LM133043</small>
                                 </td>
@@ -3555,7 +3528,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP133001</small>
                                 </td>
@@ -3585,7 +3557,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE BOMBEROS</strong></div> 
                                     <small class="cod-eq">Cód: IP133002</small>
                                 </td>
@@ -3615,7 +3586,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: IP133003</small>
                                 </td>
@@ -3645,7 +3615,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MODULO SALVAMENTO PLAYA LOS LOCOS</strong></div> 
                                     <small class="cod-eq">Cód: IP133004</small>
                                 </td>
@@ -3705,7 +3674,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO SAMPER LA INMACULADA</strong></div> 
                                     <small class="cod-eq">Cód: TA133001</small>
                                 </td>
@@ -3765,7 +3733,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CUBA</strong></div> 
                                     <small class="cod-eq">Cód: ID133001</small>
                                 </td>
@@ -3795,7 +3762,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE FÚTBOL VICENTE GARCIA</strong></div> 
                                     <small class="cod-eq">Cód: ID133003</small>
                                 </td>
@@ -3825,7 +3791,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DE RAQUETAS Y ESTADIO NELSON MANDELA</strong></div> 
                                     <small class="cod-eq">Cód: ID133004</small>
                                 </td>
@@ -3855,7 +3820,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MARE NOSTRUM</strong></div> 
                                     <small class="cod-eq">Cód: ID133006</small>
                                 </td>
@@ -3885,7 +3849,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP EL ACEQUION</strong></div> 
                                     <small class="cod-eq">Cód: ID133007</small>
                                 </td>
@@ -3915,7 +3878,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL CECILIO GALLEGO</strong></div> 
                                     <small class="cod-eq">Cód: ID133010</small>
                                 </td>
@@ -3945,7 +3907,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA PLAZA PERFECTA RODRIGUEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID133011</small>
                                 </td>
@@ -3975,7 +3936,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUERTO DEPORTIVO MARINA INTERNACIONAL</strong></div> 
                                     <small class="cod-eq">Cód: ID133012</small>
                                 </td>
@@ -4005,7 +3965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DOÑA INES</strong></div> 
                                     <small class="cod-eq">Cód: ID133017</small>
                                 </td>
@@ -4035,7 +3994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CIUDAD DEL MAR</strong></div> 
                                     <small class="cod-eq">Cód: ID133020</small>
                                 </td>
@@ -4065,7 +4023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA CABO CERVERA</strong></div> 
                                     <small class="cod-eq">Cód: ID133022</small>
                                 </td>
@@ -4095,7 +4052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP HABANERAS</strong></div> 
                                     <small class="cod-eq">Cód: ID133023</small>
                                 </td>
@@ -4125,7 +4081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP INMACULADA CONCEPCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID133024</small>
                                 </td>
@@ -4155,7 +4110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LAS CULTURAS</strong></div> 
                                     <small class="cod-eq">Cód: ID133026</small>
                                 </td>
@@ -4185,7 +4139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP NUESTRA SEÑORA DEL ROSARIO</strong></div> 
                                     <small class="cod-eq">Cód: ID133027</small>
                                 </td>
@@ -4215,7 +4168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ROMUALDO BALLESTER</strong></div> 
                                     <small class="cod-eq">Cód: ID133028</small>
                                 </td>
@@ -4245,7 +4197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. MAESTRO SALVADOR RUSO</strong></div> 
                                     <small class="cod-eq">Cód: ID133029</small>
                                 </td>
@@ -4275,7 +4226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: ID133030</small>
                                 </td>
@@ -4305,7 +4255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALACIO DE DEPORTES Y CAMPOS DE FUTBOL</strong></div> 
                                     <small class="cod-eq">Cód: ID133057</small>
                                 </td>
@@ -4335,7 +4284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB NAUTICO</strong></div> 
                                     <small class="cod-eq">Cód: ID133058</small>
                                 </td>
@@ -4365,7 +4313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES Nº 1 LIBERTAS</strong></div> 
                                     <small class="cod-eq">Cód: ID133073</small>
                                 </td>
@@ -4395,7 +4342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LAS LAGUNAS</strong></div> 
                                     <small class="cod-eq">Cód: ID133074</small>
                                 </td>
@@ -4425,7 +4371,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES NUMERO 5</strong></div> 
                                     <small class="cod-eq">Cód: ID133077</small>
                                 </td>
@@ -4455,7 +4400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB TENIS TORREVIEJA</strong></div> 
                                     <small class="cod-eq">Cód: ID133083</small>
                                 </td>
@@ -4485,7 +4429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MEDITERRÁNEO</strong></div> 
                                     <small class="cod-eq">Cód: ID133084</small>
                                 </td>
@@ -4515,7 +4458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LA PURISIMA</strong></div> 
                                     <small class="cod-eq">Cód: ID133085</small>
                                 </td>
@@ -4545,7 +4487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP AMANECER</strong></div> 
                                     <small class="cod-eq">Cód: ID133086</small>
                                 </td>
@@ -4575,7 +4516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DEPORTIVAS</strong></div> 
                                     <small class="cod-eq">Cód: ID133087</small>
                                 </td>
@@ -4605,7 +4545,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA LOS ALTOS</strong></div> 
                                     <small class="cod-eq">Cód: ID133088</small>
                                 </td>
@@ -4635,7 +4574,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA EN PARQUE CALLE CHURRUCA</strong></div> 
                                     <small class="cod-eq">Cód: ID133089</small>
                                 </td>
@@ -4665,7 +4603,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA PARQUE URB. LAGO SOL I (P.P)</strong></div> 
                                     <small class="cod-eq">Cód: ID133090</small>
                                 </td>
@@ -4695,7 +4632,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: ID133091</small>
                                 </td>
@@ -4725,7 +4661,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS PARQUE JARDIN DEL MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: ID133092</small>
                                 </td>
@@ -4755,7 +4690,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORT. AVDA. TIRSO DE MOLINA</strong></div> 
                                     <small class="cod-eq">Cód: ID133093</small>
                                 </td>
@@ -4785,7 +4719,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DE PETANCA AVDA. JOSÉ ZORRILLA</strong></div> 
                                     <small class="cod-eq">Cód: ID133094</small>
                                 </td>
@@ -4815,7 +4748,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE PLAZA LA ESTACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID133095</small>
                                 </td>
@@ -4845,7 +4777,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORTIVA PLAZA EUROPA</strong></div> 
                                     <small class="cod-eq">Cód: ID133096</small>
                                 </td>
@@ -4875,7 +4806,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. BALEARES CON C/ MALLORCA.</strong></div> 
                                     <small class="cod-eq">Cód: ID133097</small>
                                 </td>
@@ -4905,7 +4835,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS CALLE ELGAR</strong></div> 
                                     <small class="cod-eq">Cód: ID133098</small>
                                 </td>
@@ -4935,7 +4864,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA LA TORRETA III</strong></div> 
                                     <small class="cod-eq">Cód: ID133099</small>
                                 </td>
@@ -4965,7 +4893,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>INSTAL. DEPORTIVAS PARQUE LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID133100</small>
                                 </td>
@@ -4995,7 +4922,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DEPORTIVAS CEIP Nº 15</strong></div> 
                                     <small class="cod-eq">Cód: ID133101</small>
                                 </td>
@@ -5025,7 +4951,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ID CEIP Nº 14</strong></div> 
                                     <small class="cod-eq">Cód: ID133102</small>
                                 </td>
@@ -5055,7 +4980,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO LA MATA</strong></div> 
                                     <small class="cod-eq">Cód: ID133103</small>
                                 </td>
@@ -5085,7 +5009,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA PETANCA PARQUE LA ABEJA</strong></div> 
                                     <small class="cod-eq">Cód: ID133104</small>
                                 </td>
@@ -5115,7 +5038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PARQUE LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID133105</small>
                                 </td>
@@ -5145,7 +5067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PZA. MARINA ESPAÑOLA</strong></div> 
                                     <small class="cod-eq">Cód: ID133106</small>
                                 </td>
@@ -5175,7 +5096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PZA. MAR AZUL</strong></div> 
                                     <small class="cod-eq">Cód: ID133107</small>
                                 </td>
@@ -5205,7 +5125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PARQUE VICTORIA DE LOS ANGELES</strong></div> 
                                     <small class="cod-eq">Cód: ID133108</small>
                                 </td>
@@ -5235,7 +5154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA BARRIO SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: ID133109</small>
                                 </td>
@@ -5265,7 +5183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA CABO CERVERA</strong></div> 
                                     <small class="cod-eq">Cód: ID133110</small>
                                 </td>
@@ -5295,7 +5212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA LAS TORRESTA I</strong></div> 
                                     <small class="cod-eq">Cód: ID133111</small>
                                 </td>
@@ -5325,7 +5241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA LAS TORRESTA II</strong></div> 
                                     <small class="cod-eq">Cód: ID133112</small>
                                 </td>
@@ -5355,7 +5270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PARQUE JIAN VALERA</strong></div> 
                                     <small class="cod-eq">Cód: ID133113</small>
                                 </td>
@@ -5385,7 +5299,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA LOS BALCONES</strong></div> 
                                     <small class="cod-eq">Cód: ID133114</small>
                                 </td>
@@ -5415,7 +5328,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID133115</small>
                                 </td>
@@ -5445,7 +5357,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PETANCA PLAZA SEVILLA</strong></div> 
                                     <small class="cod-eq">Cód: ID133116</small>
                                 </td>
@@ -5475,7 +5386,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUMP TRACK LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID133117</small>
                                 </td>
@@ -5535,7 +5445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA WALDO CALERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133001</small>
                                 </td>
@@ -5565,7 +5474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 13 B V-3</strong></div> 
                                     <small class="cod-eq">Cód: PJ133002</small>
                                 </td>
@@ -5595,7 +5503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CONSTITUCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133003</small>
                                 </td>
@@ -5625,7 +5532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE ORIENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ133004</small>
                                 </td>
@@ -5655,7 +5561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO VISTALEGRE.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133005</small>
                                 </td>
@@ -5685,7 +5590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ISLAS CANARIAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133006</small>
                                 </td>
@@ -5715,7 +5619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MOLINO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133007</small>
                                 </td>
@@ -5745,7 +5648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RINCON DE ASTURIAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133008</small>
                                 </td>
@@ -5775,7 +5677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PERFECTA RODRIGUEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133012</small>
                                 </td>
@@ -5805,7 +5706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA 4 ESTACIONES.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133013</small>
                                 </td>
@@ -5835,7 +5735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LIBRA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133014</small>
                                 </td>
@@ -5865,7 +5764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 11A, ZV 4 (P.P Dª INES)</strong></div> 
                                     <small class="cod-eq">Cód: PJ133017</small>
                                 </td>
@@ -5895,7 +5793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LAS PALOMAS.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133018</small>
                                 </td>
@@ -5925,7 +5822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LAS GOLONDRINAS.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133019</small>
                                 </td>
@@ -5955,7 +5851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LAS AGUILAS.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133020</small>
                                 </td>
@@ -5985,7 +5880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LOS HALCONES.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133021</small>
                                 </td>
@@ -6015,7 +5909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA MARINA ESPAÑOLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133022</small>
                                 </td>
@@ -6045,7 +5938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MARIA ASUNCION.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133023</small>
                                 </td>
@@ -6075,7 +5967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAGO JARDIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133024</small>
                                 </td>
@@ -6105,7 +5996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO PUNTA CARRAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ133025</small>
                                 </td>
@@ -6135,7 +6025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL DE TRAFICO.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133026</small>
                                 </td>
@@ -6165,7 +6054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DOÑA SINFOROSA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133028</small>
                                 </td>
@@ -6195,7 +6083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE LAS NACIONES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133030</small>
                                 </td>
@@ -6225,7 +6112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL MOLINO DE AGUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133032</small>
                                 </td>
@@ -6255,7 +6141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133033</small>
                                 </td>
@@ -6285,7 +6170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORRE DEL MORO JARDIN NILS GABEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ133034</small>
                                 </td>
@@ -6315,7 +6199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA ESTACION</strong></div> 
                                     <small class="cod-eq">Cód: PJ133035</small>
                                 </td>
@@ -6345,7 +6228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EUROPA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133036</small>
                                 </td>
@@ -6375,7 +6257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA AGRICULTURA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133037</small>
                                 </td>
@@ -6405,7 +6286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 13 B V-4</strong></div> 
                                     <small class="cod-eq">Cód: PJ133038</small>
                                 </td>
@@ -6435,7 +6315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 13 B V-5</strong></div> 
                                     <small class="cod-eq">Cód: PJ133039</small>
                                 </td>
@@ -6465,7 +6344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DEL MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133040</small>
                                 </td>
@@ -6495,7 +6373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE URB. CALA DORADA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133074</small>
                                 </td>
@@ -6525,7 +6402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE URB. LOS LEANDROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133075</small>
                                 </td>
@@ -6555,7 +6431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN ERMITA DE SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: PJ133076</small>
                                 </td>
@@ -6585,7 +6460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN PANORAMA II (RESIDENCIAL EL MOLIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133077</small>
                                 </td>
@@ -6615,7 +6489,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POETA JOSE MANUEL CABALLERO BONALD</strong></div> 
                                     <small class="cod-eq">Cód: PJ133078</small>
                                 </td>
@@ -6645,7 +6518,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE EN LAS TORRETAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133080</small>
                                 </td>
@@ -6675,7 +6547,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AROMÁTICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133082</small>
                                 </td>
@@ -6705,7 +6576,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE SEVILLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133083</small>
                                 </td>
@@ -6735,7 +6605,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DE RECREO RESIDENCIAL "EL MOLINO"</strong></div> 
                                     <small class="cod-eq">Cód: PJ133084</small>
                                 </td>
@@ -6765,7 +6634,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. BALEARES CON C/MALLORCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133085</small>
                                 </td>
@@ -6795,7 +6663,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 2 "LOS ALTOS" PARCELA 24</strong></div> 
                                     <small class="cod-eq">Cód: PJ133087</small>
                                 </td>
@@ -6825,7 +6692,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>URB. LAGO SOL I (P.P) ZONA JUEGOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133088</small>
                                 </td>
@@ -6855,7 +6721,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>URB. LAGO SOL I (P.P)</strong></div> 
                                     <small class="cod-eq">Cód: PJ133089</small>
                                 </td>
@@ -6885,7 +6750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>URB. LAGO JARDIN (ZONA JUEGOS)</strong></div> 
                                     <small class="cod-eq">Cód: PJ133090</small>
                                 </td>
@@ -6915,7 +6779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 2 "LOS ALTOS" PARCELA 22</strong></div> 
                                     <small class="cod-eq">Cód: PJ133091</small>
                                 </td>
@@ -6945,7 +6808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 2  "LOS ALTOS" PARCELA V-1.1</strong></div> 
                                     <small class="cod-eq">Cód: PJ133092</small>
                                 </td>
@@ -6975,7 +6837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL CATIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133093</small>
                                 </td>
@@ -7005,7 +6866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 18 ZV-3(P.P EL LIMONAR II)</strong></div> 
                                     <small class="cod-eq">Cód: PJ133095</small>
                                 </td>
@@ -7035,7 +6895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE</strong></div> 
                                     <small class="cod-eq">Cód: PJ133098</small>
                                 </td>
@@ -7065,7 +6924,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ENCARNACION PUCHOL</strong></div> 
                                     <small class="cod-eq">Cód: PJ133100</small>
                                 </td>
@@ -7095,7 +6953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA HABANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133101</small>
                                 </td>
@@ -7125,7 +6982,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO MARITIMO JUAN APARICIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133102</small>
                                 </td>
@@ -7155,7 +7011,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LA LIBERTAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ133103</small>
                                 </td>
@@ -7185,7 +7040,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DIQUE DE LEVANTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ133104</small>
                                 </td>
@@ -7215,7 +7069,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO JUAN BAUTISTA BUADES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133105</small>
                                 </td>
@@ -7245,7 +7098,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LA MATA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133106</small>
                                 </td>
@@ -7275,7 +7127,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL SALINERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133107</small>
                                 </td>
@@ -7305,7 +7156,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ133108</small>
                                 </td>
@@ -7335,7 +7185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133109</small>
                                 </td>
@@ -7365,7 +7214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA LOS ALBENTOSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133112</small>
                                 </td>
@@ -7395,7 +7243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>REINA DE LA SAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ133113</small>
                                 </td>
@@ -7425,7 +7272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ILO - ILO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133114</small>
                                 </td>
@@ -7455,7 +7301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOS LEANDROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133115</small>
                                 </td>
@@ -7485,7 +7330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALFONSO DE QUIJANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133116</small>
                                 </td>
@@ -7515,7 +7359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL CALLE DEL TOBOSO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133117</small>
                                 </td>
@@ -7545,7 +7388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOS ALTOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133118</small>
                                 </td>
@@ -7575,7 +7417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CABO CERVERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133119</small>
                                 </td>
@@ -7605,7 +7446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL,ZONA JUEGOS Y PETANCA L</strong></div> 
                                     <small class="cod-eq">Cód: PJ133120</small>
                                 </td>
@@ -7635,7 +7475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LOS CONQUISTADORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133121</small>
                                 </td>
@@ -7665,7 +7504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE CHURRUCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133122</small>
                                 </td>
@@ -7695,7 +7533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DE CÓRCEGA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133123</small>
                                 </td>
@@ -7725,7 +7562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DEL AGUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133124</small>
                                 </td>
@@ -7755,7 +7591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE FRAY LUÍS DE LEÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133125</small>
                                 </td>
@@ -7785,7 +7620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA PALMA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133126</small>
                                 </td>
@@ -7815,7 +7649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA PINOSO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133127</small>
                                 </td>
@@ -7845,7 +7678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA GRACIOSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133128</small>
                                 </td>
@@ -7875,7 +7707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE MONTEPERDIDO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133129</small>
                                 </td>
@@ -7905,7 +7736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ALEGRANZA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133130</small>
                                 </td>
@@ -7935,7 +7765,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA TOMÁS MARTÍNEZ DOMENECH</strong></div> 
                                     <small class="cod-eq">Cód: PJ133131</small>
                                 </td>
@@ -7965,7 +7794,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. TENERIFE</strong></div> 
                                     <small class="cod-eq">Cód: PJ133132</small>
                                 </td>
@@ -7995,7 +7823,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA GASPAR PERELLÓ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133133</small>
                                 </td>
@@ -8025,7 +7852,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL COLONIA SAN ESTEBAN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133134</small>
                                 </td>
@@ -8055,7 +7881,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE MARIA GIL VALLEJOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133135</small>
                                 </td>
@@ -8085,7 +7910,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE SANTA PETRA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ133136</small>
                                 </td>
@@ -8115,7 +7939,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RAMÓN IMBERNON VERDÚ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133137</small>
                                 </td>
@@ -8145,7 +7968,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE EFREN GUTIERREZ MATEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133138</small>
                                 </td>
@@ -8175,7 +7997,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE RAFAEL ANTÓN PÉREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133139</small>
                                 </td>
@@ -8205,7 +8026,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE I CALLE JUAN VALERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133140</small>
                                 </td>
@@ -8235,7 +8055,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE II CALLE JUAN VALERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133141</small>
                                 </td>
@@ -8265,7 +8084,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  RESIDEN. PARQUE DE LAS NACIONES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133142</small>
                                 </td>
@@ -8295,7 +8113,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  FRENTE PLAZA MARIA ASUNCION</strong></div> 
                                     <small class="cod-eq">Cód: PJ133143</small>
                                 </td>
@@ -8325,7 +8142,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE NATALIO SÁEZ GONZÁLEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133144</small>
                                 </td>
@@ -8355,7 +8171,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EMBARCADERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133145</small>
                                 </td>
@@ -8385,7 +8200,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO C/ VICTORIA DE LOS ANGELES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133146</small>
                                 </td>
@@ -8415,7 +8229,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO C/ MARIA SAN GIL NOAIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133147</small>
                                 </td>
@@ -8445,7 +8258,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO C/ CESAR MATEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133148</small>
                                 </td>
@@ -8475,7 +8287,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE CALISTENIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133149</small>
                                 </td>
@@ -8505,7 +8316,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA SIESTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133150</small>
                                 </td>
@@ -8535,7 +8345,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ZONA RAQUETAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ133151</small>
                                 </td>
@@ -8565,7 +8374,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PISTA ATLETISMO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133152</small>
                                 </td>
@@ -8595,7 +8403,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALISTENIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133153</small>
                                 </td>
@@ -8625,7 +8432,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INUNDABLE DOÑA INES</strong></div> 
                                     <small class="cod-eq">Cód: PJ133154</small>
                                 </td>
@@ -8655,7 +8461,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA LA PINADA</strong></div> 
                                     <small class="cod-eq">Cód: PJ133155</small>
                                 </td>
@@ -8685,7 +8490,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CL JOAQUIN GARCIA SANCHEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ133156</small>
                                 </td>
@@ -8715,7 +8519,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE TORREJÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ133157</small>
                                 </td>
@@ -8745,7 +8548,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SAN EMIGDIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ133158</small>
                                 </td>
@@ -8794,6 +8596,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -8809,7 +8612,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -8900,7 +8703,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -9030,7 +8833,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

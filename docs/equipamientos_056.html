@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC056001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE COCENTAINA</strong></div> 
                                     <small class="cod-eq">Cód: CC056002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN   SAN RAFAEL (LAVADERO)</strong></div> 
                                     <small class="cod-eq">Cód: CC056004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE ALGARS</strong></div> 
                                     <small class="cod-eq">Cód: CC056005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO PLA DE LA FONT</strong></div> 
                                     <small class="cod-eq">Cód: CC056006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE FRAGA</strong></div> 
                                     <small class="cod-eq">Cód: CC056008</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE PENELLA</strong></div> 
                                     <small class="cod-eq">Cód: CC056013</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE ALCUDIA</strong></div> 
                                     <small class="cod-eq">Cód: CC056014</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPARTAMENTO DE URBANISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC056015</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL PZ VENERABLE ESCUDER, 23</strong></div> 
                                     <small class="cod-eq">Cód: CC056017</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALAU COMTAL</strong></div> 
                                     <small class="cod-eq">Cód: CU056001</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL I MUSEU FESTER</strong></div> 
                                     <small class="cod-eq">Cód: CU056002</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU ARQUEOLÒGIC I ETNOLÒGIC DEL COMTAT</strong></div> 
                                     <small class="cod-eq">Cód: CU056005</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SOCIETAT UNIÓ MUSICAL CONTESTANA</strong></div> 
                                     <small class="cod-eq">Cód: CU056006</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTELL DE COCENTAINA</strong></div> 
                                     <small class="cod-eq">Cód: CU056007</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE CULTURAL "EL TEULAR"</strong></div> 
                                     <small class="cod-eq">Cód: CU056008</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL POLIVALENTE ALGARS</strong></div> 
                                     <small class="cod-eq">Cód: CU056009</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE POLIVALENT ALCUDIA</strong></div> 
                                     <small class="cod-eq">Cód: CU056010</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE SOCIAL "REAL BLANC"</strong></div> 
                                     <small class="cod-eq">Cód: CU056011</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA JOVENTUT</strong></div> 
                                     <small class="cod-eq">Cód: CU056012</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL "PARE ARQUES"</strong></div> 
                                     <small class="cod-eq">Cód: CU056013</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE UNDEF</strong></div> 
                                     <small class="cod-eq">Cód: CU056015</small>
                                 </td>
@@ -915,7 +972,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A. BENIASSENT (ANTIGUO INSTITUTO PARE ARQUÉS)</strong></div> 
                                     <small class="cod-eq">Cód: EN056002</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP BOSCO</strong></div> 
                                     <small class="cod-eq">Cód: EN056003</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES PARE ARQUES</strong></div> 
                                     <small class="cod-eq">Cód: EN056004</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP REAL BLANC</strong></div> 
                                     <small class="cod-eq">Cód: EN056005</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN FRANCISCO DE ASIS</strong></div> 
                                     <small class="cod-eq">Cód: EN056007</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL SAN HIPÓLITO</strong></div> 
                                     <small class="cod-eq">Cód: EN056008</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>L'ATENEU MUSICAL</strong></div> 
                                     <small class="cod-eq">Cód: EN056009</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA UNIÓN MUSICAL CONTESTANA</strong></div> 
                                     <small class="cod-eq">Cód: EN056011</small>
                                 </td>
@@ -1185,7 +1234,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT DE COCENTAINA</strong></div> 
                                     <small class="cod-eq">Cód: SA056001</small>
                                 </td>
@@ -1215,7 +1263,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UMIVALE COCENTAINA</strong></div> 
                                     <small class="cod-eq">Cód: SA056002</small>
                                 </td>
@@ -1275,7 +1322,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA CENTRO DIA DOMUSVI COCENTAINA</strong></div> 
                                     <small class="cod-eq">Cód: AS056002</small>
                                 </td>
@@ -1305,7 +1351,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALCOHÓLICOS REHABILITADOS SAN JORGE</strong></div> 
                                     <small class="cod-eq">Cód: AS056003</small>
                                 </td>
@@ -1365,7 +1410,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCAT MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM056001</small>
                                 </td>
@@ -1425,7 +1469,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRAL COMARCAL</strong></div> 
                                     <small class="cod-eq">Cód: IP056001</small>
                                 </td>
@@ -1485,7 +1528,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORI DEL COMTAT</strong></div> 
                                     <small class="cod-eq">Cód: TA056001</small>
                                 </td>
@@ -1515,7 +1557,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORI COMARCAL DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: TA056002</small>
                                 </td>
@@ -1575,7 +1616,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TIRO DE PICHÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID056001</small>
                                 </td>
@@ -1605,7 +1645,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID056002</small>
                                 </td>
@@ -1635,7 +1674,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP BOSCO</strong></div> 
                                     <small class="cod-eq">Cód: ID056003</small>
                                 </td>
@@ -1665,7 +1703,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES PADRE ARQUES</strong></div> 
                                     <small class="cod-eq">Cód: ID056004</small>
                                 </td>
@@ -1695,7 +1732,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP REAL BLANC</strong></div> 
                                     <small class="cod-eq">Cód: ID056005</small>
                                 </td>
@@ -1725,7 +1761,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. SAN FRANCISCO DE ASIS</strong></div> 
                                     <small class="cod-eq">Cód: ID056007</small>
                                 </td>
@@ -1755,7 +1790,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA DE ALCUDIA</strong></div> 
                                     <small class="cod-eq">Cód: ID056008</small>
                                 </td>
@@ -1785,7 +1819,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA DE ALGARS</strong></div> 
                                     <small class="cod-eq">Cód: ID056009</small>
                                 </td>
@@ -1815,7 +1848,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS POLIDEPORTIVAS ZONA UE 4.4</strong></div> 
                                     <small class="cod-eq">Cód: ID056010</small>
                                 </td>
@@ -1845,7 +1877,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. FPA BENIASSENT (ANTIGUO INSTITUTO)</strong></div> 
                                     <small class="cod-eq">Cód: ID056011</small>
                                 </td>
@@ -1905,7 +1936,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>REAL BLANC</strong></div> 
                                     <small class="cod-eq">Cód: PJ056003</small>
                                 </td>
@@ -1935,7 +1965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARAJE SAN CRISTÓBAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ056005</small>
                                 </td>
@@ -1965,7 +1994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLA DE LA FONT</strong></div> 
                                     <small class="cod-eq">Cód: PJ056006</small>
                                 </td>
@@ -1995,7 +2023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE PAQUITO EL XOCOLATERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ056007</small>
                                 </td>
@@ -2025,7 +2052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARAJE SANTA BÁRBARA</strong></div> 
                                     <small class="cod-eq">Cód: PJ056011</small>
                                 </td>
@@ -2055,7 +2081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL POLIDEPORTIVO</strong></div> 
                                     <small class="cod-eq">Cód: PJ056012</small>
                                 </td>
@@ -2085,7 +2110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE REY DON JAIME</strong></div> 
                                     <small class="cod-eq">Cód: PJ056020</small>
                                 </td>
@@ -2115,7 +2139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PEDANÍA ALCUDIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ056021</small>
                                 </td>
@@ -2145,7 +2168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DEL FERROCARRIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ056022</small>
                                 </td>
@@ -2175,7 +2197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SANT HIPÒLIT</strong></div> 
                                     <small class="cod-eq">Cód: PJ056023</small>
                                 </td>
@@ -2205,7 +2226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PEDANIA ALGARS</strong></div> 
                                     <small class="cod-eq">Cód: PJ056024</small>
                                 </td>
@@ -2235,7 +2255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ANSELMO MARTÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ056025</small>
                                 </td>
@@ -2265,7 +2284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL POBLE NOU DE SANT RAFAEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ056026</small>
                                 </td>
@@ -2295,7 +2313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SALIDA A FRAGA</strong></div> 
                                     <small class="cod-eq">Cód: PJ056028</small>
                                 </td>
@@ -2325,7 +2342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EL TINTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ056029</small>
                                 </td>
@@ -2355,7 +2371,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ALMUDAINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ056030</small>
                                 </td>
@@ -2385,7 +2400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BARRANCO PLAZA SAN PEDRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ056031</small>
                                 </td>
@@ -2415,7 +2429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIBLIOTECA</strong></div> 
                                     <small class="cod-eq">Cód: PJ056032</small>
                                 </td>
@@ -2445,7 +2458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE TRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ056033</small>
                                 </td>
@@ -2475,7 +2487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DEL CARDENAL FERRIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ056034</small>
                                 </td>
@@ -2505,7 +2516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE BARRIO SANT JAUME</strong></div> 
                                     <small class="cod-eq">Cód: PJ056035</small>
                                 </td>
@@ -2535,7 +2545,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE MAS DE MOLTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ056036</small>
                                 </td>
@@ -2584,6 +2593,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2599,7 +2609,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2690,7 +2700,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2820,7 +2830,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

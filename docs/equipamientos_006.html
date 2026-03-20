@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL (ANTIGUO AYUNTAMIENTO)</strong></div> 
                                     <small class="cod-eq">Cód: CC006001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE DE LA ENTIDAD LOCAL MENOR DE LLOSA</strong></div> 
                                     <small class="cod-eq">Cód: CC006002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO FONDOS FONT</strong></div> 
                                     <small class="cod-eq">Cód: CC006003</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC006004</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL (ANTIGUA BIBLIOTECA)</strong></div> 
                                     <small class="cod-eq">Cód: CC006005</small>
                                 </td>
@@ -375,7 +449,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DEL PENSIONISTA LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: CU006001</small>
                                 </td>
@@ -405,7 +478,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE CIVIC CARRER VALENT</strong></div> 
                                     <small class="cod-eq">Cód: CU006002</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORRE MEDIEVAL DE LOS BARONES DE ALC</strong></div> 
                                     <small class="cod-eq">Cód: CU006003</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MULTIUSOS</strong></div> 
                                     <small class="cod-eq">Cód: CU006005</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU006006</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ETNOLOGICO</strong></div> 
                                     <small class="cod-eq">Cód: CU006007</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU006008</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MOSQUERA (CRA TERRA DE RIURAUS)</strong></div> 
                                     <small class="cod-eq">Cód: EN006001</small>
                                 </td>
@@ -675,7 +741,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE ALCALALI</strong></div> 
                                     <small class="cod-eq">Cód: SA006001</small>
                                 </td>
@@ -705,7 +770,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR LA LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: SA006002</small>
                                 </td>
@@ -773,7 +837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID006001</small>
                                 </td>
@@ -803,7 +866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA MUNICIPAL LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: ID006002</small>
                                 </td>
@@ -833,7 +895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: ID006003</small>
                                 </td>
@@ -893,7 +954,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASSEIG DEL POU</strong></div> 
                                     <small class="cod-eq">Cód: PJ006001</small>
                                 </td>
@@ -923,7 +983,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA CREU</strong></div> 
                                     <small class="cod-eq">Cód: PJ006002</small>
                                 </td>
@@ -953,7 +1012,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE UE-16</strong></div> 
                                     <small class="cod-eq">Cód: PJ006003</small>
                                 </td>
@@ -983,7 +1041,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA NOVA</strong></div> 
                                     <small class="cod-eq">Cód: PJ006004</small>
                                 </td>
@@ -1013,7 +1070,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MAYOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ006005</small>
                                 </td>
@@ -1043,7 +1099,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE L'AJUNTAMENT</strong></div> 
                                     <small class="cod-eq">Cód: PJ006006</small>
                                 </td>
@@ -1073,7 +1128,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL CALLE SALAMANCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ006007</small>
                                 </td>
@@ -1103,7 +1157,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: PJ006008</small>
                                 </td>
@@ -1133,7 +1186,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA RECREATIVA LLOSA DE CAMACHO</strong></div> 
                                     <small class="cod-eq">Cód: PJ006009</small>
                                 </td>
@@ -1163,7 +1215,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA LES SOLANETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ006010</small>
                                 </td>
@@ -1212,6 +1263,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1227,7 +1279,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1318,7 +1370,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1448,7 +1500,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

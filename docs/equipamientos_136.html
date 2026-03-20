@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT DE VALL DE GALLINERA</strong></div> 
                                     <small class="cod-eq">Cód: CC136001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE LA FONT DEL SAFAREIG BENIRRAMA</strong></div> 
                                     <small class="cod-eq">Cód: CC136004</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE LA FONT DE LA CONCEPCIO BENIALI</strong></div> 
                                     <small class="cod-eq">Cód: CC136005</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE ALPATRO</strong></div> 
                                     <small class="cod-eq">Cód: CC136006</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE BENISSIVA</strong></div> 
                                     <small class="cod-eq">Cód: CC136007</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO LA CARROJA</strong></div> 
                                     <small class="cod-eq">Cód: CC136008</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE BENISSILI</strong></div> 
                                     <small class="cod-eq">Cód: CC136009</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TURISMO. EDIFICIO MULTIUSOS.</strong></div> 
                                     <small class="cod-eq">Cód: CC136010</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO DE LLOMBAI</strong></div> 
                                     <small class="cod-eq">Cód: CC136011</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COLIVING ALPATRÓ</strong></div> 
                                     <small class="cod-eq">Cód: CC136012</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA DE BENIALI</strong></div> 
                                     <small class="cod-eq">Cód: CU136001</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE LA TERCERA EDAT BENIALI</strong></div> 
                                     <small class="cod-eq">Cód: CU136003</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE SOCIAL JOAN PELLICER</strong></div> 
                                     <small class="cod-eq">Cód: CU136004</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL L'ERA</strong></div> 
                                     <small class="cod-eq">Cód: CU136005</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL GUILLÉN AGULLÓ</strong></div> 
                                     <small class="cod-eq">Cód: CU136006</small>
                                 </td>
@@ -705,7 +769,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JOANOT MARTORELL</strong></div> 
                                     <small class="cod-eq">Cód: EN136001</small>
                                 </td>
@@ -735,7 +798,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AUSIAS MARCH</strong></div> 
                                     <small class="cod-eq">Cód: EN136004</small>
                                 </td>
@@ -795,7 +857,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE BENIRRAMA</strong></div> 
                                     <small class="cod-eq">Cód: SA136001</small>
                                 </td>
@@ -825,7 +886,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE BENIALI</strong></div> 
                                     <small class="cod-eq">Cód: SA136002</small>
                                 </td>
@@ -855,7 +915,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE BENISSIVA</strong></div> 
                                     <small class="cod-eq">Cód: SA136003</small>
                                 </td>
@@ -885,7 +944,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE ALPATRO</strong></div> 
                                     <small class="cod-eq">Cód: SA136004</small>
                                 </td>
@@ -915,7 +973,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE BENISILI</strong></div> 
                                     <small class="cod-eq">Cód: SA136005</small>
                                 </td>
@@ -979,7 +1036,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASETA VIGILANCIA FORESTAL</strong></div> 
                                     <small class="cod-eq">Cód: IP136001</small>
                                 </td>
@@ -1041,7 +1097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA DEPORTIVA IVAN ALEMANY PUCHOL</strong></div> 
                                     <small class="cod-eq">Cód: ID136002</small>
                                 </td>
@@ -1071,7 +1126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JOANOT MARTORELL</strong></div> 
                                     <small class="cod-eq">Cód: ID136003</small>
                                 </td>
@@ -1101,7 +1155,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA DEPORTIVA DE ALPATRO</strong></div> 
                                     <small class="cod-eq">Cód: ID136004</small>
                                 </td>
@@ -1161,7 +1214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BENIALI</strong></div> 
                                     <small class="cod-eq">Cód: PJ136001</small>
                                 </td>
@@ -1191,7 +1243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA GARRIGA</strong></div> 
                                     <small class="cod-eq">Cód: PJ136003</small>
                                 </td>
@@ -1221,7 +1272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FONT DELS NOGUERS</strong></div> 
                                     <small class="cod-eq">Cód: PJ136004</small>
                                 </td>
@@ -1251,7 +1301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  DE BENIRRAMA</strong></div> 
                                     <small class="cod-eq">Cód: PJ136005</small>
                                 </td>
@@ -1281,7 +1330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE BENISSILI</strong></div> 
                                     <small class="cod-eq">Cód: PJ136006</small>
                                 </td>
@@ -1330,6 +1378,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1345,7 +1394,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1436,7 +1485,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1566,7 +1615,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

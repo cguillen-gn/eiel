@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC116001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC116002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MULTIUSOS</strong></div> 
                                     <small class="cod-eq">Cód: CC116004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 9</strong></div> 
                                     <small class="cod-eq">Cód: CC116005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 3</strong></div> 
                                     <small class="cod-eq">Cód: CC116006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 5</strong></div> 
                                     <small class="cod-eq">Cód: CC116007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 11</strong></div> 
                                     <small class="cod-eq">Cód: CC116008</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 13</strong></div> 
                                     <small class="cod-eq">Cód: CC116009</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 15</strong></div> 
                                     <small class="cod-eq">Cód: CC116010</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 17</strong></div> 
                                     <small class="cod-eq">Cód: CC116011</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 19</strong></div> 
                                     <small class="cod-eq">Cód: CC116012</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 21</strong></div> 
                                     <small class="cod-eq">Cód: CC116013</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 23</strong></div> 
                                     <small class="cod-eq">Cód: CC116014</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 25</strong></div> 
                                     <small class="cod-eq">Cód: CC116015</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MOLINETA, 27</strong></div> 
                                     <small class="cod-eq">Cód: CC116016</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE REPÚBLICA DOMINICANA, 12</strong></div> 
                                     <small class="cod-eq">Cód: CC116017</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE REPÚBLICA DOMINICANA, 16</strong></div> 
                                     <small class="cod-eq">Cód: CC116018</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE REPÚBLICA DOMINICANA, 18</strong></div> 
                                     <small class="cod-eq">Cód: CC116019</small>
                                 </td>
@@ -735,7 +796,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL CALLE REP. DOMINICANA, 20</strong></div> 
                                     <small class="cod-eq">Cód: CC116020</small>
                                 </td>
@@ -765,7 +825,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE CANARIAS, 12</strong></div> 
                                     <small class="cod-eq">Cód: CC116021</small>
                                 </td>
@@ -795,7 +854,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE CANARIAS, 14</strong></div> 
                                     <small class="cod-eq">Cód: CC116022</small>
                                 </td>
@@ -825,7 +883,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE CANARIAS, 16 1º PLANTA</strong></div> 
                                     <small class="cod-eq">Cód: CC116023</small>
                                 </td>
@@ -855,7 +912,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE CANARIAS, 7</strong></div> 
                                     <small class="cod-eq">Cód: CC116024</small>
                                 </td>
@@ -885,7 +941,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE CANARIAS, 9</strong></div> 
                                     <small class="cod-eq">Cód: CC116025</small>
                                 </td>
@@ -915,7 +970,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MIGUEL DE UNAMUNO, 2</strong></div> 
                                     <small class="cod-eq">Cód: CC116026</small>
                                 </td>
@@ -945,7 +999,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MIGUEL DE UNAMUNO, 4</strong></div> 
                                     <small class="cod-eq">Cód: CC116027</small>
                                 </td>
@@ -975,7 +1028,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE MIGUEL DE UNAMUNO, 6</strong></div> 
                                     <small class="cod-eq">Cód: CC116028</small>
                                 </td>
@@ -1005,7 +1057,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE FILIPINAS, 21</strong></div> 
                                     <small class="cod-eq">Cód: CC116029</small>
                                 </td>
@@ -1035,7 +1086,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE FILIPINAS, 23</strong></div> 
                                     <small class="cod-eq">Cód: CC116030</small>
                                 </td>
@@ -1065,7 +1115,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL CALLE FILIPINAS, 25</strong></div> 
                                     <small class="cod-eq">Cód: CC116031</small>
                                 </td>
@@ -1095,7 +1144,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO ADMINISTRACIÓN MUNICIPAL (TEMPORAL)</strong></div> 
                                     <small class="cod-eq">Cód: CC116032</small>
                                 </td>
@@ -1125,7 +1173,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GARAJES MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CC116033</small>
                                 </td>
@@ -1155,7 +1202,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO ALMACEN Y TALLERES EMPLEO CALLE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: CC116034</small>
                                 </td>
@@ -1185,7 +1231,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL C/CANARIAS (10)</strong></div> 
                                     <small class="cod-eq">Cód: CC116035</small>
                                 </td>
@@ -1245,7 +1290,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UNION DE PENSIONISTAS DE SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: CU116002</small>
                                 </td>
@@ -1275,7 +1319,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: CU116003</small>
                                 </td>
@@ -1305,7 +1348,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDES ASOCIACIONES</strong></div> 
                                     <small class="cod-eq">Cód: CU116005</small>
                                 </td>
@@ -1335,7 +1377,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO</strong></div> 
                                     <small class="cod-eq">Cód: CU116006</small>
                                 </td>
@@ -1365,7 +1406,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL JUNTO PISCINA</strong></div> 
                                     <small class="cod-eq">Cód: CU116007</small>
                                 </td>
@@ -1395,7 +1435,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL CIVICO SOCIAL FRENTE GASOLINERA</strong></div> 
                                     <small class="cod-eq">Cód: CU116008</small>
                                 </td>
@@ -1425,7 +1464,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU116009</small>
                                 </td>
@@ -1455,7 +1493,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN DE JÓVENES</strong></div> 
                                     <small class="cod-eq">Cód: CU116010</small>
                                 </td>
@@ -1485,7 +1522,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE EN LA MOLINETA</strong></div> 
                                     <small class="cod-eq">Cód: CU116011</small>
                                 </td>
@@ -1515,7 +1551,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO MUNICIPAL SALINAS LUGAR VIEJO</strong></div> 
                                     <small class="cod-eq">Cód: CU116012</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DEL ROSARIO</strong></div> 
                                     <small class="cod-eq">Cód: EN116001</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA PUBLICA DE MUSICA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN116002</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN116003</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COWORKING FORMACIÓN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN116004</small>
                                 </td>
@@ -1725,7 +1756,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO COMPLEMENTARIO DE SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: SA116001</small>
                                 </td>
@@ -1787,7 +1817,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: LM116001</small>
                                 </td>
@@ -1847,7 +1876,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCIÓN CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP116001</small>
                                 </td>
@@ -1909,7 +1937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARED CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: ID116001</small>
                                 </td>
@@ -1939,7 +1966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA NORIA</strong></div> 
                                     <small class="cod-eq">Cód: ID116002</small>
                                 </td>
@@ -1969,7 +1995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DE SQUASH</strong></div> 
                                     <small class="cod-eq">Cód: ID116003</small>
                                 </td>
@@ -1999,7 +2024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA BÚLDER</strong></div> 
                                     <small class="cod-eq">Cód: ID116004</small>
                                 </td>
@@ -2029,7 +2053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DEL ROSARIO</strong></div> 
                                     <small class="cod-eq">Cód: ID116005</small>
                                 </td>
@@ -2059,7 +2082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ROCODROMO JUNTO AUDITORIO</strong></div> 
                                     <small class="cod-eq">Cód: ID116006</small>
                                 </td>
@@ -2089,7 +2111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUMP TRACK SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: ID116007</small>
                                 </td>
@@ -2149,7 +2170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASICA MATAIX</strong></div> 
                                     <small class="cod-eq">Cód: PJ116001</small>
                                 </td>
@@ -2179,7 +2199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA RECREATIVA LOS CASTILLOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ116003</small>
                                 </td>
@@ -2209,7 +2228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116004</small>
                                 </td>
@@ -2239,7 +2257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARED CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ116006</small>
                                 </td>
@@ -2269,7 +2286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA RANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116009</small>
                                 </td>
@@ -2299,7 +2315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SAN ISIDRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ116010</small>
                                 </td>
@@ -2329,7 +2344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA BOLERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116011</small>
                                 </td>
@@ -2359,7 +2373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA TEJERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116012</small>
                                 </td>
@@ -2389,7 +2402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA VEREDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116013</small>
                                 </td>
@@ -2419,7 +2431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA TERMICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116014</small>
                                 </td>
@@ -2449,7 +2460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE DE LOS MÚSICOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ116015</small>
                                 </td>
@@ -2479,7 +2489,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LAS MINAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ116016</small>
                                 </td>
@@ -2509,7 +2518,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116017</small>
                                 </td>
@@ -2539,7 +2547,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FINCA CON BALSA Y CABAÑA CAMINO ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ116018</small>
                                 </td>
@@ -2588,6 +2595,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2603,7 +2611,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2694,7 +2702,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2824,7 +2832,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

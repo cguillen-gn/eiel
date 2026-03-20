@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN-ANTIGUA BIBLIOTECA</strong></div> 
                                     <small class="cod-eq">Cód: CC034004</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC034005</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE POLÍGONO LOS VALEROS</strong></div> 
                                     <small class="cod-eq">Cód: CC034006</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO USOS MULTIPLES CALLE JUAN RAMÓN JIMENEZ</strong></div> 
                                     <small class="cod-eq">Cód: CC034007</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CORREOS</strong></div> 
                                     <small class="cod-eq">Cód: CC034008</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUO CONSULTORIO MÉDICO</strong></div> 
                                     <small class="cod-eq">Cód: CC034009</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIVIENDA DE LOS MAESTROS EN CALLE DR. FLEMING</strong></div> 
                                     <small class="cod-eq">Cód: CC034010</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR DE LA TERCERA EDAD</strong></div> 
                                     <small class="cod-eq">Cód: CU034002</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU034003</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALON SOCIAL POLIVALENTE</strong></div> 
                                     <small class="cod-eq">Cód: CU034004</small>
                                 </td>
@@ -555,7 +624,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: EN034001</small>
                                 </td>
@@ -585,7 +653,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL LAS 5 CUEVAS</strong></div> 
                                     <small class="cod-eq">Cód: EN034003</small>
                                 </td>
@@ -645,7 +712,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE BENIJÓFAR</strong></div> 
                                     <small class="cod-eq">Cód: SA034002</small>
                                 </td>
@@ -709,7 +775,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL ASOCIACIONES. ANTIGUO AYTO</strong></div> 
                                     <small class="cod-eq">Cód: IP034001</small>
                                 </td>
@@ -771,7 +836,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID034001</small>
                                 </td>
@@ -801,7 +865,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SAN JAIME</strong></div> 
                                     <small class="cod-eq">Cód: ID034002</small>
                                 </td>
@@ -831,7 +894,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ATALAYA PARK</strong></div> 
                                     <small class="cod-eq">Cód: ID034003</small>
                                 </td>
@@ -891,7 +953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA EL SECANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ034001</small>
                                 </td>
@@ -921,7 +982,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA INMACULADA CONCEPCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ034003</small>
                                 </td>
@@ -951,7 +1011,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ANETO</strong></div> 
                                     <small class="cod-eq">Cód: PJ034004</small>
                                 </td>
@@ -981,7 +1040,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ TEIDE</strong></div> 
                                     <small class="cod-eq">Cód: PJ034005</small>
                                 </td>
@@ -1011,7 +1069,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CAÑADA MARSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034007</small>
                                 </td>
@@ -1041,7 +1098,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ TEIDE 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034008</small>
                                 </td>
@@ -1071,7 +1127,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ TEIDE 3</strong></div> 
                                     <small class="cod-eq">Cód: PJ034009</small>
                                 </td>
@@ -1101,7 +1156,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LOS PINOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ034011</small>
                                 </td>
@@ -1131,7 +1185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JOAQUÍN SÁNCHEZ GARCÍA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034012</small>
                                 </td>
@@ -1161,7 +1214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE CRISTÓBAL COLÓN.</strong></div> 
                                     <small class="cod-eq">Cód: PJ034014</small>
                                 </td>
@@ -1191,7 +1243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ JACINTO BENAVENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ034015</small>
                                 </td>
@@ -1221,7 +1272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ JACINTO BENAVENTE 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034016</small>
                                 </td>
@@ -1251,7 +1301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CORUÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034017</small>
                                 </td>
@@ -1281,7 +1330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ VALENCIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034018</small>
                                 </td>
@@ -1311,7 +1359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ VALENCIA 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034019</small>
                                 </td>
@@ -1341,7 +1388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ IMPERIO ARGENTINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034021</small>
                                 </td>
@@ -1371,7 +1417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ IMPERIO ARGENTINA 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034022</small>
                                 </td>
@@ -1401,7 +1446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MARIA CALLAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ034023</small>
                                 </td>
@@ -1431,7 +1475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ INDIRA GANDHI</strong></div> 
                                     <small class="cod-eq">Cód: PJ034024</small>
                                 </td>
@@ -1461,7 +1504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ INDIRA GANDHI 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034025</small>
                                 </td>
@@ -1491,7 +1533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ENMELINE PANKHULST</strong></div> 
                                     <small class="cod-eq">Cód: PJ034026</small>
                                 </td>
@@ -1521,7 +1562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PICASSO</strong></div> 
                                     <small class="cod-eq">Cód: PJ034027</small>
                                 </td>
@@ -1551,7 +1591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ENMELINE PANKHULST 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034028</small>
                                 </td>
@@ -1581,7 +1620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 3 DE ABRIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ034029</small>
                                 </td>
@@ -1611,7 +1649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/FEDERICO GARCIA LORCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034030</small>
                                 </td>
@@ -1641,7 +1678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CONSTITUCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ034031</small>
                                 </td>
@@ -1671,7 +1707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ENRIQUE TIERNO GALVAN</strong></div> 
                                     <small class="cod-eq">Cód: PJ034032</small>
                                 </td>
@@ -1701,7 +1736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE MIGUEL DELIBES</strong></div> 
                                     <small class="cod-eq">Cód: PJ034033</small>
                                 </td>
@@ -1731,7 +1765,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE MARIE CURIE</strong></div> 
                                     <small class="cod-eq">Cód: PJ034034</small>
                                 </td>
@@ -1761,7 +1794,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ SIERRA DE ALCARAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ034035</small>
                                 </td>
@@ -1791,7 +1823,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANIZACIÓN ATALAYA PARK</strong></div> 
                                     <small class="cod-eq">Cód: PJ034036</small>
                                 </td>
@@ -1821,7 +1852,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JUNTO HOGAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ034037</small>
                                 </td>
@@ -1851,7 +1881,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RECINTO LAS CAMPAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ034038</small>
                                 </td>
@@ -1881,7 +1910,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ034039</small>
                                 </td>
@@ -1911,7 +1939,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE UNIDAD EJECUCION 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ034040</small>
                                 </td>
@@ -1941,7 +1968,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE SECTOR S-3</strong></div> 
                                     <small class="cod-eq">Cód: PJ034041</small>
                                 </td>
@@ -1990,6 +2016,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2005,7 +2032,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2096,7 +2123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2226,7 +2253,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

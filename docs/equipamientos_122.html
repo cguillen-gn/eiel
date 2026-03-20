@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC122004</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NAVE DE MANTENIMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC122013</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUEVO AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC122014</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO POLIFUNCIONAL</strong></div> 
                                     <small class="cod-eq">Cód: CC122016</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGENCIA DE DESARROLLO LOCAL, FORMACIÓN Y EMPLEO</strong></div> 
                                     <small class="cod-eq">Cód: CC122017</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>APSA, ACTIAULAS Y CÁRITAS</strong></div> 
                                     <small class="cod-eq">Cód: CC122018</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIVERO DE EMPRESAS</strong></div> 
                                     <small class="cod-eq">Cód: CC122019</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC122020</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC</strong></div> 
                                     <small class="cod-eq">Cód: CC122021</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>APARCAMIENTO PZA. DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: CC122022</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (SUMA)</strong></div> 
                                     <small class="cod-eq">Cód: CC122023</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA CIVIC</strong></div> 
                                     <small class="cod-eq">Cód: CC122024</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: CU122002</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA PÚBLICA MUN MIGUEL DELIBES</strong></div> 
                                     <small class="cod-eq">Cód: CU122005</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CR MU JUBILADOS-PENSIONISTAS C/CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: CU122007</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL DE LA FESTA</strong></div> 
                                     <small class="cod-eq">Cód: CU122013</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL SANTA ISABEL</strong></div> 
                                     <small class="cod-eq">Cód: CU122016</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL LOS GIRASOLES</strong></div> 
                                     <small class="cod-eq">Cód: CU122017</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUN INFANTIL MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: CU122018</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO JUVENIL LOS MOLINOS</strong></div> 
                                     <small class="cod-eq">Cód: CU122019</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA TALLER CASERÓN HAYGÓN</strong></div> 
                                     <small class="cod-eq">Cód: CU122020</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DIDÁCTICO DEL ACEITE "LA ALMAZARA"</strong></div> 
                                     <small class="cod-eq">Cód: CU122021</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA DE LA NATURALEZA PARQUE LO TORRENT</strong></div> 
                                     <small class="cod-eq">Cód: CU122022</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ANTIGUO AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CU122023</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO SOCIAL CALLE CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: CU122024</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU DE LA UNIVERSITAT D'ALACANT - MUA</strong></div> 
                                     <small class="cod-eq">Cód: CU122025</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT SANTA FAZ</strong></div> 
                                     <small class="cod-eq">Cód: EN122001</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANTA ISABEL</strong></div> 
                                     <small class="cod-eq">Cód: EN122003</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES HAYGÓN</strong></div> 
                                     <small class="cod-eq">Cód: EN122004</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.I.P.F.P. CANASTELL</strong></div> 
                                     <small class="cod-eq">Cód: EN122005</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP RASPEIG</strong></div> 
                                     <small class="cod-eq">Cód: EN122007</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP BEC DE L'ÀGUILA</strong></div> 
                                     <small class="cod-eq">Cód: EN122008</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP L'HORTA</strong></div> 
                                     <small class="cod-eq">Cód: EN122009</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: EN122010</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN122011</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JUAN RAMÓN JIMÉNEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN122012</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AZORÍN</strong></div> 
                                     <small class="cod-eq">Cód: EN122013</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP REYES CATÓLICOS</strong></div> 
                                     <small class="cod-eq">Cód: EN122014</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO VICENTE LILLO CANOVAS</strong></div> 
                                     <small class="cod-eq">Cód: EN122017</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: EN122018</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LA ALMAZARA</strong></div> 
                                     <small class="cod-eq">Cód: EN122019</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JOSÉ RAMÓN GARCÍA ANTÓN</strong></div> 
                                     <small class="cod-eq">Cód: EN122020</small>
                                 </td>
@@ -1515,7 +1552,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES GAIA</strong></div> 
                                     <small class="cod-eq">Cód: EN122021</small>
                                 </td>
@@ -1545,7 +1581,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MARÍA BLASCO (ANTIGUO NUMERO 5)</strong></div> 
                                     <small class="cod-eq">Cód: EN122022</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VICTORIA KENT</strong></div> 
                                     <small class="cod-eq">Cód: EN122023</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE PEÑAFORT</strong></div> 
                                     <small class="cod-eq">Cód: EN122024</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT SAN RAIMUNDO DE PEÑAFORT</strong></div> 
                                     <small class="cod-eq">Cód: EN122025</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT PEÑAFORT-2</strong></div> 
                                     <small class="cod-eq">Cód: EN122026</small>
                                 </td>
@@ -1695,7 +1726,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE DUENDES</strong></div> 
                                     <small class="cod-eq">Cód: EN122027</small>
                                 </td>
@@ -1725,7 +1755,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE EL SOLET</strong></div> 
                                     <small class="cod-eq">Cód: EN122028</small>
                                 </td>
@@ -1755,7 +1784,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE GARABATOS</strong></div> 
                                     <small class="cod-eq">Cód: EN122029</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE TRAZOS Y RAYAJOS</strong></div> 
                                     <small class="cod-eq">Cód: EN122030</small>
                                 </td>
@@ -1815,7 +1842,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE NATURA</strong></div> 
                                     <small class="cod-eq">Cód: EN122031</small>
                                 </td>
@@ -1845,7 +1871,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE SOL Y LUNA</strong></div> 
                                     <small class="cod-eq">Cód: EN122032</small>
                                 </td>
@@ -1875,7 +1900,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE LAS LIBÉLULAS</strong></div> 
                                     <small class="cod-eq">Cód: EN122033</small>
                                 </td>
@@ -1905,7 +1929,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE LOS OLIVOS</strong></div> 
                                     <small class="cod-eq">Cód: EN122034</small>
                                 </td>
@@ -1935,7 +1958,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE SENTIDOS</strong></div> 
                                     <small class="cod-eq">Cód: EN122038</small>
                                 </td>
@@ -1965,7 +1987,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UNIVERSIDAD DE ALICANTE</strong></div> 
                                     <small class="cod-eq">Cód: EN122039</small>
                                 </td>
@@ -1995,7 +2016,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE TURULETA</strong></div> 
                                     <small class="cod-eq">Cód: EN122040</small>
                                 </td>
@@ -2025,7 +2045,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE MICKEY</strong></div> 
                                     <small class="cod-eq">Cód: EN122041</small>
                                 </td>
@@ -2055,7 +2074,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE BAMBI</strong></div> 
                                     <small class="cod-eq">Cód: EN122042</small>
                                 </td>
@@ -2085,7 +2103,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE A-E-I-O-U</strong></div> 
                                     <small class="cod-eq">Cód: EN122043</small>
                                 </td>
@@ -2115,7 +2132,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE PETITS</strong></div> 
                                     <small class="cod-eq">Cód: EN122044</small>
                                 </td>
@@ -2145,7 +2161,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLE DUENDES JUNIOR</strong></div> 
                                     <small class="cod-eq">Cód: EN122045</small>
                                 </td>
@@ -2175,7 +2190,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A. SANT VICENT FERRER</strong></div> 
                                     <small class="cod-eq">Cód: EN122047</small>
                                 </td>
@@ -2205,7 +2219,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA OFICIAL D'IDIOMES L'ALACANTÍ</strong></div> 
                                     <small class="cod-eq">Cód: EN122048</small>
                                 </td>
@@ -2265,7 +2278,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: SA122001</small>
                                 </td>
@@ -2295,7 +2307,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD SAN VICENTE I</strong></div> 
                                     <small class="cod-eq">Cód: SA122002</small>
                                 </td>
@@ -2325,7 +2336,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO HAYGON</strong></div> 
                                     <small class="cod-eq">Cód: SA122003</small>
                                 </td>
@@ -2355,7 +2365,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD SAN VICENTE II</strong></div> 
                                     <small class="cod-eq">Cód: SA122004</small>
                                 </td>
@@ -2415,7 +2424,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD CORAZON DE MARIA</strong></div> 
                                     <small class="cod-eq">Cód: AS122001</small>
                                 </td>
@@ -2445,7 +2453,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL MAIGMO</strong></div> 
                                     <small class="cod-eq">Cód: AS122002</small>
                                 </td>
@@ -2475,7 +2482,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DIA DE ALZHEIMER</strong></div> 
                                     <small class="cod-eq">Cód: AS122003</small>
                                 </td>
@@ -2505,7 +2511,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA P.M.D. DOMUSVI SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: AS122011</small>
                                 </td>
@@ -2535,7 +2540,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PMD SANT VICENT</strong></div> 
                                     <small class="cod-eq">Cód: AS122012</small>
                                 </td>
@@ -2565,7 +2569,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PDM NTRA SRA DE LA VICTORIA</strong></div> 
                                     <small class="cod-eq">Cód: AS122013</small>
                                 </td>
@@ -2625,7 +2628,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM122001</small>
                                 </td>
@@ -2685,7 +2687,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE BOMBEROS DE SAN VICENT DEL RASPEIG</strong></div> 
                                     <small class="cod-eq">Cód: IP122001</small>
                                 </td>
@@ -2715,7 +2716,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA SAN VICENT DEL RASPEIG</strong></div> 
                                     <small class="cod-eq">Cód: IP122003</small>
                                 </td>
@@ -2745,7 +2745,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCIÓN CIVIL SAN VICENTE DEL RASPEIG</strong></div> 
                                     <small class="cod-eq">Cód: IP122004</small>
                                 </td>
@@ -2805,7 +2804,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN VICENTE FERRER S.L</strong></div> 
                                     <small class="cod-eq">Cód: TA122001</small>
                                 </td>
@@ -2835,7 +2833,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRISTO DE LA PAZ</strong></div> 
                                     <small class="cod-eq">Cód: TA122002</small>
                                 </td>
@@ -2895,7 +2892,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANTA ISABEL</strong></div> 
                                     <small class="cod-eq">Cód: ID122001</small>
                                 </td>
@@ -2925,7 +2921,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COLONIA SANTA ISABEL</strong></div> 
                                     <small class="cod-eq">Cód: ID122002</small>
                                 </td>
@@ -2955,7 +2950,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES HAYGON</strong></div> 
                                     <small class="cod-eq">Cód: ID122003</small>
                                 </td>
@@ -2985,7 +2979,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. C.I.P.F.P. CANASTELL</strong></div> 
                                     <small class="cod-eq">Cód: ID122004</small>
                                 </td>
@@ -3015,7 +3008,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: ID122005</small>
                                 </td>
@@ -3045,7 +3037,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP RASPEIG</strong></div> 
                                     <small class="cod-eq">Cód: ID122006</small>
                                 </td>
@@ -3075,7 +3066,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP BEC DE L'AGUILA</strong></div> 
                                     <small class="cod-eq">Cód: ID122007</small>
                                 </td>
@@ -3105,7 +3095,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIUDAD DEPORTIVA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID122008</small>
                                 </td>
@@ -3135,7 +3124,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP L'HORTA</strong></div> 
                                     <small class="cod-eq">Cód: ID122010</small>
                                 </td>
@@ -3165,7 +3153,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VALENCIANA DE CEMENTOS</strong></div> 
                                     <small class="cod-eq">Cód: ID122011</small>
                                 </td>
@@ -3195,7 +3182,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID122013</small>
                                 </td>
@@ -3225,7 +3211,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JUAN RAMON JIMENEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID122014</small>
                                 </td>
@@ -3255,7 +3240,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP AZORIN</strong></div> 
                                     <small class="cod-eq">Cód: ID122015</small>
                                 </td>
@@ -3285,7 +3269,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP REYES CATOLICOS</strong></div> 
                                     <small class="cod-eq">Cód: ID122016</small>
                                 </td>
@@ -3315,7 +3298,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT SANTA FAZ</strong></div> 
                                     <small class="cod-eq">Cód: ID122017</small>
                                 </td>
@@ -3345,7 +3327,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA PARQUE HUERTO LO TORRENT</strong></div> 
                                     <small class="cod-eq">Cód: ID122020</small>
                                 </td>
@@ -3375,7 +3356,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DE CARRERAS HUERTO LO TORRENT</strong></div> 
                                     <small class="cod-eq">Cód: ID122021</small>
                                 </td>
@@ -3405,7 +3385,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MARÍA BLASCO</strong></div> 
                                     <small class="cod-eq">Cód: ID122022</small>
                                 </td>
@@ -3435,7 +3414,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VICTORIA KENT</strong></div> 
                                     <small class="cod-eq">Cód: ID122023</small>
                                 </td>
@@ -3465,7 +3443,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS POLIDEPORTIVAS LOS GIRASOLES</strong></div> 
                                     <small class="cod-eq">Cód: ID122025</small>
                                 </td>
@@ -3495,7 +3472,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA PARQUE PRESIDENTE ADOLFO SUÁREZ</strong></div> 
                                     <small class="cod-eq">Cód: ID122026</small>
                                 </td>
@@ -3525,7 +3501,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT SAN RAIMUNDO DE PEÑAFORT</strong></div> 
                                     <small class="cod-eq">Cód: ID122027</small>
                                 </td>
@@ -3555,7 +3530,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT PEÑAFORT-2</strong></div> 
                                     <small class="cod-eq">Cód: ID122028</small>
                                 </td>
@@ -3585,7 +3559,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO DEPORTIVO SUR</strong></div> 
                                     <small class="cod-eq">Cód: ID122029</small>
                                 </td>
@@ -3615,7 +3588,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE VIAL LOS HOLANDESES</strong></div> 
                                     <small class="cod-eq">Cód: ID122030</small>
                                 </td>
@@ -3645,7 +3617,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES GAIA</strong></div> 
                                     <small class="cod-eq">Cód: ID122031</small>
                                 </td>
@@ -3675,7 +3646,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: ID122032</small>
                                 </td>
@@ -3705,7 +3675,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JOSÉ RAMÓN GARCÍA ANTÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID122034</small>
                                 </td>
@@ -3735,7 +3704,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB PETANCA SAN VICENTE</strong></div> 
                                     <small class="cod-eq">Cód: ID122035</small>
                                 </td>
@@ -3765,7 +3733,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS FÚTBOL PLAZA DE LAS FLORES</strong></div> 
                                     <small class="cod-eq">Cód: ID122036</small>
                                 </td>
@@ -3795,7 +3762,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS CARRER ELDA</strong></div> 
                                     <small class="cod-eq">Cód: ID122037</small>
                                 </td>
@@ -3825,7 +3791,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO DEPORTIVO UNIVERSIDAD DE ALICANTE</strong></div> 
                                     <small class="cod-eq">Cód: ID122208</small>
                                 </td>
@@ -3855,7 +3820,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SKATE PARK - PARQUE ADOLFO SUAREZ</strong></div> 
                                     <small class="cod-eq">Cód: ID122209</small>
                                 </td>
@@ -3885,7 +3849,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PABELLON POLIDEPORTIVO</strong></div> 
                                     <small class="cod-eq">Cód: ID122210</small>
                                 </td>
@@ -3915,7 +3878,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>INSTALACIÓN DEPORTIVA VILLAMONTES</strong></div> 
                                     <small class="cod-eq">Cód: ID122211</small>
                                 </td>
@@ -3975,7 +3937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ122001</small>
                                 </td>
@@ -4005,7 +3966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PEPITA MOLTÓ PERAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ122002</small>
                                 </td>
@@ -4035,7 +3995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE HUERTO LO TORRENT</strong></div> 
                                     <small class="cod-eq">Cód: PJ122003</small>
                                 </td>
@@ -4065,7 +4024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INGENIERO JOSÉ RAMÓN GARCÍA ANTÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ122004</small>
                                 </td>
@@ -4095,7 +4053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN ESTHER PEÑA FRANCO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122005</small>
                                 </td>
@@ -4125,7 +4082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA DEMOCRACIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122006</small>
                                 </td>
@@ -4155,7 +4111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AUDITORIO JUAN XXIII</strong></div> 
                                     <small class="cod-eq">Cód: PJ122008</small>
                                 </td>
@@ -4185,7 +4140,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. FELIPE MALLOL</strong></div> 
                                     <small class="cod-eq">Cód: PJ122011</small>
                                 </td>
@@ -4215,7 +4169,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EL RABOSAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ122013</small>
                                 </td>
@@ -4245,7 +4198,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA HUERTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122014</small>
                                 </td>
@@ -4275,7 +4227,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PRESIDENTE ADOLFO SUÁREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ122015</small>
                                 </td>
@@ -4305,7 +4256,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL EDF. POLIFUNC Y VIVERO DE EMP</strong></div> 
                                     <small class="cod-eq">Cód: PJ122016</small>
                                 </td>
@@ -4335,7 +4285,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA BOQUERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122017</small>
                                 </td>
@@ -4365,7 +4314,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MIMOSA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ122019</small>
                                 </td>
@@ -4395,7 +4343,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO HUERTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122020</small>
                                 </td>
@@ -4425,7 +4372,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA COOPERANTE VICENTE FERRER</strong></div> 
                                     <small class="cod-eq">Cód: PJ122021</small>
                                 </td>
@@ -4455,7 +4401,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JUAN PABLO II</strong></div> 
                                     <small class="cod-eq">Cód: PJ122022</small>
                                 </td>
@@ -4485,7 +4430,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VICENTE SAVALL</strong></div> 
                                     <small class="cod-eq">Cód: PJ122023</small>
                                 </td>
@@ -4515,7 +4459,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JOAQUIN RODRIGUEZ PEREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ122024</small>
                                 </td>
@@ -4545,7 +4488,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JOAQUIN RODRIGUEZ PEREZ II</strong></div> 
                                     <small class="cod-eq">Cód: PJ122025</small>
                                 </td>
@@ -4575,7 +4517,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ALCALDE GABRIEL MOLINA VILLEGAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ122026</small>
                                 </td>
@@ -4605,7 +4546,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE PELAYO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122027</small>
                                 </td>
@@ -4635,7 +4575,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA HORT DELS LLEONS</strong></div> 
                                     <small class="cod-eq">Cód: PJ122028</small>
                                 </td>
@@ -4665,7 +4604,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN AVDA. SEVILLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122029</small>
                                 </td>
@@ -4695,7 +4633,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA FRANCISCO SANTANA ORTS</strong></div> 
                                     <small class="cod-eq">Cód: PJ122030</small>
                                 </td>
@@ -4725,7 +4662,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LAS NACIONES</strong></div> 
                                     <small class="cod-eq">Cód: PJ122031</small>
                                 </td>
@@ -4755,7 +4691,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122032</small>
                                 </td>
@@ -4785,7 +4720,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA ESPARCIMIENTO SANTA ISABEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ122033</small>
                                 </td>
@@ -4815,7 +4749,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA COMUNIDAD VALENCIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122034</small>
                                 </td>
@@ -4845,7 +4778,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DEL MESTRE ( C/ COLÓN )</strong></div> 
                                     <small class="cod-eq">Cód: PJ122035</small>
                                 </td>
@@ -4875,7 +4807,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL AV PRIMERO DE MAYO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122036</small>
                                 </td>
@@ -4905,7 +4836,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVINGUDA DE L'ALMÀSSERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122037</small>
                                 </td>
@@ -4935,7 +4865,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VICTIMAS DEL TERRORISMO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122039</small>
                                 </td>
@@ -4965,7 +4894,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JUNTO PASAJE ANDORRA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122041</small>
                                 </td>
@@ -4995,7 +4923,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA 8 DE MARZO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122042</small>
                                 </td>
@@ -5025,7 +4952,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AL VOLUNTARIADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122043</small>
                                 </td>
@@ -5055,7 +4981,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EN PASEO DE LOS OLIVOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ122044</small>
                                 </td>
@@ -5085,7 +5010,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LAS FLORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ122045</small>
                                 </td>
@@ -5115,7 +5039,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. ZORITA ROMERO CHECA</strong></div> 
                                     <small class="cod-eq">Cód: PJ122046</small>
                                 </td>
@@ -5145,7 +5068,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE VETERINARIO MANUEL I</strong></div> 
                                     <small class="cod-eq">Cód: PJ122047</small>
                                 </td>
@@ -5175,7 +5097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MANUELA SENTANA FUENTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ122049</small>
                                 </td>
@@ -5205,7 +5126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BARRIO LOS MANCHEGOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ122050</small>
                                 </td>
@@ -5235,7 +5155,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL MAESTRO J. MONTOYO</strong></div> 
                                     <small class="cod-eq">Cód: PJ122051</small>
                                 </td>
@@ -5265,7 +5184,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE LA CARRASQUETA - VILLAMONTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ122052</small>
                                 </td>
@@ -5314,6 +5232,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -5329,7 +5248,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -5420,7 +5339,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -5550,7 +5469,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

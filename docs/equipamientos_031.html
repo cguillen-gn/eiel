@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC031005</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACIÓN Y TURISMO I TORREJÓ</strong></div> 
                                     <small class="cod-eq">Cód: CC031006</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACIÓN Y TURISMO III</strong></div> 
                                     <small class="cod-eq">Cód: CC031007</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACIÓN Y TURISMO II</strong></div> 
                                     <small class="cod-eq">Cód: CC031008</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPÓSITO MUNICIPAL DE VEHÍCULOS</strong></div> 
                                     <small class="cod-eq">Cód: CC031009</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS CENTRALES DE LA POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC031010</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXTENSIÓN ADMINISTRATIVA LA CALA(PROP)</strong></div> 
                                     <small class="cod-eq">Cód: CC031012</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICÍA LOCAL (PLAYAS)</strong></div> 
                                     <small class="cod-eq">Cód: CC031013</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE SANIDAD. LABORATORIO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC031016</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA NACIONAL</strong></div> 
                                     <small class="cod-eq">Cód: CC031017</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC031018</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA MUNICIPAL MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: CC031019</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXTENSION ADMINISTRATIVA RINCON DE LOIX(PROP)</strong></div> 
                                     <small class="cod-eq">Cód: CC031022</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT</strong></div> 
                                     <small class="cod-eq">Cód: CC031023</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXTENSION ADMINISTRATIVA DE FOIETES (PROP)</strong></div> 
                                     <small class="cod-eq">Cód: CC031024</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXT.ADMINISTRATIVA  ELS TOLLS AVDA.ANDALUCIA(PROP)</strong></div> 
                                     <small class="cod-eq">Cód: CC031025</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL ( AYTO.)</strong></div> 
                                     <small class="cod-eq">Cód: CC031026</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE INFORMACION JUVENIL</strong></div> 
                                     <small class="cod-eq">Cód: CC031027</small>
                                 </td>
@@ -735,7 +796,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIONES MARTNEZ ORIOLA</strong></div> 
                                     <small class="cod-eq">Cód: CC031028</small>
                                 </td>
@@ -765,7 +825,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL 1 EN EDIFICIO FUNDACION I. (ALMACÉN)</strong></div> 
                                     <small class="cod-eq">Cód: CC031029</small>
                                 </td>
@@ -795,7 +854,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL 2 EN EDIFICIO FUNDACION I. (ALMACÉN)</strong></div> 
                                     <small class="cod-eq">Cód: CC031030</small>
                                 </td>
@@ -825,7 +883,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL 3  EN EDIFICIO FUNDACION I.(CEDIDO CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: CC031031</small>
                                 </td>
@@ -855,7 +912,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACION TURISTICA TERRA MITICA</strong></div> 
                                     <small class="cod-eq">Cód: CC031032</small>
                                 </td>
@@ -885,7 +941,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MUNICIPAL TORREJO, OMIC, FPA</strong></div> 
                                     <small class="cod-eq">Cód: CC031033</small>
                                 </td>
@@ -915,7 +970,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IMPRENTA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC031034</small>
                                 </td>
@@ -945,7 +999,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PERRERA MUNICIPAL DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: CC031035</small>
                                 </td>
@@ -975,7 +1028,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIVEROS MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CC031036</small>
                                 </td>
@@ -1005,7 +1057,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA NACIONAL RINCON DE LOIX</strong></div> 
                                     <small class="cod-eq">Cód: CC031037</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO JULIO IGLESIAS</strong></div> 
                                     <small class="cod-eq">Cód: CU031001</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA DE CULTURA FUNDACION C.A.M</strong></div> 
                                     <small class="cod-eq">Cód: CU031004</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL FESTER DIEGO  CANO</strong></div> 
                                     <small class="cod-eq">Cód: CU031005</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL MARÍTIMO</strong></div> 
                                     <small class="cod-eq">Cód: CU031006</small>
                                 </td>
@@ -1185,7 +1232,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA TOROS DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: CU031007</small>
                                 </td>
@@ -1215,7 +1261,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL JOSÉ LLORCA LLINARES</strong></div> 
                                     <small class="cod-eq">Cód: CU031008</small>
                                 </td>
@@ -1245,7 +1290,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA RINCON DE LOIX</strong></div> 
                                     <small class="cod-eq">Cód: CU031009</small>
                                 </td>
@@ -1275,7 +1319,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL JELENA.BIENESTAR SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU031010</small>
                                 </td>
@@ -1305,7 +1348,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCALES SOCIALES MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CU031011</small>
                                 </td>
@@ -1335,7 +1377,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA CENTRAL</strong></div> 
                                     <small class="cod-eq">Cód: CU031012</small>
                                 </td>
@@ -1365,7 +1406,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULT. Y DE CONGR.AVDA. DE EUROPA</strong></div> 
                                     <small class="cod-eq">Cód: CU031013</small>
                                 </td>
@@ -1395,7 +1435,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: CU031014</small>
                                 </td>
@@ -1425,7 +1464,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA EUROPEA</strong></div> 
                                     <small class="cod-eq">Cód: CU031015</small>
                                 </td>
@@ -1455,7 +1493,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FORMATIVO PARA EL EMPLEO PEPITA P</strong></div> 
                                     <small class="cod-eq">Cód: CU031020</small>
                                 </td>
@@ -1485,7 +1522,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE OFICIOS</strong></div> 
                                     <small class="cod-eq">Cód: CU031021</small>
                                 </td>
@@ -1515,7 +1551,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CIVICO  TANIT</strong></div> 
                                     <small class="cod-eq">Cód: CU031023</small>
                                 </td>
@@ -1545,7 +1580,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO VECINAL ELS TOLLS</strong></div> 
                                     <small class="cod-eq">Cód: CU031024</small>
                                 </td>
@@ -1575,7 +1609,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO L'HORT DE COLON</strong></div> 
                                     <small class="cod-eq">Cód: CU031026</small>
                                 </td>
@@ -1605,7 +1638,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO BOCA DEL CALVARI</strong></div> 
                                     <small class="cod-eq">Cód: CU031027</small>
                                 </td>
@@ -1635,7 +1667,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO OSCAR ESPLÁ</strong></div> 
                                     <small class="cod-eq">Cód: CU031028</small>
                                 </td>
@@ -1665,7 +1696,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL PEPITA ESPERANZA LLINARES</strong></div> 
                                     <small class="cod-eq">Cód: CU031029</small>
                                 </td>
@@ -1695,7 +1725,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA DEL MAR</strong></div> 
                                     <small class="cod-eq">Cód: CU031030</small>
                                 </td>
@@ -1725,7 +1754,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPAI D'ART LA CASITA</strong></div> 
                                     <small class="cod-eq">Cód: CU031031</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN031001</small>
                                 </td>
@@ -1815,7 +1842,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AUSIAS MARCH</strong></div> 
                                     <small class="cod-eq">Cód: EN031002</small>
                                 </td>
@@ -1845,7 +1871,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUESTRA SEÑORA DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN031004</small>
                                 </td>
@@ -1875,7 +1900,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SERRA GELADA</strong></div> 
                                     <small class="cod-eq">Cód: EN031006</small>
                                 </td>
@@ -1905,7 +1929,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: EN031007</small>
                                 </td>
@@ -1935,7 +1958,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LEONOR CANALEJAS</strong></div> 
                                     <small class="cod-eq">Cód: EN031009</small>
                                 </td>
@@ -1965,7 +1987,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FORMACION PERSONAS ADULTAS (F.P.A)</strong></div> 
                                     <small class="cod-eq">Cód: EN031010</small>
                                 </td>
@@ -1995,7 +2016,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO ELEMENTAL DE DANZA</strong></div> 
                                     <small class="cod-eq">Cód: EN031011</small>
                                 </td>
@@ -2025,7 +2045,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PUIG CAMPANA</strong></div> 
                                     <small class="cod-eq">Cód: EN031014</small>
                                 </td>
@@ -2055,7 +2074,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ELS TOLLS</strong></div> 
                                     <small class="cod-eq">Cód: EN031015</small>
                                 </td>
@@ -2085,7 +2103,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP BAUTISTA LLEDÓ PÉREZ</strong></div> 
                                     <small class="cod-eq">Cód: EN031017</small>
                                 </td>
@@ -2115,7 +2132,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AITANA</strong></div> 
                                     <small class="cod-eq">Cód: EN031018</small>
                                 </td>
@@ -2145,7 +2161,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VASCO NÚÑEZ DE BALBOA</strong></div> 
                                     <small class="cod-eq">Cód: EN031019</small>
                                 </td>
@@ -2175,7 +2190,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES BERNAT DE SARRIÁ</strong></div> 
                                     <small class="cod-eq">Cód: EN031020</small>
                                 </td>
@@ -2205,7 +2219,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MESTRE GASPAR LÓPEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN031021</small>
                                 </td>
@@ -2235,7 +2248,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES PERE MARÍA ORTS I BOSCH</strong></div> 
                                     <small class="cod-eq">Cód: EN031022</small>
                                 </td>
@@ -2265,7 +2277,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES L'ALMADRAVA</strong></div> 
                                     <small class="cod-eq">Cód: EN031023</small>
                                 </td>
@@ -2295,7 +2306,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP GABRIEL MIRÓ</strong></div> 
                                     <small class="cod-eq">Cód: EN031024</small>
                                 </td>
@@ -2325,7 +2335,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA OFICIAL DE IDIOMAS PROFESORA CARMEN GARCIA</strong></div> 
                                     <small class="cod-eq">Cód: EN031026</small>
                                 </td>
@@ -2355,7 +2364,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUESTRA SRA. DE LOS DOLORES (INFANTIL)</strong></div> 
                                     <small class="cod-eq">Cód: EN031027</small>
                                 </td>
@@ -2385,7 +2393,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES BEATRIU FAJARDO DE MENDOZA</strong></div> 
                                     <small class="cod-eq">Cód: EN031028</small>
                                 </td>
@@ -2415,7 +2422,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOPE DE VEGA</strong></div> 
                                     <small class="cod-eq">Cód: EN031029</small>
                                 </td>
@@ -2445,7 +2451,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COSTA BLANCA INTERNATIONAL COL-LEGE S.L.</strong></div> 
                                     <small class="cod-eq">Cód: EN031030</small>
                                 </td>
@@ -2475,7 +2480,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MEDITERRANEA</strong></div> 
                                     <small class="cod-eq">Cód: EN031031</small>
                                 </td>
@@ -2505,7 +2509,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP EL MURTAL</strong></div> 
                                     <small class="cod-eq">Cód: EN031033</small>
                                 </td>
@@ -2535,7 +2538,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO PROFESIONAL DE MUSICA J.PERZ BARCELO</strong></div> 
                                     <small class="cod-eq">Cód: EN031034</small>
                                 </td>
@@ -2565,7 +2567,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL LES CALETES</strong></div> 
                                     <small class="cod-eq">Cód: EN031035</small>
                                 </td>
@@ -2595,7 +2596,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL FONTANELLES</strong></div> 
                                     <small class="cod-eq">Cód: EN031036</small>
                                 </td>
@@ -2625,7 +2625,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL EL TOSSALET</strong></div> 
                                     <small class="cod-eq">Cód: EN031037</small>
                                 </td>
@@ -2655,7 +2654,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DESARROLLO TURISTICO (C.D.T.)</strong></div> 
                                     <small class="cod-eq">Cód: EN031039</small>
                                 </td>
@@ -2685,7 +2683,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MUSICA UNION MUSICAL</strong></div> 
                                     <small class="cod-eq">Cód: EN031040</small>
                                 </td>
@@ -2715,7 +2712,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MUSICA LA MARINA L'ILLA DE BENID</strong></div> 
                                     <small class="cod-eq">Cód: EN031042</small>
                                 </td>
@@ -2745,7 +2741,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FORMACION PROFESIONAL PRIVADA ARCE</strong></div> 
                                     <small class="cod-eq">Cód: EN031043</small>
                                 </td>
@@ -2775,7 +2770,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE ENSENYAMENTS ESPORTIUS LOPE DE VEGA DEPORTI</strong></div> 
                                     <small class="cod-eq">Cód: EN031044</small>
                                 </td>
@@ -2805,7 +2799,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>L'ALMAFRA</strong></div> 
                                     <small class="cod-eq">Cód: EN031045</small>
                                 </td>
@@ -2835,7 +2828,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA LA NOVA DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: EN031047</small>
                                 </td>
@@ -2865,7 +2857,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIV. ED. INF. 1er CICLE MY BIG KINGDOM</strong></div> 
                                     <small class="cod-eq">Cód: EN031048</small>
                                 </td>
@@ -2925,7 +2916,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD II TOMAS ORTUÑO</strong></div> 
                                     <small class="cod-eq">Cód: SA031005</small>
                                 </td>
@@ -2955,7 +2945,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL CLINICA BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: SA031009</small>
                                 </td>
@@ -2985,7 +2974,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD I FOIETES</strong></div> 
                                     <small class="cod-eq">Cód: SA031010</small>
                                 </td>
@@ -3015,7 +3003,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE ESPECIALIDADES FOIETES</strong></div> 
                                     <small class="cod-eq">Cód: SA031011</small>
                                 </td>
@@ -3045,7 +3032,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD III LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: SA031012</small>
                                 </td>
@@ -3075,7 +3061,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL IMED  LEVANTE</strong></div> 
                                     <small class="cod-eq">Cód: SA031013</small>
                                 </td>
@@ -3105,7 +3090,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLINICA UMIVALE BENIDORM.</strong></div> 
                                     <small class="cod-eq">Cód: SA031014</small>
                                 </td>
@@ -3135,7 +3119,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MCSS IBERMUTUA</strong></div> 
                                     <small class="cod-eq">Cód: SA031015</small>
                                 </td>
@@ -3165,7 +3148,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASEPEYO BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: SA031016</small>
                                 </td>
@@ -3195,7 +3177,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FREMAP</strong></div> 
                                     <small class="cod-eq">Cód: SA031017</small>
                                 </td>
@@ -3225,7 +3206,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD RINCÓN DE LOIX</strong></div> 
                                     <small class="cod-eq">Cód: SA031018</small>
                                 </td>
@@ -3285,7 +3265,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUNDACION CORTÉS ROIG</strong></div> 
                                     <small class="cod-eq">Cód: AS031002</small>
                                 </td>
@@ -3315,7 +3294,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DE DIA P.M.D. DE BEN</strong></div> 
                                     <small class="cod-eq">Cód: AS031003</small>
                                 </td>
@@ -3345,7 +3323,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA DE ENFERMOS MENTALES,REHABILI</strong></div> 
                                     <small class="cod-eq">Cód: AS031004</small>
                                 </td>
@@ -3375,7 +3352,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL DISC.DOBLE AMOR</strong></div> 
                                     <small class="cod-eq">Cód: AS031005</small>
                                 </td>
@@ -3405,7 +3381,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA GERIATRICA CIUDAD PATRICIA</strong></div> 
                                     <small class="cod-eq">Cód: AS031006</small>
                                 </td>
@@ -3465,7 +3440,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO ABRIL</strong></div> 
                                     <small class="cod-eq">Cód: LM031002</small>
                                 </td>
@@ -3495,7 +3469,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MERCALOIX</strong></div> 
                                     <small class="cod-eq">Cód: LM031003</small>
                                 </td>
@@ -3525,7 +3498,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM031005</small>
                                 </td>
@@ -3585,7 +3557,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COMARCAL DE BOMBEROS MARINA BAIXA</strong></div> 
                                     <small class="cod-eq">Cód: IP031001</small>
                                 </td>
@@ -3615,7 +3586,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGRUPACION  VOLUNTARIOS PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP031002</small>
                                 </td>
@@ -3645,7 +3615,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: IP031003</small>
                                 </td>
@@ -3675,7 +3644,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALVAMENTO MARITIMO</strong></div> 
                                     <small class="cod-eq">Cód: IP031004</small>
                                 </td>
@@ -3705,7 +3673,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP031005</small>
                                 </td>
@@ -3767,7 +3734,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIUDAD DEPORTIVA GUILLERMO AMOR (FOIETES)</strong></div> 
                                     <small class="cod-eq">Cód: ID031003</small>
                                 </td>
@@ -3797,7 +3763,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TRINQUET ALCALDE VICENTE PEREZ DEVESA</strong></div> 
                                     <small class="cod-eq">Cód: ID031004</small>
                                 </td>
@@ -3827,7 +3792,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. NUESTRA SEÑORA DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: ID031005</small>
                                 </td>
@@ -3857,7 +3821,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: ID031007</small>
                                 </td>
@@ -3887,7 +3850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES BERNAT DE SARRIÁ</strong></div> 
                                     <small class="cod-eq">Cód: ID031008</small>
                                 </td>
@@ -3917,7 +3879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LEONOR CANALEJAS</strong></div> 
                                     <small class="cod-eq">Cód: ID031009</small>
                                 </td>
@@ -3947,7 +3908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SERRA GELADA</strong></div> 
                                     <small class="cod-eq">Cód: ID031010</small>
                                 </td>
@@ -3977,7 +3937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP PUIG CAMPANA</strong></div> 
                                     <small class="cod-eq">Cód: ID031011</small>
                                 </td>
@@ -4007,7 +3966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ELS TOLLS</strong></div> 
                                     <small class="cod-eq">Cód: ID031012</small>
                                 </td>
@@ -4037,7 +3995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP AITANA</strong></div> 
                                     <small class="cod-eq">Cód: ID031013</small>
                                 </td>
@@ -4067,7 +4024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VASCO NÚÑEZ DE BALBOA</strong></div> 
                                     <small class="cod-eq">Cód: ID031014</small>
                                 </td>
@@ -4097,7 +4053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. MESTRE GASPAR LÓPEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID031015</small>
                                 </td>
@@ -4127,7 +4082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES PERE MARÍA ORTS I BOSCH</strong></div> 
                                     <small class="cod-eq">Cód: ID031016</small>
                                 </td>
@@ -4157,7 +4111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ALMADRABA</strong></div> 
                                     <small class="cod-eq">Cód: ID031017</small>
                                 </td>
@@ -4187,7 +4140,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. GABRIEL MIRÓ</strong></div> 
                                     <small class="cod-eq">Cód: ID031018</small>
                                 </td>
@@ -4217,7 +4169,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LOPE DE VEGA</strong></div> 
                                     <small class="cod-eq">Cód: ID031020</small>
                                 </td>
@@ -4247,7 +4198,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES BEATRIU FAJARDO DE MENDOZA</strong></div> 
                                     <small class="cod-eq">Cód: ID031021</small>
                                 </td>
@@ -4277,7 +4227,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUERTO DEPORTIVO DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: ID031022</small>
                                 </td>
@@ -4307,7 +4256,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. COSTA BLANCA INTERNATIONAL COL-LEGE S.L.</strong></div> 
                                     <small class="cod-eq">Cód: ID031025</small>
                                 </td>
@@ -4337,7 +4285,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MEDITERRANEA</strong></div> 
                                     <small class="cod-eq">Cód: ID031026</small>
                                 </td>
@@ -4367,7 +4314,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP EL MURTAL</strong></div> 
                                     <small class="cod-eq">Cód: ID031028</small>
                                 </td>
@@ -4397,7 +4343,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP AUSIAS MARCH</strong></div> 
                                     <small class="cod-eq">Cód: ID031032</small>
                                 </td>
@@ -4427,7 +4372,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP BAUTISTA LLEDO PEREZ</strong></div> 
                                     <small class="cod-eq">Cód: ID031033</small>
                                 </td>
@@ -4457,7 +4401,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALAU DELS ESPORTS L'ILLA DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: ID031034</small>
                                 </td>
@@ -4487,7 +4430,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID031035</small>
                                 </td>
@@ -4517,7 +4459,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPOS DE FÚTBOL ANTONIO LOPEZ (RINCON DE LOIX)</strong></div> 
                                     <small class="cod-eq">Cód: ID031036</small>
                                 </td>
@@ -4547,7 +4488,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO DEPORTIVO LA MARINA</strong></div> 
                                     <small class="cod-eq">Cód: ID031037</small>
                                 </td>
@@ -4577,7 +4517,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE GOLF LAS REJAS</strong></div> 
                                     <small class="cod-eq">Cód: ID031038</small>
                                 </td>
@@ -4607,7 +4546,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PATINÓDROMO</strong></div> 
                                     <small class="cod-eq">Cód: ID031039</small>
                                 </td>
@@ -4637,7 +4575,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PABELLÓN RAUL MESA</strong></div> 
                                     <small class="cod-eq">Cód: ID031040</small>
                                 </td>
@@ -4667,7 +4604,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUMP TRACK BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: ID031041</small>
                                 </td>
@@ -4727,7 +4663,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE L'AIGUERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031001</small>
                                 </td>
@@ -4757,7 +4692,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HUERTO COLÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ031005</small>
                                 </td>
@@ -4787,7 +4721,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ISLA DE BENIDORM</strong></div> 
                                     <small class="cod-eq">Cód: PJ031006</small>
                                 </td>
@@ -4817,7 +4750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE ELCHE</strong></div> 
                                     <small class="cod-eq">Cód: PJ031008</small>
                                 </td>
@@ -4847,7 +4779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL XALOC</strong></div> 
                                     <small class="cod-eq">Cód: PJ031011</small>
                                 </td>
@@ -4877,7 +4808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL DE TRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ031013</small>
                                 </td>
@@ -4907,7 +4837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AVENIDA MURCIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031014</small>
                                 </td>
@@ -4937,7 +4866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA HISPANIDAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ031015</small>
                                 </td>
@@ -4967,7 +4895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031016</small>
                                 </td>
@@ -4997,7 +4924,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031017</small>
                                 </td>
@@ -5027,7 +4953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA BELGICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031019</small>
                                 </td>
@@ -5057,7 +4982,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE VENEZUELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031020</small>
                                 </td>
@@ -5087,7 +5011,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  OFICINA TURISMO RINCON DE LOIX</strong></div> 
                                     <small class="cod-eq">Cód: PJ031022</small>
                                 </td>
@@ -5117,7 +5040,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO AVENIDA DE MALLORCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031023</small>
                                 </td>
@@ -5147,7 +5069,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN AVDA. DE FILIPINAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ031024</small>
                                 </td>
@@ -5177,7 +5098,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIOSALUDABLE AVDA. VENEZUELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031025</small>
                                 </td>
@@ -5207,7 +5127,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE LA SENYORIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031026</small>
                                 </td>
@@ -5237,7 +5156,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ031027</small>
                                 </td>
@@ -5267,7 +5185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL CASTELL</strong></div> 
                                     <small class="cod-eq">Cód: PJ031028</small>
                                 </td>
@@ -5297,7 +5214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR PLAÇA DEL CASTELL</strong></div> 
                                     <small class="cod-eq">Cód: PJ031029</small>
                                 </td>
@@ -5327,7 +5243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO DEL RINCON DE LOIX</strong></div> 
                                     <small class="cod-eq">Cód: PJ031030</small>
                                 </td>
@@ -5357,7 +5272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE PONIENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ031031</small>
                                 </td>
@@ -5387,7 +5301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MANIZALES</strong></div> 
                                     <small class="cod-eq">Cód: PJ031032</small>
                                 </td>
@@ -5417,7 +5330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ. AVDA. VICENTE LLORCA ALOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ031033</small>
                                 </td>
@@ -5447,7 +5359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE</strong></div> 
                                     <small class="cod-eq">Cód: PJ031034</small>
                                 </td>
@@ -5477,7 +5388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ZONA LA CALA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031035</small>
                                 </td>
@@ -5507,7 +5417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE FOIETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ031036</small>
                                 </td>
@@ -5537,7 +5446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE SS. MM. LOS REYES DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031037</small>
                                 </td>
@@ -5567,7 +5475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC ELS AMETLERS</strong></div> 
                                     <small class="cod-eq">Cód: PJ031038</small>
                                 </td>
@@ -5597,7 +5504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA SEQUIA MARE</strong></div> 
                                     <small class="cod-eq">Cód: PJ031039</small>
                                 </td>
@@ -5627,7 +5533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA MADRID</strong></div> 
                                     <small class="cod-eq">Cód: PJ031040</small>
                                 </td>
@@ -5657,7 +5562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CEMENTERIO VIEJO</strong></div> 
                                     <small class="cod-eq">Cód: PJ031041</small>
                                 </td>
@@ -5687,7 +5591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIOSALUDABLE CALLE BENISSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031042</small>
                                 </td>
@@ -5717,7 +5620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC BIOSALUDABLE AVDA. ADOLFO SUAREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ031043</small>
                                 </td>
@@ -5747,7 +5649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIOSALUDABLE ZONA PONENT</strong></div> 
                                     <small class="cod-eq">Cód: PJ031044</small>
                                 </td>
@@ -5777,7 +5678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE CIUDAD REAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ031045</small>
                                 </td>
@@ -5807,7 +5707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIOSALUDABLE AVDA. BENIARDÁ.</strong></div> 
                                     <small class="cod-eq">Cód: PJ031046</small>
                                 </td>
@@ -5837,7 +5736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE L'INFANT</strong></div> 
                                     <small class="cod-eq">Cód: PJ031047</small>
                                 </td>
@@ -5867,7 +5765,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL MORALET</strong></div> 
                                     <small class="cod-eq">Cód: PJ031048</small>
                                 </td>
@@ -5897,7 +5794,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. VICENTE PEREZ DEVESA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031049</small>
                                 </td>
@@ -5927,7 +5823,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. ALC. VICENTE PEREZ DEVESA  I</strong></div> 
                                     <small class="cod-eq">Cód: PJ031050</small>
                                 </td>
@@ -5957,7 +5852,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. ALC. VICENTE PEREZ DEVESA II</strong></div> 
                                     <small class="cod-eq">Cód: PJ031051</small>
                                 </td>
@@ -5987,7 +5881,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV. MARINA ALTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031052</small>
                                 </td>
@@ -6017,7 +5910,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FINCA BARRINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ031053</small>
                                 </td>
@@ -6047,7 +5939,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA NEPTUNO</strong></div> 
                                     <small class="cod-eq">Cód: PJ031054</small>
                                 </td>
@@ -6077,7 +5968,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIOSALUDABLE - Av. PUERTO RICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ031055</small>
                                 </td>
@@ -6126,6 +6016,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -6141,7 +6032,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -6232,7 +6123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -6362,7 +6253,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

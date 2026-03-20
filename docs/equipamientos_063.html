@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT DE DENIA</strong></div> 
                                     <small class="cod-eq">Cód: CC063001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGENCIA MUNICIPAL DE URBANISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC063002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA D'INFORMACIÓ I TURISME</strong></div> 
                                     <small class="cod-eq">Cód: CC063003</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CREAMA - AGENCIA DE DESARROLLO LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC063007</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>E.A.T.I.M. DE JESÚS POBRE</strong></div> 
                                     <small class="cod-eq">Cód: CC063008</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE EATIM LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: CC063009</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS MUNICIPALES C/ HERMANOS GAVILÀ FERRER</strong></div> 
                                     <small class="cod-eq">Cód: CC063010</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC063011</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE DE LAS ASOCIACIONES</strong></div> 
                                     <small class="cod-eq">Cód: CC063012</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: CC063013</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO MUNICIPAL LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: CC063014</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE DE ANIMALES</strong></div> 
                                     <small class="cod-eq">Cód: CC063015</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC063016</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA MUNICIPAL DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU063001</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU ETNOLÒGIC DE LA CIUTAT DE DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: CU063002</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE INTERPRETACIÓN CIUDAD DE DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: CU063003</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE D'ART L'ESTACIÓ</strong></div> 
                                     <small class="cod-eq">Cód: CU063004</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARXIU MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU063007</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU063009</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE CULTURAL JESÚS POBRE</strong></div> 
                                     <small class="cod-eq">Cód: CU063011</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGENCIA DE LECTURA ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: CU063015</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGENCIA DE LECTURA BAIX LA MAR</strong></div> 
                                     <small class="cod-eq">Cód: CU063016</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GRAN RIURAU DE JESÚS POBRE</strong></div> 
                                     <small class="cod-eq">Cód: CU063018</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARTISTICS</strong></div> 
                                     <small class="cod-eq">Cód: CU063019</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NAVES COMISIONES FESTERAS</strong></div> 
                                     <small class="cod-eq">Cód: CU063020</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE BARRIO OESTE</strong></div> 
                                     <small class="cod-eq">Cód: CU063021</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE BARRIO SERTORI</strong></div> 
                                     <small class="cod-eq">Cód: CU063022</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE JUBILATS DE LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: CU063023</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DEL CINEMA</strong></div> 
                                     <small class="cod-eq">Cód: CU063024</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE JUVENTUD "LLUNÀTICS"</strong></div> 
                                     <small class="cod-eq">Cód: CU063025</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE SOCIAL 8 DE MARÇ</strong></div> 
                                     <small class="cod-eq">Cód: CU063026</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA PÚBLICA DÉNIA 'JUAN CHABÁS'</strong></div> 
                                     <small class="cod-eq">Cód: CU063027</small>
                                 </td>
@@ -1185,7 +1232,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DE LA MAR</strong></div> 
                                     <small class="cod-eq">Cód: CU063028</small>
                                 </td>
@@ -1215,7 +1261,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA CULTURA LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: CU063029</small>
                                 </td>
@@ -1245,7 +1290,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MAD (MUSEO ARQUEOLÓGICO CIUDAD DE DÉNIA)</strong></div> 
                                     <small class="cod-eq">Cód: CU063031</small>
                                 </td>
@@ -1275,7 +1319,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU FESTER DE DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: CU063032</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MONTGÓ</strong></div> 
                                     <small class="cod-eq">Cód: EN063001</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LES VESSANES</strong></div> 
                                     <small class="cod-eq">Cód: EN063002</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP POU DE LA MUNTANYA</strong></div> 
                                     <small class="cod-eq">Cód: EN063003</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: EN063004</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LLEBEIG</strong></div> 
                                     <small class="cod-eq">Cód: EN063005</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAGRADO CORAZÓN (HH. CARMELITAS)</strong></div> 
                                     <small class="cod-eq">Cód: EN063006</small>
                                 </td>
@@ -1515,7 +1552,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN JUAN BAUTISTA (HH. MARISTAS)</strong></div> 
                                     <small class="cod-eq">Cód: EN063007</small>
                                 </td>
@@ -1545,7 +1581,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PAIDOS</strong></div> 
                                     <small class="cod-eq">Cód: EN063008</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALFA Y OMEGA</strong></div> 
                                     <small class="cod-eq">Cód: EN063009</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A. RAMON ORTEGA</strong></div> 
                                     <small class="cod-eq">Cód: EN063010</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PARE PERE</strong></div> 
                                     <small class="cod-eq">Cód: EN063011</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: EN063012</small>
                                 </td>
@@ -1695,7 +1726,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES HISTORIADOR CHABAS</strong></div> 
                                     <small class="cod-eq">Cód: EN063013</small>
                                 </td>
@@ -1725,7 +1755,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MARÍA IBARS</strong></div> 
                                     <small class="cod-eq">Cód: EN063014</small>
                                 </td>
@@ -1755,7 +1784,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE COMARCAL RAQUEL PAYÀ</strong></div> 
                                     <small class="cod-eq">Cód: EN063016</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES SORTS DE LA MAR</strong></div> 
                                     <small class="cod-eq">Cód: EN063017</small>
                                 </td>
@@ -1815,7 +1842,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORI PROFESSIONAL DE MÚSICA TENOR CORTIS</strong></div> 
                                     <small class="cod-eq">Cód: EN063018</small>
                                 </td>
@@ -1845,7 +1871,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT D'EDUCACIÓ INFANTIL BAMBI</strong></div> 
                                     <small class="cod-eq">Cód: EN063019</small>
                                 </td>
@@ -1875,7 +1900,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA DE MÚSICA MANUEL LATTUR</strong></div> 
                                     <small class="cod-eq">Cód: EN063020</small>
                                 </td>
@@ -1905,7 +1929,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT FORMACIÓ PROFESSIONAL ESPECÍFICA</strong></div> 
                                     <small class="cod-eq">Cód: EN063021</small>
                                 </td>
@@ -1935,7 +1958,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL L'ESCOLETA</strong></div> 
                                     <small class="cod-eq">Cód: EN063022</small>
                                 </td>
@@ -1965,7 +1987,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA OFICIAL D'IDIOMES</strong></div> 
                                     <small class="cod-eq">Cód: EN063023</small>
                                 </td>
@@ -1995,7 +2016,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE EDUCACIÓ INFANTIL EL PORTET</strong></div> 
                                     <small class="cod-eq">Cód: EN063024</small>
                                 </td>
@@ -2025,7 +2045,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE EDUCACIÓ INFANTIL COLORETS</strong></div> 
                                     <small class="cod-eq">Cód: EN063025</small>
                                 </td>
@@ -2055,7 +2074,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL MUNICIPAL MESTRA VICENTA ESTELA</strong></div> 
                                     <small class="cod-eq">Cód: EN063026</small>
                                 </td>
@@ -2085,7 +2103,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE INTEGRAT PÚBLIC DE FP DE DÉNIA. CDT</strong></div> 
                                     <small class="cod-eq">Cód: EN063027</small>
                                 </td>
@@ -2115,7 +2132,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO EDUCACIÓN INFANTIL SANTA MARÍA</strong></div> 
                                     <small class="cod-eq">Cód: EN063028</small>
                                 </td>
@@ -2145,7 +2161,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA INFANTIL EL CASTELLET</strong></div> 
                                     <small class="cod-eq">Cód: EN063029</small>
                                 </td>
@@ -2175,7 +2190,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE D´EDUCACIÓ INFANTIL BOMBONETS</strong></div> 
                                     <small class="cod-eq">Cód: EN063030</small>
                                 </td>
@@ -2235,7 +2249,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT PUBLICA</strong></div> 
                                     <small class="cod-eq">Cód: SA063001</small>
                                 </td>
@@ -2265,7 +2278,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL COMARCAL LA PEDRERA</strong></div> 
                                     <small class="cod-eq">Cód: SA063002</small>
                                 </td>
@@ -2295,7 +2307,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MEDICO DE DENIA</strong></div> 
                                     <small class="cod-eq">Cód: SA063004</small>
                                 </td>
@@ -2325,7 +2336,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL SAN CARLOS HLA</strong></div> 
                                     <small class="cod-eq">Cód: SA063005</small>
                                 </td>
@@ -2355,7 +2365,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLINICA OFTALMICA BUIGUES</strong></div> 
                                     <small class="cod-eq">Cód: SA063006</small>
                                 </td>
@@ -2385,7 +2394,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE JESUS POBRE</strong></div> 
                                     <small class="cod-eq">Cód: SA063009</small>
                                 </td>
@@ -2415,7 +2423,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SANITARIO INTEGRADO DENIA II</strong></div> 
                                     <small class="cod-eq">Cód: SA063010</small>
                                 </td>
@@ -2445,7 +2452,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL DE DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: SA063011</small>
                                 </td>
@@ -2475,7 +2481,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SANITARIO INTEGRADO DENIA I</strong></div> 
                                     <small class="cod-eq">Cód: SA063012</small>
                                 </td>
@@ -2505,7 +2510,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UMIVALE DENIA-MARINA ALTA</strong></div> 
                                     <small class="cod-eq">Cód: SA063013</small>
                                 </td>
@@ -2535,7 +2539,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: SA063014</small>
                                 </td>
@@ -2565,7 +2568,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR LES MARINES</strong></div> 
                                     <small class="cod-eq">Cód: SA063015</small>
                                 </td>
@@ -2595,7 +2597,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUTUA UNIVERSAL DENIA</strong></div> 
                                     <small class="cod-eq">Cód: SA063016</small>
                                 </td>
@@ -2625,7 +2626,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MCSS IBERMUTUA</strong></div> 
                                     <small class="cod-eq">Cód: SA063017</small>
                                 </td>
@@ -2655,7 +2655,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FREMAP</strong></div> 
                                     <small class="cod-eq">Cód: SA063018</small>
                                 </td>
@@ -2685,7 +2684,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HCB DÉNIA HOSPITAL</strong></div> 
                                     <small class="cod-eq">Cód: SA063019</small>
                                 </td>
@@ -2745,7 +2743,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA COMARCAL LES ROTES</strong></div> 
                                     <small class="cod-eq">Cód: AS063001</small>
                                 </td>
@@ -2775,7 +2772,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DIA SANTA LUCÍA</strong></div> 
                                     <small class="cod-eq">Cód: AS063002</small>
                                 </td>
@@ -2805,7 +2801,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTROS OCUPACIONAL Y DE DIA  LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: AS063004</small>
                                 </td>
@@ -2835,7 +2830,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>T.A.P.I.S.</strong></div> 
                                     <small class="cod-eq">Cód: AS063005</small>
                                 </td>
@@ -2895,7 +2889,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCAT MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM063002</small>
                                 </td>
@@ -2925,7 +2918,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCAT DE PEIX</strong></div> 
                                     <small class="cod-eq">Cód: LM063005</small>
                                 </td>
@@ -2985,7 +2977,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE BOMBEROS DE DENIA</strong></div> 
                                     <small class="cod-eq">Cód: IP063001</small>
                                 </td>
@@ -3015,7 +3006,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASAMBLEA LOCAL Y CRUZ ROJA DEL MAR</strong></div> 
                                     <small class="cod-eq">Cód: IP063002</small>
                                 </td>
@@ -3045,7 +3035,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL DE DENIA</strong></div> 
                                     <small class="cod-eq">Cód: IP063007</small>
                                 </td>
@@ -3105,7 +3094,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO-CREMATORIO MARINA ALTA</strong></div> 
                                     <small class="cod-eq">Cód: TA063001</small>
                                 </td>
@@ -3165,7 +3153,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MONTGÓ</strong></div> 
                                     <small class="cod-eq">Cód: ID063001</small>
                                 </td>
@@ -3195,7 +3182,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LES VESSANES</strong></div> 
                                     <small class="cod-eq">Cód: ID063002</small>
                                 </td>
@@ -3225,7 +3211,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP POU DE LA MUNTANYA</strong></div> 
                                     <small class="cod-eq">Cód: ID063003</small>
                                 </td>
@@ -3255,7 +3240,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIESPORTIU MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID063004</small>
                                 </td>
@@ -3285,7 +3269,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: ID063006</small>
                                 </td>
@@ -3315,7 +3298,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMP DE FÚTBOL EL RODAT</strong></div> 
                                     <small class="cod-eq">Cód: ID063007</small>
                                 </td>
@@ -3345,7 +3327,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA MUNICIPAL JESÚS POBRE</strong></div> 
                                     <small class="cod-eq">Cód: ID063008</small>
                                 </td>
@@ -3375,7 +3356,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LLEBEIG</strong></div> 
                                     <small class="cod-eq">Cód: ID063010</small>
                                 </td>
@@ -3405,7 +3385,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TRINQUET VISTA ALEGRE</strong></div> 
                                     <small class="cod-eq">Cód: ID063013</small>
                                 </td>
@@ -3435,7 +3414,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. PAIDOS</strong></div> 
                                     <small class="cod-eq">Cód: ID063014</small>
                                 </td>
@@ -3465,7 +3443,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE TENIS DENIA</strong></div> 
                                     <small class="cod-eq">Cód: ID063015</small>
                                 </td>
@@ -3495,7 +3472,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMP DE FÚTBOL MUNICIPAL DIEGO MENA CUESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID063016</small>
                                 </td>
@@ -3525,7 +3501,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. SAN JUAN BAUTISTA</strong></div> 
                                     <small class="cod-eq">Cód: ID063017</small>
                                 </td>
@@ -3555,7 +3530,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ALFA Y OMEGA</strong></div> 
                                     <small class="cod-eq">Cód: ID063018</small>
                                 </td>
@@ -3585,7 +3559,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. SAGRADO CORAZON</strong></div> 
                                     <small class="cod-eq">Cód: ID063019</small>
                                 </td>
@@ -3615,7 +3588,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE GOLF LA SELLA</strong></div> 
                                     <small class="cod-eq">Cód: ID063020</small>
                                 </td>
@@ -3645,7 +3617,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB NAUTICO DENIA</strong></div> 
                                     <small class="cod-eq">Cód: ID063021</small>
                                 </td>
@@ -3675,7 +3646,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIESPORTIU DE LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: ID063022</small>
                                 </td>
@@ -3705,7 +3675,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO DEL BARRIO JOAN FUSTER</strong></div> 
                                     <small class="cod-eq">Cód: ID063023</small>
                                 </td>
@@ -3735,7 +3704,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA MADRIGUERES</strong></div> 
                                     <small class="cod-eq">Cód: ID063024</small>
                                 </td>
@@ -3765,7 +3733,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TRINQUET EL ROVELLET</strong></div> 
                                     <small class="cod-eq">Cód: ID063025</small>
                                 </td>
@@ -3795,7 +3762,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DEPORTIVO DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: ID063026</small>
                                 </td>
@@ -3825,7 +3791,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA MUNICIPAL DE LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: ID063027</small>
                                 </td>
@@ -3885,7 +3850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: PJ063001</small>
                                 </td>
@@ -3915,7 +3879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EXPLANADA CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ063002</small>
                                 </td>
@@ -3945,7 +3908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC PÚBLIC TORREQUEMADA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063003</small>
                                 </td>
@@ -3975,7 +3937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRO SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ063004</small>
                                 </td>
@@ -4005,7 +3966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LES BASSETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ063005</small>
                                 </td>
@@ -4035,7 +3995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL EL RODAT</strong></div> 
                                     <small class="cod-eq">Cód: PJ063006</small>
                                 </td>
@@ -4065,7 +4024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL PASSEIG EL SALADAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ063007</small>
                                 </td>
@@ -4095,7 +4053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ MANUEL LATUR</strong></div> 
                                     <small class="cod-eq">Cód: PJ063008</small>
                                 </td>
@@ -4125,7 +4082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTELL DE DÉNIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063012</small>
                                 </td>
@@ -4155,7 +4111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL LA XARA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063013</small>
                                 </td>
@@ -4185,7 +4140,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASSEIG JOAN BAPTISTE BASSET</strong></div> 
                                     <small class="cod-eq">Cód: PJ063014</small>
                                 </td>
@@ -4215,7 +4169,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE LA PEDRERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063015</small>
                                 </td>
@@ -4245,7 +4198,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE SECTOR C1 (PUMP TRUCK, SKATE)</strong></div> 
                                     <small class="cod-eq">Cód: PJ063016</small>
                                 </td>
@@ -4275,7 +4227,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CARLOS SENTÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ063017</small>
                                 </td>
@@ -4305,7 +4256,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CHABÁS</strong></div> 
                                     <small class="cod-eq">Cód: PJ063018</small>
                                 </td>
@@ -4335,7 +4285,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LOS POMELOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ063019</small>
                                 </td>
@@ -4365,7 +4314,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ063020</small>
                                 </td>
@@ -4395,7 +4343,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RIU RAU</strong></div> 
                                     <small class="cod-eq">Cód: PJ063021</small>
                                 </td>
@@ -4425,7 +4372,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL PINARET</strong></div> 
                                     <small class="cod-eq">Cód: PJ063022</small>
                                 </td>
@@ -4455,7 +4401,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BIOSALUDABLE</strong></div> 
                                     <small class="cod-eq">Cód: PJ063023</small>
                                 </td>
@@ -4485,7 +4430,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL LA VIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063024</small>
                                 </td>
@@ -4515,7 +4459,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC SALUDABLE MARINETA CASSIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063025</small>
                                 </td>
@@ -4545,7 +4488,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BOSC DE DIANA (CENTRE INTERPRET. MONTGÓ)</strong></div> 
                                     <small class="cod-eq">Cód: PJ063026</small>
                                 </td>
@@ -4575,7 +4517,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ARCHIDUQUE CARLOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ063027</small>
                                 </td>
@@ -4605,7 +4546,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ÁREA RECREATIVA  EL PINARET</strong></div> 
                                     <small class="cod-eq">Cód: PJ063028</small>
                                 </td>
@@ -4635,7 +4575,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GLORIETA DEL PAÍS VALENCIÀ</strong></div> 
                                     <small class="cod-eq">Cód: PJ063029</small>
                                 </td>
@@ -4665,7 +4604,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DEL GINJOLER</strong></div> 
                                     <small class="cod-eq">Cód: PJ063030</small>
                                 </td>
@@ -4695,7 +4633,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PÚBLICA CANOA</strong></div> 
                                     <small class="cod-eq">Cód: PJ063031</small>
                                 </td>
@@ -4725,7 +4662,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PÚBLICA FERRERET</strong></div> 
                                     <small class="cod-eq">Cód: PJ063032</small>
                                 </td>
@@ -4755,7 +4691,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PÚBLICA LLAÜT</strong></div> 
                                     <small class="cod-eq">Cód: PJ063033</small>
                                 </td>
@@ -4785,7 +4720,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PÚBLICA MILÀ</strong></div> 
                                     <small class="cod-eq">Cód: PJ063034</small>
                                 </td>
@@ -4815,7 +4749,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE PÚBLICA PIT-ROIG</strong></div> 
                                     <small class="cod-eq">Cód: PJ063035</small>
                                 </td>
@@ -4845,7 +4778,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC C/ AQUARI</strong></div> 
                                     <small class="cod-eq">Cód: PJ063036</small>
                                 </td>
@@ -4875,7 +4807,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VALGAMEDIOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ063037</small>
                                 </td>
@@ -4905,7 +4836,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MARÍA HERVÁS</strong></div> 
                                     <small class="cod-eq">Cód: PJ063038</small>
                                 </td>
@@ -4954,6 +4884,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -4969,7 +4900,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -5060,7 +4991,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -5190,7 +5121,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT</strong></div> 
                                     <small class="cod-eq">Cód: CC048001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL_SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC048002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC, CONCEJALIA Y ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC048003</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO</strong></div> 
                                     <small class="cod-eq">Cód: CC048006</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACION TURISTICA</strong></div> 
                                     <small class="cod-eq">Cód: CC048007</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TURISMO ALGAR</strong></div> 
                                     <small class="cod-eq">Cód: CC048008</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC048009</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALÍA DE CULTURA Y FIESTAS DE CALLOSA</strong></div> 
                                     <small class="cod-eq">Cód: CC048010</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUZGADO DE PAZ</strong></div> 
                                     <small class="cod-eq">Cód: CC048011</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA TÉCNICA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC048012</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO DE SERVICIOS MUNICIPALES_CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CC048013</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA CULTURA JAUME PASTOR FLUIXA</strong></div> 
                                     <small class="cod-eq">Cód: CU048002</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA MUSICA.FUNDACION S. PERZ MIRA</strong></div> 
                                     <small class="cod-eq">Cód: CU048003</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA</strong></div> 
                                     <small class="cod-eq">Cód: CU048004</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEU MEDIAMBIENT ALGAR</strong></div> 
                                     <small class="cod-eq">Cód: CU048010</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ETNOLOGICO</strong></div> 
                                     <small class="cod-eq">Cód: CU048012</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO SOCIAL Y CULTURAL CAIXACALLOSA</strong></div> 
                                     <small class="cod-eq">Cód: CU048016</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU048017</small>
                                 </td>
@@ -795,7 +856,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP BERNAT D'EN SARRIA (INFANTIL)</strong></div> 
                                     <small class="cod-eq">Cód: EN048001</small>
                                 </td>
@@ -825,7 +885,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP BERNAT D'EN SARRIÀ (PRIMARIA)</strong></div> 
                                     <small class="cod-eq">Cód: EN048003</small>
                                 </td>
@@ -855,7 +914,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES RODOLFO LLOPIS</strong></div> 
                                     <small class="cod-eq">Cód: EN048004</small>
                                 </td>
@@ -885,7 +943,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMEDIA</strong></div> 
                                     <small class="cod-eq">Cód: EN048005</small>
                                 </td>
@@ -915,7 +972,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MIRANTBÒ</strong></div> 
                                     <small class="cod-eq">Cód: EN048006</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MUSICA JOSE SEGUI</strong></div> 
                                     <small class="cod-eq">Cód: EN048007</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN048008</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A MUNICIPAL CENTRE NOU</strong></div> 
                                     <small class="cod-eq">Cód: EN048009</small>
                                 </td>
@@ -1065,7 +1118,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT DE CALLOSA D'EN SARRIA</strong></div> 
                                     <small class="cod-eq">Cód: SA048001</small>
                                 </td>
@@ -1125,7 +1177,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUNDACION ASILO HOSP CALLOSA D'EN SARRIA</strong></div> 
                                     <small class="cod-eq">Cód: AS048001</small>
                                 </td>
@@ -1155,7 +1206,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEA CALLOSA D'EN SARRIA</strong></div> 
                                     <small class="cod-eq">Cód: AS048003</small>
                                 </td>
@@ -1215,7 +1265,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCAT MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM048001</small>
                                 </td>
@@ -1275,7 +1324,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP048001</small>
                                 </td>
@@ -1305,7 +1353,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BOMBEROS</strong></div> 
                                     <small class="cod-eq">Cód: IP048002</small>
                                 </td>
@@ -1365,7 +1412,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: TA048001</small>
                                 </td>
@@ -1395,7 +1441,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORI EL SACRISTA</strong></div> 
                                     <small class="cod-eq">Cód: TA048002</small>
                                 </td>
@@ -1455,7 +1500,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID048001</small>
                                 </td>
@@ -1485,7 +1529,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. BERNAT D'EN SARRIÀ</strong></div> 
                                     <small class="cod-eq">Cód: ID048003</small>
                                 </td>
@@ -1515,7 +1558,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES RODOLFO LLOPIS</strong></div> 
                                     <small class="cod-eq">Cód: ID048004</small>
                                 </td>
@@ -1545,7 +1587,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ALMEDIA</strong></div> 
                                     <small class="cod-eq">Cód: ID048005</small>
                                 </td>
@@ -1575,7 +1616,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MIRANTBÓ</strong></div> 
                                     <small class="cod-eq">Cód: ID048006</small>
                                 </td>
@@ -1635,7 +1675,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEL LLAURADOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ048004</small>
                                 </td>
@@ -1665,7 +1704,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA ACAMPADA Y  BARBACOA ALGAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ048005</small>
                                 </td>
@@ -1695,7 +1733,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL TITANIC</strong></div> 
                                     <small class="cod-eq">Cód: PJ048006</small>
                                 </td>
@@ -1725,7 +1762,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL CONVENT</strong></div> 
                                     <small class="cod-eq">Cód: PJ048007</small>
                                 </td>
@@ -1755,7 +1791,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HORT DEL SENYOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ048008</small>
                                 </td>
@@ -1785,7 +1820,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BARRANC DELS XORROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ048010</small>
                                 </td>
@@ -1815,7 +1849,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL ABDET</strong></div> 
                                     <small class="cod-eq">Cód: PJ048011</small>
                                 </td>
@@ -1845,7 +1878,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EDIFICIO LA MARINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ048012</small>
                                 </td>
@@ -1875,7 +1907,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRO DE SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ048013</small>
                                 </td>
@@ -1905,7 +1936,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARAJE NATURAL ALGAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ048014</small>
                                 </td>
@@ -1935,7 +1965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA RECREATVA PIC NIC</strong></div> 
                                     <small class="cod-eq">Cód: PJ048016</small>
                                 </td>
@@ -1965,7 +1994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR ALMEIDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ048017</small>
                                 </td>
@@ -1995,7 +2023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA RECREATIVA FONT DELS PEIXOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ048018</small>
                                 </td>
@@ -2025,7 +2052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE GUADALEST</strong></div> 
                                     <small class="cod-eq">Cód: PJ048019</small>
                                 </td>
@@ -2074,6 +2100,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2089,7 +2116,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2180,7 +2207,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2310,7 +2337,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

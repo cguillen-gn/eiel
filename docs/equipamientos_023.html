@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSISTORIO DE BENEJAMA</strong></div> 
                                     <small class="cod-eq">Cód: CC023001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL I</strong></div> 
                                     <small class="cod-eq">Cód: CC023002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL II</strong></div> 
                                     <small class="cod-eq">Cód: CC023003</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUO DIVINA AURORA</strong></div> 
                                     <small class="cod-eq">Cód: CC023004</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL III</strong></div> 
                                     <small class="cod-eq">Cód: CC023005</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUA VIVIENDA MAESTROS 2 (A)</strong></div> 
                                     <small class="cod-eq">Cód: CC023007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIVIENDA MAESTROS 3 (A)</strong></div> 
                                     <small class="cod-eq">Cód: CC023008</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUA VIVIENDA MAESTROS 5 (A)</strong></div> 
                                     <small class="cod-eq">Cód: CC023009</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR DEL PENSIONISTA.</strong></div> 
                                     <small class="cod-eq">Cód: CU023001</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU023002</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO POETA PASTOR AICART</strong></div> 
                                     <small class="cod-eq">Cód: CU023003</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL POLIVALENTE</strong></div> 
                                     <small class="cod-eq">Cód: CU023004</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ETNOGRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: CU023005</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA EXPOSICIONES TEMPORALES</strong></div> 
                                     <small class="cod-eq">Cód: CU023006</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO MUNI. PEDRO JOAQUÍN FRANCES</strong></div> 
                                     <small class="cod-eq">Cód: CU023007</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUNDACION ELENA SANTONJA</strong></div> 
                                     <small class="cod-eq">Cód: CU023008</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SOCIEDAD MUSICAL LA PAU</strong></div> 
                                     <small class="cod-eq">Cód: CU023010</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORRE DE LA ATALAYA</strong></div> 
                                     <small class="cod-eq">Cód: CU023012</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECTA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU023013</small>
                                 </td>
@@ -825,7 +885,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP DIVINA AURORA</strong></div> 
                                     <small class="cod-eq">Cód: EN023003</small>
                                 </td>
@@ -885,7 +944,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE BENEJAMA</strong></div> 
                                     <small class="cod-eq">Cód: SA023001</small>
                                 </td>
@@ -945,7 +1003,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DEL MEDICO</strong></div> 
                                     <small class="cod-eq">Cód: AS023001</small>
                                 </td>
@@ -1011,7 +1068,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA AURORA</strong></div> 
                                     <small class="cod-eq">Cód: ID023001</small>
                                 </td>
@@ -1041,7 +1097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID023002</small>
                                 </td>
@@ -1071,7 +1126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP DIVINA AURORA</strong></div> 
                                     <small class="cod-eq">Cód: ID023005</small>
                                 </td>
@@ -1131,7 +1185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE DE RITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ023001</small>
                                 </td>
@@ -1161,7 +1214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA ESTACION</strong></div> 
                                     <small class="cod-eq">Cód: PJ023002</small>
                                 </td>
@@ -1191,7 +1243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA PAU</strong></div> 
                                     <small class="cod-eq">Cód: PJ023003</small>
                                 </td>
@@ -1221,7 +1272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: PJ023005</small>
                                 </td>
@@ -1251,7 +1301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA TALAETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ023006</small>
                                 </td>
@@ -1281,7 +1330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AZAGADOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ023007</small>
                                 </td>
@@ -1311,7 +1359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA CREU</strong></div> 
                                     <small class="cod-eq">Cód: PJ023008</small>
                                 </td>
@@ -1341,7 +1388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MESON</strong></div> 
                                     <small class="cod-eq">Cód: PJ023009</small>
                                 </td>
@@ -1371,7 +1417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DONANTES DE SANGRE</strong></div> 
                                     <small class="cod-eq">Cód: PJ023010</small>
                                 </td>
@@ -1401,7 +1446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ023011</small>
                                 </td>
@@ -1431,7 +1475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ACCESO ESTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ023012</small>
                                 </td>
@@ -1461,7 +1504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GLORIETA JOSE MARCO</strong></div> 
                                     <small class="cod-eq">Cód: PJ023013</small>
                                 </td>
@@ -1491,7 +1533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA GLORIETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ023014</small>
                                 </td>
@@ -1521,7 +1562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE ESTACION FERROCARRIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ023015</small>
                                 </td>
@@ -1551,7 +1591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE ESCUELA DEL SALSE</strong></div> 
                                     <small class="cod-eq">Cód: PJ023016</small>
                                 </td>
@@ -1581,7 +1620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA TORRE</strong></div> 
                                     <small class="cod-eq">Cód: PJ023017</small>
                                 </td>
@@ -1611,7 +1649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE L'ATMETLERAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ023018</small>
                                 </td>
@@ -1641,7 +1678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CALLE PRACTICANTE BELLOD CORT</strong></div> 
                                     <small class="cod-eq">Cód: PJ023019</small>
                                 </td>
@@ -1671,7 +1707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ESCUELAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ023020</small>
                                 </td>
@@ -1701,7 +1736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE TRASERA CARDENAL PAYÁ</strong></div> 
                                     <small class="cod-eq">Cód: PJ023021</small>
                                 </td>
@@ -1731,7 +1765,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EN ANTIGUO COLEGIO DIVINA AURORA</strong></div> 
                                     <small class="cod-eq">Cód: PJ023022</small>
                                 </td>
@@ -1780,6 +1813,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1795,7 +1829,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1886,7 +1920,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2016,7 +2050,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

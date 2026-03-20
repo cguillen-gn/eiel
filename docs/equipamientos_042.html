@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT DE BENITATXELL</strong></div> 
                                     <small class="cod-eq">Cód: CC042001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CREAMA</strong></div> 
                                     <small class="cod-eq">Cód: CC042002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC042004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC042005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC042006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC042007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC042008</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA ADMINISTRATIVA Y TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC042009</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL DEL FESTER</strong></div> 
                                     <small class="cod-eq">Cód: CU042001</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE, TELECLUB Y JUBILADOS</strong></div> 
                                     <small class="cod-eq">Cód: CU042002</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU042005</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPAI CULTURAL MULTIFUNCIONAL EL MOLÍ</strong></div> 
                                     <small class="cod-eq">Cód: CU042006</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANTA MARIA MAGDALENA</strong></div> 
                                     <small class="cod-eq">Cód: EN042001</small>
                                 </td>
@@ -645,7 +711,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAUDE LADY ELIZABETH JUNIOR SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: EN042002</small>
                                 </td>
@@ -675,7 +740,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PUBLICA DE MUSICA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN042003</small>
                                 </td>
@@ -705,7 +769,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A MUNICIPAL BENITATXELL</strong></div> 
                                     <small class="cod-eq">Cód: EN042004</small>
                                 </td>
@@ -735,7 +798,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIV. ED.1ER CICLE INFANTIL ELS PATUFETS</strong></div> 
                                     <small class="cod-eq">Cód: EN042005</small>
                                 </td>
@@ -765,7 +827,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PÚBLICA DE DANSA MUNICIPAL DEL POBLE NOU DE</strong></div> 
                                     <small class="cod-eq">Cód: EN042006</small>
                                 </td>
@@ -795,7 +856,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAUDE LADY ELIZABETH SENIOR SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: EN042007</small>
                                 </td>
@@ -855,7 +915,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR P.N.BENITATXELL</strong></div> 
                                     <small class="cod-eq">Cód: SA042001</small>
                                 </td>
@@ -917,7 +976,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCAT MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM042001</small>
                                 </td>
@@ -977,7 +1035,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL Y BOMBEROS VOLUNTARIOS</strong></div> 
                                     <small class="cod-eq">Cód: IP042002</small>
                                 </td>
@@ -1039,7 +1096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANTA MARIA MAGDALENA</strong></div> 
                                     <small class="cod-eq">Cód: ID042001</small>
                                 </td>
@@ -1069,7 +1125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIESPORTIU MUNICIPAL DE BENITATXELL</strong></div> 
                                     <small class="cod-eq">Cód: ID042002</small>
                                 </td>
@@ -1099,7 +1154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DEPORTIVO CUMBRE DEL SOL</strong></div> 
                                     <small class="cod-eq">Cód: ID042003</small>
                                 </td>
@@ -1129,7 +1183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LAUDE LADY ELIZABETH JUNIOR SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: ID042004</small>
                                 </td>
@@ -1159,7 +1212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LAUDE LADY ELIZABETH SENIOR SCHOOL</strong></div> 
                                     <small class="cod-eq">Cód: ID042005</small>
                                 </td>
@@ -1219,7 +1271,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAÇA DE LES PESQUERES</strong></div> 
                                     <small class="cod-eq">Cód: PJ042001</small>
                                 </td>
@@ -1249,7 +1300,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE LA BURRETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ042002</small>
                                 </td>
@@ -1279,7 +1329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ÁREA RECREATIVA GARSIVÀ (KALMIAS)</strong></div> 
                                     <small class="cod-eq">Cód: PJ042003</small>
                                 </td>
@@ -1309,7 +1358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ÁREA RECREATIVA LOS POUS DE L'ABIAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ042004</small>
                                 </td>
@@ -1339,7 +1387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL Y SKATEPARK</strong></div> 
                                     <small class="cod-eq">Cód: PJ042005</small>
                                 </td>
@@ -1369,7 +1416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR DELS TESTOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ042006</small>
                                 </td>
@@ -1399,7 +1445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLACETA DELS MESTRES: VICENT LLOBELL ...</strong></div> 
                                     <small class="cod-eq">Cód: PJ042007</small>
                                 </td>
@@ -1429,7 +1474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CARRETERA DE JÁVEA</strong></div> 
                                     <small class="cod-eq">Cód: PJ042008</small>
                                 </td>
@@ -1459,7 +1503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LES FONTS</strong></div> 
                                     <small class="cod-eq">Cód: PJ042009</small>
                                 </td>
@@ -1489,7 +1532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIRADOR Y ZONA DE RECREO CALA MORAIG</strong></div> 
                                     <small class="cod-eq">Cód: PJ042010</small>
                                 </td>
@@ -1538,6 +1580,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1553,7 +1596,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1644,7 +1687,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1774,7 +1817,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: CC018001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO POLIVALENTE ALTEA LA VELLA. EXT. ADMINIST</strong></div> 
                                     <small class="cod-eq">Cód: CC018003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUZGADO DE PAZ</strong></div> 
                                     <small class="cod-eq">Cód: CC018008</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEMARCACION FORESTAL ALTEA GENERALITAT</strong></div> 
                                     <small class="cod-eq">Cód: CC018010</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN DE VIAS Y OBRAS</strong></div> 
                                     <small class="cod-eq">Cód: CC018011</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION DE VECINOS DE SAN LLUIS</strong></div> 
                                     <small class="cod-eq">Cód: CC018015</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC018016</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC018017</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPOSITO MUNICIPAL DE VEHICULOS</strong></div> 
                                     <small class="cod-eq">Cód: CC018018</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC018019</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN EMPRESA DE DESARROLLO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC018020</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARKING MUNICIPAL CEAM</strong></div> 
                                     <small class="cod-eq">Cód: CC018021</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARKING MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC018022</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ORIENTACIÓN LABORAL</strong></div> 
                                     <small class="cod-eq">Cód: CC018023</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (S.P.E)</strong></div> 
                                     <small class="cod-eq">Cód: CC018024</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIO DE LIMPIEZA VIARIA ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: CC018025</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA MAR D'ASSOCIACIONS</strong></div> 
                                     <small class="cod-eq">Cód: CC018026</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU018002</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU018006</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: CU018012</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA DE ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: CU018013</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PALAU ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: CU018016</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO PLAZA DEL AGUA</strong></div> 
                                     <small class="cod-eq">Cód: CU018017</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL JUVENIL.RADIO ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: CU018018</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: CU018019</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VILLA GADEA</strong></div> 
                                     <small class="cod-eq">Cód: CU018020</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA SCHLOTTER</strong></div> 
                                     <small class="cod-eq">Cód: CU018021</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORI PROFESSIONAL DE MUSICA D'ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: EN018002</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES ALTAIA</strong></div> 
                                     <small class="cod-eq">Cód: EN018003</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP GARGANES FOIETA</strong></div> 
                                     <small class="cod-eq">Cód: EN018004</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP EL BLANQUINAL</strong></div> 
                                     <small class="cod-eq">Cód: EN018005</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES BELLAGUARDA</strong></div> 
                                     <small class="cod-eq">Cód: EN018006</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LES ROTES</strong></div> 
                                     <small class="cod-eq">Cód: EN018007</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: EN018008</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP L'OLLA</strong></div> 
                                     <small class="cod-eq">Cód: EN018009</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT EL PLANET</strong></div> 
                                     <small class="cod-eq">Cód: EN018010</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE EDUCACION INFANTIL DE ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: EN018011</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>F.P.A MUNICIPAL ALGAR</strong></div> 
                                     <small class="cod-eq">Cód: EN018012</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MUSICA I DANSA D'ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: EN018013</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FACULTAD DE BELLAS ARTES - CAMPUS DE ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: EN018014</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MINI-MON</strong></div> 
                                     <small class="cod-eq">Cód: EN018015</small>
                                 </td>
@@ -1515,7 +1553,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT D'ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: SA018001</small>
                                 </td>
@@ -1545,7 +1582,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI D'ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: SA018002</small>
                                 </td>
@@ -1575,7 +1611,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR CASCO ANTIGUO</strong></div> 
                                     <small class="cod-eq">Cód: SA018003</small>
                                 </td>
@@ -1635,7 +1670,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA MAYORES DEPEND ALTEA BOQUERES</strong></div> 
                                     <small class="cod-eq">Cód: AS018003</small>
                                 </td>
@@ -1665,7 +1699,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEAM</strong></div> 
                                     <small class="cod-eq">Cód: AS018004</small>
                                 </td>
@@ -1725,7 +1758,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM018003</small>
                                 </td>
@@ -1755,7 +1787,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LONJA DE PESCADO</strong></div> 
                                     <small class="cod-eq">Cód: LM018004</small>
                                 </td>
@@ -1815,7 +1846,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUESTO DE SOCORRO CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: IP018002</small>
                                 </td>
@@ -1845,7 +1875,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: IP018003</small>
                                 </td>
@@ -1875,7 +1904,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP018004</small>
                                 </td>
@@ -1937,7 +1965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES ALTAIA</strong></div> 
                                     <small class="cod-eq">Cód: ID018001</small>
                                 </td>
@@ -1967,7 +1994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP GARGANES FOIETA</strong></div> 
                                     <small class="cod-eq">Cód: ID018002</small>
                                 </td>
@@ -1997,7 +2023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL.PALAU DELS ESPORTS</strong></div> 
                                     <small class="cod-eq">Cód: ID018003</small>
                                 </td>
@@ -2027,7 +2052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. EL BLANQUINAL</strong></div> 
                                     <small class="cod-eq">Cód: ID018004</small>
                                 </td>
@@ -2057,7 +2081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES BELLAGUARDA</strong></div> 
                                     <small class="cod-eq">Cód: ID018005</small>
                                 </td>
@@ -2087,7 +2110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LES ROTES</strong></div> 
                                     <small class="cod-eq">Cód: ID018006</small>
                                 </td>
@@ -2117,7 +2139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE GOLF DON CAYO</strong></div> 
                                     <small class="cod-eq">Cód: ID018008</small>
                                 </td>
@@ -2147,7 +2168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB NAUTICO CAMPOMANES</strong></div> 
                                     <small class="cod-eq">Cód: ID018009</small>
                                 </td>
@@ -2177,7 +2197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB NAUTICO DE ALTEA</strong></div> 
                                     <small class="cod-eq">Cód: ID018010</small>
                                 </td>
@@ -2207,7 +2226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO DEPORTIVO JOAN MONTIEL I RIPOLL</strong></div> 
                                     <small class="cod-eq">Cód: ID018011</small>
                                 </td>
@@ -2237,7 +2255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ALTEA LA VELLA</strong></div> 
                                     <small class="cod-eq">Cód: ID018012</small>
                                 </td>
@@ -2267,7 +2284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. EL PLANET</strong></div> 
                                     <small class="cod-eq">Cód: ID018013</small>
                                 </td>
@@ -2327,7 +2343,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL AGUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018004</small>
                                 </td>
@@ -2357,7 +2372,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDINES SCHLOTTER VILLA GADEA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018008</small>
                                 </td>
@@ -2387,7 +2401,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FONT DE LA BARCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018009</small>
                                 </td>
@@ -2417,7 +2430,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE SAN JERONIMO</strong></div> 
                                     <small class="cod-eq">Cód: PJ018010</small>
                                 </td>
@@ -2447,7 +2459,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE LES ROTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ018012</small>
                                 </td>
@@ -2477,7 +2488,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GARGANES</strong></div> 
                                     <small class="cod-eq">Cód: PJ018013</small>
                                 </td>
@@ -2507,7 +2517,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VILLA GADEA I</strong></div> 
                                     <small class="cod-eq">Cód: PJ018014</small>
                                 </td>
@@ -2537,7 +2546,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLZA.VENTURA MARTI -LA COMARE(ARCHIVO)</strong></div> 
                                     <small class="cod-eq">Cód: PJ018015</small>
                                 </td>
@@ -2567,7 +2575,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CRUZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ018016</small>
                                 </td>
@@ -2597,7 +2604,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA CARRASCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018017</small>
                                 </td>
@@ -2627,7 +2633,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LLAVADOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ018018</small>
                                 </td>
@@ -2657,7 +2662,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARGENTINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018019</small>
                                 </td>
@@ -2687,7 +2691,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL CALLE MARINA BAJA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018020</small>
                                 </td>
@@ -2717,7 +2720,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRO SOCIAL 3ª EDAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ018021</small>
                                 </td>
@@ -2747,7 +2749,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPACIO RECREATIVO Y SALUDABLE SANT PERE</strong></div> 
                                     <small class="cod-eq">Cód: PJ018022</small>
                                 </td>
@@ -2777,7 +2778,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA RECREATIVA DE LA ERMITA D SANTA BAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ018023</small>
                                 </td>
@@ -2807,7 +2807,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE NORUEGO</strong></div> 
                                     <small class="cod-eq">Cód: PJ018024</small>
                                 </td>
@@ -2837,7 +2836,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ LES LLIMERES</strong></div> 
                                     <small class="cod-eq">Cód: PJ018025</small>
                                 </td>
@@ -2867,7 +2865,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CARRER MENUT</strong></div> 
                                     <small class="cod-eq">Cód: PJ018026</small>
                                 </td>
@@ -2897,7 +2894,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SAN CHUCHIM</strong></div> 
                                     <small class="cod-eq">Cód: PJ018027</small>
                                 </td>
@@ -2927,7 +2923,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ018028</small>
                                 </td>
@@ -2957,7 +2952,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA PAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ018029</small>
                                 </td>
@@ -2987,7 +2981,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MARINA BAJA_CEAM</strong></div> 
                                     <small class="cod-eq">Cód: PJ018030</small>
                                 </td>
@@ -3017,7 +3010,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JOSE Mª PLANELLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ018031</small>
                                 </td>
@@ -3047,7 +3039,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BULEVAR AV. COMUNIDAD VALENCIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018032</small>
                                 </td>
@@ -3077,7 +3068,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL PASEO DEL MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ018033</small>
                                 </td>
@@ -3107,7 +3097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE PITERES</strong></div> 
                                     <small class="cod-eq">Cód: PJ018034</small>
                                 </td>
@@ -3137,7 +3126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE LA TROMPA</strong></div> 
                                     <small class="cod-eq">Cód: PJ018035</small>
                                 </td>
@@ -3167,7 +3155,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA CALVARI</strong></div> 
                                     <small class="cod-eq">Cód: PJ018036</small>
                                 </td>
@@ -3216,6 +3203,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -3231,7 +3219,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -3322,7 +3310,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -3452,7 +3440,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

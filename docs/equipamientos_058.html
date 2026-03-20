@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA CONSISTORIAL</strong></div> 
                                     <small class="cod-eq">Cód: CC058001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC058005</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN OBRAS Y SERVICIOS</strong></div> 
                                     <small class="cod-eq">Cód: CC058006</small>
                                 </td>
@@ -315,7 +391,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA REINA SOFIA</strong></div> 
                                     <small class="cod-eq">Cód: CU058001</small>
                                 </td>
@@ -345,7 +420,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JOSE LOZANO MANRESA</strong></div> 
                                     <small class="cod-eq">Cód: CU058002</small>
                                 </td>
@@ -375,7 +449,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR SOCIAL DE LA TERCERA EDAD</strong></div> 
                                     <small class="cod-eq">Cód: CU058004</small>
                                 </td>
@@ -405,7 +478,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO JOSEFINA MANRESA</strong></div> 
                                     <small class="cod-eq">Cód: CU058006</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO DE VERANO</strong></div> 
                                     <small class="cod-eq">Cód: CU058007</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MOLINO DE COX</strong></div> 
                                     <small class="cod-eq">Cód: CU058008</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: CU058009</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUA SEDE EPA CALLE VICENTE ALEIXANDR</strong></div> 
                                     <small class="cod-eq">Cód: CU058010</small>
                                 </td>
@@ -585,7 +653,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DEL CARMEN.</strong></div> 
                                     <small class="cod-eq">Cód: EN058002</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DE LAS VIRTUDES</strong></div> 
                                     <small class="cod-eq">Cód: EN058003</small>
                                 </td>
@@ -645,7 +711,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES DE COX</strong></div> 
                                     <small class="cod-eq">Cód: EN058004</small>
                                 </td>
@@ -675,7 +740,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FPA MUNICIPAL DE COX (SEDE CASA DE CULTURA)</strong></div> 
                                     <small class="cod-eq">Cód: EN058005</small>
                                 </td>
@@ -705,7 +769,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA ANTONIO QUIRANTE</strong></div> 
                                     <small class="cod-eq">Cód: EN058006</small>
                                 </td>
@@ -735,7 +798,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIV. ED. INF. 1ER CICLO MENUDOS GENIOS</strong></div> 
                                     <small class="cod-eq">Cód: EN058007</small>
                                 </td>
@@ -795,7 +857,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE COX</strong></div> 
                                     <small class="cod-eq">Cód: SA058002</small>
                                 </td>
@@ -855,7 +916,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ALZHEIMER MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: AS058001</small>
                                 </td>
@@ -915,7 +975,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO DE ABASTOS MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM058001</small>
                                 </td>
@@ -979,7 +1038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DEL CARMEN.</strong></div> 
                                     <small class="cod-eq">Cód: ID058003</small>
                                 </td>
@@ -1009,7 +1067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DE LAS VIRTUDES</strong></div> 
                                     <small class="cod-eq">Cód: ID058004</small>
                                 </td>
@@ -1039,7 +1096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL LAS BALSAS</strong></div> 
                                     <small class="cod-eq">Cód: ID058005</small>
                                 </td>
@@ -1069,7 +1125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL SAN FERNANDO</strong></div> 
                                     <small class="cod-eq">Cód: ID058006</small>
                                 </td>
@@ -1099,7 +1154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PABELLÓN CUBIERTO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID058008</small>
                                 </td>
@@ -1129,7 +1183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES DE COX</strong></div> 
                                     <small class="cod-eq">Cód: ID058010</small>
                                 </td>
@@ -1159,7 +1212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINAS MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: ID058011</small>
                                 </td>
@@ -1189,7 +1241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE Y BALONCESTO</strong></div> 
                                     <small class="cod-eq">Cód: ID058012</small>
                                 </td>
@@ -1219,7 +1270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA FUTBITO PARQUE EL PORTICHUELO</strong></div> 
                                     <small class="cod-eq">Cód: ID058013</small>
                                 </td>
@@ -1279,7 +1329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CEMENTERIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058001</small>
                                 </td>
@@ -1309,7 +1358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA GLORIETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058002</small>
                                 </td>
@@ -1339,7 +1387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SAN ISIDRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058003</small>
                                 </td>
@@ -1369,7 +1416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VIRGEN DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: PJ058004</small>
                                 </td>
@@ -1399,7 +1445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL CASTILLO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058005</small>
                                 </td>
@@ -1429,7 +1474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL TEMPLETE</strong></div> 
                                     <small class="cod-eq">Cód: PJ058006</small>
                                 </td>
@@ -1459,7 +1503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA MUSICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058007</small>
                                 </td>
@@ -1489,7 +1532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MEMORANDUM</strong></div> 
                                     <small class="cod-eq">Cód: PJ058008</small>
                                 </td>
@@ -1519,7 +1561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA BOLARINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058009</small>
                                 </td>
@@ -1549,7 +1590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA SENDA DEL POETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058010</small>
                                 </td>
@@ -1579,7 +1619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA MUJER TRABAJADORA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058011</small>
                                 </td>
@@ -1609,7 +1648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VIRGEN DE LAS VIRTUDES</strong></div> 
                                     <small class="cod-eq">Cód: PJ058012</small>
                                 </td>
@@ -1639,7 +1677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ADORACION NOCTURNA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058013</small>
                                 </td>
@@ -1669,7 +1706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA TALLER EMPLEO VIRGEN DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: PJ058014</small>
                                 </td>
@@ -1699,7 +1735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LAS COFRADIAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ058015</small>
                                 </td>
@@ -1729,7 +1764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LOS AUROROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ058016</small>
                                 </td>
@@ -1759,7 +1793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SAN ROQUE</strong></div> 
                                     <small class="cod-eq">Cód: PJ058018</small>
                                 </td>
@@ -1789,7 +1822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PALMERAL EL PINTAOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ058019</small>
                                 </td>
@@ -1819,7 +1851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JOSE LUIS RODRÍGUEZ ZAPATERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058020</small>
                                 </td>
@@ -1849,7 +1880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LOS JABONEROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ058021</small>
                                 </td>
@@ -1879,7 +1909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA PARAJE LOS JABONEROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ058022</small>
                                 </td>
@@ -1909,7 +1938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LOS FRUTEROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ058023</small>
                                 </td>
@@ -1939,7 +1967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA VENTA AMBULANTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ058024</small>
                                 </td>
@@ -1969,7 +1996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MERCADILLO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058025</small>
                                 </td>
@@ -1999,7 +2025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LA FRONTERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ058026</small>
                                 </td>
@@ -2029,7 +2054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SAN JUAN</strong></div> 
                                     <small class="cod-eq">Cód: PJ058027</small>
                                 </td>
@@ -2059,7 +2083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ058028</small>
                                 </td>
@@ -2089,7 +2112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL PORTICHUELO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058029</small>
                                 </td>
@@ -2119,7 +2141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LAS FLORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ058030</small>
                                 </td>
@@ -2149,7 +2170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SANTO ENCUENTRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058031</small>
                                 </td>
@@ -2179,7 +2199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JESUS SACRAMENTADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ058032</small>
                                 </td>
@@ -2228,6 +2247,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2243,7 +2263,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2334,7 +2354,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2464,7 +2484,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

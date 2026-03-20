@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE RECURSOS DE FORMACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: CC140006</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE INFORMACION Y TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC140009</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC140010</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE TEMPORAL ALCALDIA Y CONTRATACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: CC140011</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CÁMARA DE COMERCIO. VIVERO DE EMPRESAS</strong></div> 
                                     <small class="cod-eq">Cód: CC140012</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC</strong></div> 
                                     <small class="cod-eq">Cód: CC140014</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GABINETE DESARROLLO ECONOMICO Y AGENCIA FOMENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC140015</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DEPENDENCIAS MUNICIPALES PLAZA PASCUAL DOMENECH</strong></div> 
                                     <small class="cod-eq">Cód: CC140016</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALBERGUE CANINO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC140018</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC140019</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COCHERAS JUNTO TURISMO CALLEJÓN EL CHICHO</strong></div> 
                                     <small class="cod-eq">Cód: CC140020</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE CIUDADANIA E INMIGRACION Y</strong></div> 
                                     <small class="cod-eq">Cód: CC140021</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MUNICIPAL DE SERVICIOS EMPRESARIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC140022</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE EDUCACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: CC140023</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS ADMINISTRACIÓN MUNICIPAL TEMPORALES</strong></div> 
                                     <small class="cod-eq">Cód: CC140024</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE TOROS DE VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: CU140001</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESTUDIO MUSEO NAVARRO SANTAFÉ</strong></div> 
                                     <small class="cod-eq">Cód: CU140002</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU140004</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL FESTERO</strong></div> 
                                     <small class="cod-eq">Cód: CU140006</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRO CHAPÍ</strong></div> 
                                     <small class="cod-eq">Cód: CU140007</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA LA PAZ</strong></div> 
                                     <small class="cod-eq">Cód: CU140011</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: CU140012</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCULO AGRICOLA MERCANTIL VILLENENSE</strong></div> 
                                     <small class="cod-eq">Cód: CU140013</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL BARRIO  SAN FRANCISCO</strong></div> 
                                     <small class="cod-eq">Cód: CU140014</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE RECEPCION DE VISITANTES</strong></div> 
                                     <small class="cod-eq">Cód: CU140015</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO JOVEN (JUNTO PISCINA)</strong></div> 
                                     <small class="cod-eq">Cód: CU140017</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTILLO DE LA ATALAYA</strong></div> 
                                     <small class="cod-eq">Cód: CU140021</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL Y EDUCATIVO COLACHE</strong></div> 
                                     <small class="cod-eq">Cód: CU140022</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUVI</strong></div> 
                                     <small class="cod-eq">Cód: CU140023</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C. TALLER FORMAC. OCUPACIONAL P.I.RUBIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU140024</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA ENCARNACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: EN140001</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP EL GREC</strong></div> 
                                     <small class="cod-eq">Cód: EN140002</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES HERMANOS AMORÓS</strong></div> 
                                     <small class="cod-eq">Cód: EN140003</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PRINCIPE DON JUAN MANUEL</strong></div> 
                                     <small class="cod-eq">Cód: EN140004</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MARIA AUXILIADORA</strong></div> 
                                     <small class="cod-eq">Cód: EN140005</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CELADA</strong></div> 
                                     <small class="cod-eq">Cód: EN140006</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP JOAQUÍN MARÍA LÓPEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN140007</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUESTRA SEÑORA DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN140008</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP RUPERTO CHAPÍ</strong></div> 
                                     <small class="cod-eq">Cód: EN140009</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES NAVARRO SANTAFÉ</strong></div> 
                                     <small class="cod-eq">Cód: EN140010</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE APADIS</strong></div> 
                                     <small class="cod-eq">Cód: EN140011</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANTA TERESA</strong></div> 
                                     <small class="cod-eq">Cód: EN140013</small>
                                 </td>
@@ -1515,7 +1552,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LAS FUENTES</strong></div> 
                                     <small class="cod-eq">Cód: EN140017</small>
                                 </td>
@@ -1545,7 +1581,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO PROFESIONAL DE MÚSICA</strong></div> 
                                     <small class="cod-eq">Cód: EN140018</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PÚBLICO FPA ARCO IRIS</strong></div> 
                                     <small class="cod-eq">Cód: EN140020</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL MUNICIPAL AMIGO FÉLIX</strong></div> 
                                     <small class="cod-eq">Cód: EN140021</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECCIÓ DE L'IES NAVARRO SANTAFÉ</strong></div> 
                                     <small class="cod-eq">Cód: EN140022</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PÚBLICO FPA LA ATALAYA</strong></div> 
                                     <small class="cod-eq">Cód: EN140023</small>
                                 </td>
@@ -1695,7 +1726,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO EDUCACION INFANTIL RENACUAJOS</strong></div> 
                                     <small class="cod-eq">Cód: EN140024</small>
                                 </td>
@@ -1725,7 +1755,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA SOC MUSICAL RUPERTO CHAPÍ</strong></div> 
                                     <small class="cod-eq">Cód: EN140025</small>
                                 </td>
@@ -1755,7 +1784,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDUCACIÓN INFANTIL PRIMER CICLO AQUARELAS</strong></div> 
                                     <small class="cod-eq">Cód: EN140026</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIV. ED. INF. 1er CICLO GARABATTOS</strong></div> 
                                     <small class="cod-eq">Cód: EN140028</small>
                                 </td>
@@ -1845,7 +1872,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD VILLENA I</strong></div> 
                                     <small class="cod-eq">Cód: SA140002</small>
                                 </td>
@@ -1875,7 +1901,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD VILLENA II</strong></div> 
                                     <small class="cod-eq">Cód: SA140004</small>
                                 </td>
@@ -1905,7 +1930,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SANITARIO INTEGRADO VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: SA140005</small>
                                 </td>
@@ -1935,7 +1959,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MAZ VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: SA140006</small>
                                 </td>
@@ -1965,7 +1988,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLÍNICA DELFOS</strong></div> 
                                     <small class="cod-eq">Cód: SA140007</small>
                                 </td>
@@ -1995,7 +2017,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ASISTENCIAL ESPASANA</strong></div> 
                                     <small class="cod-eq">Cód: SA140008</small>
                                 </td>
@@ -2025,7 +2046,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR LA ENCINA</strong></div> 
                                     <small class="cod-eq">Cód: SA140009</small>
                                 </td>
@@ -2085,7 +2105,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CTRO RESIDENCIAL NTRA SRA LAS VIRTUDES</strong></div> 
                                     <small class="cod-eq">Cód: AS140002</small>
                                 </td>
@@ -2115,7 +2134,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PEÑA RUBIA</strong></div> 
                                     <small class="cod-eq">Cód: AS140004</small>
                                 </td>
@@ -2145,7 +2163,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>APADIS VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: AS140005</small>
                                 </td>
@@ -2175,7 +2192,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CERESIDENCIA MIXTA CENTRO GERIÁTRICO LA</strong></div> 
                                     <small class="cod-eq">Cód: AS140006</small>
                                 </td>
@@ -2205,7 +2221,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DIA PARA ENFERMOS DE ALZHEIMER</strong></div> 
                                     <small class="cod-eq">Cód: AS140007</small>
                                 </td>
@@ -2235,7 +2250,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO ATENCION TEMPRANA APADIS</strong></div> 
                                     <small class="cod-eq">Cód: AS140008</small>
                                 </td>
@@ -2265,7 +2279,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRIS BIENESTAR SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: AS140009</small>
                                 </td>
@@ -2295,7 +2308,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL APADIS CALLE MENÉNDEZ PELAYO</strong></div> 
                                     <small class="cod-eq">Cód: AS140010</small>
                                 </td>
@@ -2325,7 +2337,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEA DON ESTEBAN BARBADO</strong></div> 
                                     <small class="cod-eq">Cód: AS140011</small>
                                 </td>
@@ -2385,7 +2396,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO CENTRAL MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM140001</small>
                                 </td>
@@ -2445,7 +2455,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: IP140001</small>
                                 </td>
@@ -2475,7 +2484,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAMU DE VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: IP140003</small>
                                 </td>
@@ -2505,7 +2513,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS CRUZ ROJA CALLE GRAN CAPITÁN</strong></div> 
                                     <small class="cod-eq">Cód: IP140004</small>
                                 </td>
@@ -2535,7 +2542,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NAVE CRUZ ROJA VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: IP140005</small>
                                 </td>
@@ -2565,7 +2571,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AUXILIAR BOMBEROS</strong></div> 
                                     <small class="cod-eq">Cód: IP140007</small>
                                 </td>
@@ -2625,7 +2630,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN JOSE</strong></div> 
                                     <small class="cod-eq">Cód: TA140001</small>
                                 </td>
@@ -2685,7 +2689,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP EL GREC</strong></div> 
                                     <small class="cod-eq">Cód: ID140001</small>
                                 </td>
@@ -2715,7 +2718,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES HERMANOS AMORÓS</strong></div> 
                                     <small class="cod-eq">Cód: ID140002</small>
                                 </td>
@@ -2745,7 +2747,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: ID140003</small>
                                 </td>
@@ -2775,7 +2776,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CELADA</strong></div> 
                                     <small class="cod-eq">Cód: ID140004</small>
                                 </td>
@@ -2805,7 +2805,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP JOAQUÍN MARÍA LÓPEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID140005</small>
                                 </td>
@@ -2835,7 +2834,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP RUPERTO CHAPÍ</strong></div> 
                                     <small class="cod-eq">Cód: ID140006</small>
                                 </td>
@@ -2865,7 +2863,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES NAVARRO SANTAFÉ</strong></div> 
                                     <small class="cod-eq">Cód: ID140007</small>
                                 </td>
@@ -2895,7 +2892,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID140008</small>
                                 </td>
@@ -2925,7 +2921,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANTA TERESA</strong></div> 
                                     <small class="cod-eq">Cód: ID140009</small>
                                 </td>
@@ -2955,7 +2950,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA</strong></div> 
                                     <small class="cod-eq">Cód: ID140010</small>
                                 </td>
@@ -2985,7 +2979,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCULO AGRICOLA MERCANTIL VILLENENSE</strong></div> 
                                     <small class="cod-eq">Cód: ID140011</small>
                                 </td>
@@ -3015,7 +3008,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE TENIS VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: ID140012</small>
                                 </td>
@@ -3045,7 +3037,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ACADEMIA DE TENIS EQUELITE</strong></div> 
                                     <small class="cod-eq">Cód: ID140013</small>
                                 </td>
@@ -3075,7 +3066,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA CALLE HUERTO REAL</strong></div> 
                                     <small class="cod-eq">Cód: ID140014</small>
                                 </td>
@@ -3105,7 +3095,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. MARIA AUXILIADORA</strong></div> 
                                     <small class="cod-eq">Cód: ID140015</small>
                                 </td>
@@ -3135,7 +3124,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LAS FUENTES</strong></div> 
                                     <small class="cod-eq">Cód: ID140016</small>
                                 </td>
@@ -3165,7 +3153,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORTIVA LA ENCINA</strong></div> 
                                     <small class="cod-eq">Cód: ID140017</small>
                                 </td>
@@ -3195,7 +3182,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DEPORTIVO VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: ID140018</small>
                                 </td>
@@ -3225,7 +3211,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. LA ENCARNACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID140019</small>
                                 </td>
@@ -3255,7 +3240,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP PRINCIPE DON JUAN MANUEL</strong></div> 
                                     <small class="cod-eq">Cód: ID140020</small>
                                 </td>
@@ -3285,7 +3269,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA CALLE AMBROSIO COTÉS</strong></div> 
                                     <small class="cod-eq">Cód: ID140021</small>
                                 </td>
@@ -3315,7 +3298,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE PINADA GALBIS</strong></div> 
                                     <small class="cod-eq">Cód: ID140022</small>
                                 </td>
@@ -3345,7 +3327,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. NUESTRA SEÑORA DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: ID140023</small>
                                 </td>
@@ -3405,7 +3386,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>DONANTES DE SANGRE</strong></div> 
                                     <small class="cod-eq">Cód: PJ140001</small>
                                 </td>
@@ -3435,7 +3415,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140002</small>
                                 </td>
@@ -3465,7 +3444,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MERCADO II</strong></div> 
                                     <small class="cod-eq">Cód: PJ140003</small>
                                 </td>
@@ -3495,7 +3473,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MARTINEZ OLIVENCIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140006</small>
                                 </td>
@@ -3525,7 +3502,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MARÍA AUXILIADORA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140007</small>
                                 </td>
@@ -3555,7 +3531,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LAS CRUCES</strong></div> 
                                     <small class="cod-eq">Cód: PJ140008</small>
                                 </td>
@@ -3585,7 +3560,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PASEO RUPERTO CHAPÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ140010</small>
                                 </td>
@@ -3615,7 +3589,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PLAZA DEL ROLLO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140012</small>
                                 </td>
@@ -3645,7 +3618,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ANTONIO MACHADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140013</small>
                                 </td>
@@ -3675,7 +3647,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LAS MALVAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ140014</small>
                                 </td>
@@ -3705,7 +3676,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA BANDA MUNICIPAL DE MUSICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140015</small>
                                 </td>
@@ -3735,7 +3705,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL LA ENCINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140017</small>
                                 </td>
@@ -3765,7 +3734,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA COMUNIDAD VALENCIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140020</small>
                                 </td>
@@ -3795,7 +3763,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COMPOSITOR ANTONIO FERRIZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ140021</small>
                                 </td>
@@ -3825,7 +3792,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PINADA DE LA VIRGEN</strong></div> 
                                     <small class="cod-eq">Cód: PJ140024</small>
                                 </td>
@@ -3855,7 +3821,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE PINTOR JUAN GRIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ140025</small>
                                 </td>
@@ -3885,7 +3850,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MARIA ZAMBRANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140026</small>
                                 </td>
@@ -3915,7 +3879,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL PERSONAL SANITARIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140027</small>
                                 </td>
@@ -3945,7 +3908,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPACIO NATURAL PEÑAS DEL SOL</strong></div> 
                                     <small class="cod-eq">Cód: PJ140028</small>
                                 </td>
@@ -3975,7 +3937,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BULEVAR COMPOSITOR MANUEL CARRASCOSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140029</small>
                                 </td>
@@ -4005,7 +3966,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BULEVAR AMBROSIO COTÉS</strong></div> 
                                     <small class="cod-eq">Cód: PJ140030</small>
                                 </td>
@@ -4035,7 +3995,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PINADA GALBIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ140031</small>
                                 </td>
@@ -4065,7 +4024,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POETISA ELENA MONTIEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ140032</small>
                                 </td>
@@ -4095,7 +4053,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL MERCAICO NEGRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140033</small>
                                 </td>
@@ -4125,7 +4082,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  INFANTIL LA ZAFRA</strong></div> 
                                     <small class="cod-eq">Cód: PJ140034</small>
                                 </td>
@@ -4155,7 +4111,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AREA RECREATIVA ERMITA SAN BARTOLOMÉ</strong></div> 
                                     <small class="cod-eq">Cód: PJ140035</small>
                                 </td>
@@ -4185,7 +4140,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO</strong></div> 
                                     <small class="cod-eq">Cód: PJ140036</small>
                                 </td>
@@ -4215,7 +4169,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA RAMON NAVARRO DIAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ140037</small>
                                 </td>
@@ -4245,7 +4198,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CALLE DOCTOR MARIANO RUIZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ140038</small>
                                 </td>
@@ -4294,6 +4246,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -4309,7 +4262,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -4400,7 +4353,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -4530,7 +4483,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

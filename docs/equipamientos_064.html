@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL CALLE JUAN XXIII</strong></div> 
                                     <small class="cod-eq">Cód: CC064001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL CALLE ALICANTE</strong></div> 
                                     <small class="cod-eq">Cód: CC064003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SINDICATO GENERAL DE AGUAS DE DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: CC064006</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC064008</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>REPARACIÓN DE ENSERES Y BELENISTAS</strong></div> 
                                     <small class="cod-eq">Cód: CC064009</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL CAMINO JORGE JUAN</strong></div> 
                                     <small class="cod-eq">Cód: CC064010</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL CUATRO CAMINOS</strong></div> 
                                     <small class="cod-eq">Cód: CC064011</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU064001</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO MUNICIPAL DE DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: CU064002</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DE LA HUERTA</strong></div> 
                                     <small class="cod-eq">Cód: CU064004</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL BIBLIOTECA</strong></div> 
                                     <small class="cod-eq">Cód: CU064005</small>
                                 </td>
@@ -585,7 +653,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP CARDENAL BELLUGA</strong></div> 
                                     <small class="cod-eq">Cód: EN064001</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN064002</small>
                                 </td>
@@ -645,7 +711,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SAN FRANCISCO DE ASÍS</strong></div> 
                                     <small class="cod-eq">Cód: EN064003</small>
                                 </td>
@@ -675,7 +740,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>E.I. PRIMER CICLO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: EN064004</small>
                                 </td>
@@ -705,7 +769,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES SAN PASCUAL</strong></div> 
                                     <small class="cod-eq">Cód: EN064005</small>
                                 </td>
@@ -735,7 +798,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA CENTRO ESTUDIO MUS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN064006</small>
                                 </td>
@@ -765,7 +827,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FPA MUNICIPAL DE DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: EN064007</small>
                                 </td>
@@ -795,7 +856,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO. E.I. PRIMER CICLO TU CASITA</strong></div> 
                                     <small class="cod-eq">Cód: EN064008</small>
                                 </td>
@@ -855,7 +915,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DOLORES ANTONIO CEREZO</strong></div> 
                                     <small class="cod-eq">Cód: SA064001</small>
                                 </td>
@@ -917,7 +976,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM064001</small>
                                 </td>
@@ -979,7 +1037,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VELATORIO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: TA064002</small>
                                 </td>
@@ -1039,7 +1096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP CARDENAL BELLUGA</strong></div> 
                                     <small class="cod-eq">Cód: ID064001</small>
                                 </td>
@@ -1069,7 +1125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DE LOS DOLORES</strong></div> 
                                     <small class="cod-eq">Cód: ID064002</small>
                                 </td>
@@ -1099,7 +1154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID064003</small>
                                 </td>
@@ -1129,7 +1183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA ALAMEDA</strong></div> 
                                     <small class="cod-eq">Cód: ID064004</small>
                                 </td>
@@ -1159,7 +1212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES SAN PASCUAL</strong></div> 
                                     <small class="cod-eq">Cód: ID064005</small>
                                 </td>
@@ -1189,7 +1241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SAN FRANCISCO DE ASIS</strong></div> 
                                     <small class="cod-eq">Cód: ID064006</small>
                                 </td>
@@ -1219,7 +1270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA CUATRO CAMINOS</strong></div> 
                                     <small class="cod-eq">Cód: ID064007</small>
                                 </td>
@@ -1249,7 +1299,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PABELLÓN POLIDEPORTIVO</strong></div> 
                                     <small class="cod-eq">Cód: ID064008</small>
                                 </td>
@@ -1279,7 +1328,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SKATE PARK PARQUE LA ALAMEDA</strong></div> 
                                     <small class="cod-eq">Cód: ID064009</small>
                                 </td>
@@ -1339,7 +1387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AGUADULCE</strong></div> 
                                     <small class="cod-eq">Cód: PJ064001</small>
                                 </td>
@@ -1369,7 +1416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LA HERRERÍA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064002</small>
                                 </td>
@@ -1399,7 +1445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL DOCTOR MORENO RUBIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ064003</small>
                                 </td>
@@ -1429,7 +1474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RAMON ALONSO RUIZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ064004</small>
                                 </td>
@@ -1459,7 +1503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CARDENAL BELLUGA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064005</small>
                                 </td>
@@ -1489,7 +1532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FELIX RODRIGUEZ DE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ064006</small>
                                 </td>
@@ -1519,7 +1561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO JOSÉ MIRA CONESA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064007</small>
                                 </td>
@@ -1549,7 +1590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE GENERAL LLOPIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ064008</small>
                                 </td>
@@ -1579,7 +1619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CONSTITUCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ064009</small>
                                 </td>
@@ -1609,7 +1648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA HERMENEGILDO MARÍA RUIZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ064010</small>
                                 </td>
@@ -1639,7 +1677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AVENIDA ALCALDE JOSÉ RODRIGUEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ064011</small>
                                 </td>
@@ -1669,7 +1706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA ALAMEDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064013</small>
                                 </td>
@@ -1699,7 +1735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ DOÑA LORETO JUAN BROTONS I</strong></div> 
                                     <small class="cod-eq">Cód: PJ064014</small>
                                 </td>
@@ -1729,7 +1764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ CONCEJALA TRINIDAD SAURA I</strong></div> 
                                     <small class="cod-eq">Cód: PJ064015</small>
                                 </td>
@@ -1759,7 +1793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ CONCEJALA TRINIDAD SAURA II</strong></div> 
                                     <small class="cod-eq">Cód: PJ064016</small>
                                 </td>
@@ -1789,7 +1822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ DOÑA LORETO JUAN BROTONS II</strong></div> 
                                     <small class="cod-eq">Cód: PJ064017</small>
                                 </td>
@@ -1819,7 +1851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ MAESTRA FILO MONTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ064018</small>
                                 </td>
@@ -1849,7 +1880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PJ COMADRONAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ064019</small>
                                 </td>
@@ -1879,7 +1909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MUSEO DE LA HUERTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064020</small>
                                 </td>
@@ -1909,7 +1938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 2</strong></div> 
                                     <small class="cod-eq">Cód: PJ064022</small>
                                 </td>
@@ -1939,7 +1967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SECTOR 2 II</strong></div> 
                                     <small class="cod-eq">Cód: PJ064023</small>
                                 </td>
@@ -1969,7 +1996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CANÓNIGO D. MANUEL GARCÍA LUCAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ064024</small>
                                 </td>
@@ -1999,7 +2025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOS AZARBES</strong></div> 
                                     <small class="cod-eq">Cód: PJ064025</small>
                                 </td>
@@ -2029,7 +2054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE LA CORUÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ064026</small>
                                 </td>
@@ -2078,6 +2102,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2093,7 +2118,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2184,7 +2209,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2314,7 +2339,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

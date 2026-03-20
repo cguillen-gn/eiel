@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC903001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO (ANTIGUA CASA DE LOS MAESTROS)</strong></div> 
                                     <small class="cod-eq">Cód: CC903003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC903004</small>
                                 </td>
@@ -315,7 +391,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CIVICO Y SOCIAL DE LOS MONTESINOS</strong></div> 
                                     <small class="cod-eq">Cód: CU903002</small>
                                 </td>
@@ -345,7 +420,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIOCULTURAL REMEDIOS MUÑOZ</strong></div> 
                                     <small class="cod-eq">Cód: CU903004</small>
                                 </td>
@@ -375,7 +449,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE POLIGONO INDUSTRIAL</strong></div> 
                                     <small class="cod-eq">Cód: CU903005</small>
                                 </td>
@@ -435,7 +508,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: EN903001</small>
                                 </td>
@@ -465,7 +537,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FPA MUNICIPAL DE LOS MONTESINOS</strong></div> 
                                     <small class="cod-eq">Cód: EN903002</small>
                                 </td>
@@ -495,7 +566,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>E.I. PRIMER CICLO MUNICIPAL MIGUEL HERNÁNDEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN903003</small>
                                 </td>
@@ -525,7 +595,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LOS MONTESINOS - REMEDIOS MUÑOZ</strong></div> 
                                     <small class="cod-eq">Cód: EN903004</small>
                                 </td>
@@ -555,7 +624,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE MÚSICA Y CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: EN903005</small>
                                 </td>
@@ -615,7 +683,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR LOS MONTESINOS</strong></div> 
                                     <small class="cod-eq">Cód: SA903001</small>
                                 </td>
@@ -683,7 +750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID903001</small>
                                 </td>
@@ -713,7 +779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: ID903002</small>
                                 </td>
@@ -743,7 +808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LOS MONTESINOS</strong></div> 
                                     <small class="cod-eq">Cód: ID903003</small>
                                 </td>
@@ -773,7 +837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CONSTITUCIÓN</strong></div> 
                                     <small class="cod-eq">Cód: ID903004</small>
                                 </td>
@@ -833,7 +896,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 30 DE JULIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ903001</small>
                                 </td>
@@ -863,7 +925,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA CONSTITUCION</strong></div> 
                                     <small class="cod-eq">Cód: PJ903002</small>
                                 </td>
@@ -893,7 +954,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ903003</small>
                                 </td>
@@ -923,7 +983,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SAGRADO CORAZON</strong></div> 
                                     <small class="cod-eq">Cód: PJ903004</small>
                                 </td>
@@ -953,7 +1012,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANIZACIÓN CIUDAD JARDÍN</strong></div> 
                                     <small class="cod-eq">Cód: PJ903005</small>
                                 </td>
@@ -983,7 +1041,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LAS NACIONES</strong></div> 
                                     <small class="cod-eq">Cód: PJ903006</small>
                                 </td>
@@ -1013,7 +1070,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ903007</small>
                                 </td>
@@ -1043,7 +1099,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AGRUPACIÓN MUSICAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ903008</small>
                                 </td>
@@ -1073,7 +1128,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE PONIENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ903009</small>
                                 </td>
@@ -1103,7 +1157,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LAS LAGUNAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ903010</small>
                                 </td>
@@ -1133,7 +1186,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LEVANTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ903011</small>
                                 </td>
@@ -1163,7 +1215,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LAS SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ903012</small>
                                 </td>
@@ -1193,7 +1244,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LAS LOMAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ903013</small>
                                 </td>
@@ -1223,7 +1273,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COMUNIDAD VALENCIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ903014</small>
                                 </td>
@@ -1253,7 +1302,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ALGARROBO</strong></div> 
                                     <small class="cod-eq">Cód: PJ903015</small>
                                 </td>
@@ -1283,7 +1331,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CAMINO VIEJO DE ORIHUELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ903016</small>
                                 </td>
@@ -1313,7 +1360,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA RIEGO DE LEVANTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ903017</small>
                                 </td>
@@ -1343,7 +1389,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE AZORÍN</strong></div> 
                                     <small class="cod-eq">Cód: PJ903018</small>
                                 </td>
@@ -1373,7 +1418,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ROJALES</strong></div> 
                                     <small class="cod-eq">Cód: PJ903019</small>
                                 </td>
@@ -1403,7 +1447,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE M2</strong></div> 
                                     <small class="cod-eq">Cód: PJ903020</small>
                                 </td>
@@ -1433,7 +1476,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE  CALLE C1</strong></div> 
                                     <small class="cod-eq">Cód: PJ903021</small>
                                 </td>
@@ -1463,7 +1505,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE B1</strong></div> 
                                     <small class="cod-eq">Cód: PJ903022</small>
                                 </td>
@@ -1493,7 +1534,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE N</strong></div> 
                                     <small class="cod-eq">Cód: PJ903023</small>
                                 </td>
@@ -1523,7 +1563,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE VIA AUGUSTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ903024</small>
                                 </td>
@@ -1553,7 +1592,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE G</strong></div> 
                                     <small class="cod-eq">Cód: PJ903025</small>
                                 </td>
@@ -1583,7 +1621,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE Q</strong></div> 
                                     <small class="cod-eq">Cód: PJ903026</small>
                                 </td>
@@ -1613,7 +1650,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALISTENIA POL. IND. LEVANTE II</strong></div> 
                                     <small class="cod-eq">Cód: PJ903027</small>
                                 </td>
@@ -1662,6 +1698,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1677,7 +1714,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1768,7 +1805,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1898,7 +1935,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

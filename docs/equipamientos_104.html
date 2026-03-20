@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE PETRER</strong></div> 
                                     <small class="cod-eq">Cód: CC104001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC104002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL JOVE Y CONCEJALIAS INFANCIA, JUVENTUD, DEPOR</strong></div> 
                                     <small class="cod-eq">Cód: CC104004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>URBANISMO Y GESTION TRIBUTARIA</strong></div> 
                                     <small class="cod-eq">Cód: CC104005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC104006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CC104007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC</strong></div> 
                                     <small class="cod-eq">Cód: CC104008</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA SERVICIOS Y MANTENIMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC104009</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS MULTIUSOS PLAZA DEL DERROCAT</strong></div> 
                                     <small class="cod-eq">Cód: CC104010</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RADIO PETRER</strong></div> 
                                     <small class="cod-eq">Cód: CC104011</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CURSOS FORMACIÓN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC104012</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO (ANTIGUO MUSEO DAMASO ALONSO)</strong></div> 
                                     <small class="cod-eq">Cód: CC104013</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS CONCEJALIA IGUALDAD E INCLUSION SOCIAL</strong></div> 
                                     <small class="cod-eq">Cód: CC104014</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRO CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: CU104001</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION DE VECINOS PABLO PICASSO</strong></div> 
                                     <small class="cod-eq">Cód: CU104003</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU104004</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA ENRIQUE AMAT</strong></div> 
                                     <small class="cod-eq">Cód: CU104007</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FORN CULTURAL CHIMENEAS</strong></div> 
                                     <small class="cod-eq">Cód: CU104008</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. SAN JOSE Y ADYACENTES</strong></div> 
                                     <small class="cod-eq">Cód: CU104009</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. VIVIENDAS UNIFAMILIARES SALINETES</strong></div> 
                                     <small class="cod-eq">Cód: CU104010</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. SAN RAFAEL</strong></div> 
                                     <small class="cod-eq">Cód: CU104011</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. LA FRONTERA</strong></div> 
                                     <small class="cod-eq">Cód: CU104012</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. DISTRITO SALINETAS Y OTROS</strong></div> 
                                     <small class="cod-eq">Cód: CU104014</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.VV. PLAZA HIPOLITO NAVARRO</strong></div> 
                                     <small class="cod-eq">Cód: CU104015</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN DE VECINOS DE MIGUEL HERNANDE</strong></div> 
                                     <small class="cod-eq">Cód: CU104016</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTILLO Y MUSEO CASAS CUEVA MURALLA</strong></div> 
                                     <small class="cod-eq">Cód: CU104017</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MUNICIPAL CLARA CAMPOAMOR</strong></div> 
                                     <small class="cod-eq">Cód: CU104018</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DE LA FIESTA</strong></div> 
                                     <small class="cod-eq">Cód: CU104019</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL ESPAI BLANC</strong></div> 
                                     <small class="cod-eq">Cód: CU104020</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN DE VECINOS HISPANOAMÉRICA</strong></div> 
                                     <small class="cod-eq">Cód: CU104021</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DAMASO NAVARRO</strong></div> 
                                     <small class="cod-eq">Cód: CU104022</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA DE ESTUDIOS 24 HORAS</strong></div> 
                                     <small class="cod-eq">Cód: CU104023</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRREY POVEDA</strong></div> 
                                     <small class="cod-eq">Cód: EN104001</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP REINA SOFIA</strong></div> 
                                     <small class="cod-eq">Cód: EN104002</small>
                                 </td>
@@ -1275,7 +1320,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP NOU D'OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: EN104003</small>
                                 </td>
@@ -1305,7 +1349,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP LA FOIA</strong></div> 
                                     <small class="cod-eq">Cód: EN104004</small>
                                 </td>
@@ -1335,7 +1378,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SANTO DOMINGO SAVIO</strong></div> 
                                     <small class="cod-eq">Cód: EN104005</small>
                                 </td>
@@ -1365,7 +1407,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES AZORIN</strong></div> 
                                     <small class="cod-eq">Cód: EN104006</small>
                                 </td>
@@ -1395,7 +1436,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CID CAMPEADOR</strong></div> 
                                     <small class="cod-eq">Cód: EN104007</small>
                                 </td>
@@ -1425,7 +1465,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RAMBLA DEL MOLINS</strong></div> 
                                     <small class="cod-eq">Cód: EN104008</small>
                                 </td>
@@ -1455,7 +1494,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP REYES CATÓLICOS</strong></div> 
                                     <small class="cod-eq">Cód: EN104009</small>
                                 </td>
@@ -1485,7 +1523,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES POETA PACO MOLLA</strong></div> 
                                     <small class="cod-eq">Cód: EN104010</small>
                                 </td>
@@ -1515,7 +1552,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PÚBLIC FPA CARLES SALVADOR</strong></div> 
                                     <small class="cod-eq">Cód: EN104011</small>
                                 </td>
@@ -1545,7 +1581,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LA CANAL</strong></div> 
                                     <small class="cod-eq">Cód: EN104012</small>
                                 </td>
@@ -1575,7 +1610,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO VIRGEN DEL REMEDIO</strong></div> 
                                     <small class="cod-eq">Cód: EN104013</small>
                                 </td>
@@ -1605,7 +1639,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT EDUCACIÓ INFANTIL AIRE LIBRE</strong></div> 
                                     <small class="cod-eq">Cód: EN104014</small>
                                 </td>
@@ -1635,7 +1668,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE MÚSICA I DANSA VALLS DEL VINALOPÓ</strong></div> 
                                     <small class="cod-eq">Cód: EN104015</small>
                                 </td>
@@ -1665,7 +1697,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL ELS PEIXOS</strong></div> 
                                     <small class="cod-eq">Cód: EN104016</small>
                                 </td>
@@ -1695,7 +1726,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA COMARCAL DE MÚSICA TRADICIONAL</strong></div> 
                                     <small class="cod-eq">Cód: EN104017</small>
                                 </td>
@@ -1725,7 +1755,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT D'EDUCACIÓ INFANTIL BABYSOL</strong></div> 
                                     <small class="cod-eq">Cód: EN104018</small>
                                 </td>
@@ -1755,7 +1784,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIV. ED. INF. 1ER CICLE CAP I CUA</strong></div> 
                                     <small class="cod-eq">Cód: EN104020</small>
                                 </td>
@@ -1785,7 +1813,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA SOCIEDAD UNIÓN MUSICAL</strong></div> 
                                     <small class="cod-eq">Cód: EN104021</small>
                                 </td>
@@ -1815,7 +1842,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT D'EDUCACIÓ INFANTIL DE PRIMER CICLE</strong></div> 
                                     <small class="cod-eq">Cód: EN104022</small>
                                 </td>
@@ -1875,7 +1901,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE PETRER I</strong></div> 
                                     <small class="cod-eq">Cód: SA104001</small>
                                 </td>
@@ -1905,7 +1930,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IBERMUTUAMUR</strong></div> 
                                     <small class="cod-eq">Cód: SA104003</small>
                                 </td>
@@ -1935,7 +1959,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD PETRER II</strong></div> 
                                     <small class="cod-eq">Cód: SA104004</small>
                                 </td>
@@ -1995,7 +2018,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL JUAN MILLA</strong></div> 
                                     <small class="cod-eq">Cód: AS104001</small>
                                 </td>
@@ -2025,7 +2047,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEA PETRER</strong></div> 
                                     <small class="cod-eq">Cód: AS104003</small>
                                 </td>
@@ -2055,7 +2076,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA P.M.D. LA MOLINETA PETRER</strong></div> 
                                     <small class="cod-eq">Cód: AS104006</small>
                                 </td>
@@ -2085,7 +2105,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DE DIA COCEMFE</strong></div> 
                                     <small class="cod-eq">Cód: AS104007</small>
                                 </td>
@@ -2115,7 +2134,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DIA DISCAPACITADOS</strong></div> 
                                     <small class="cod-eq">Cód: AS104008</small>
                                 </td>
@@ -2145,7 +2163,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE ACOGIDA</strong></div> 
                                     <small class="cod-eq">Cód: AS104009</small>
                                 </td>
@@ -2175,7 +2192,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DÍA DE MENORES SALINETES</strong></div> 
                                     <small class="cod-eq">Cód: AS104010</small>
                                 </td>
@@ -2235,7 +2251,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: LM104001</small>
                                 </td>
@@ -2265,7 +2280,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO CENTRAL FRONTERA</strong></div> 
                                     <small class="cod-eq">Cód: LM104002</small>
                                 </td>
@@ -2325,7 +2339,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA PETRER</strong></div> 
                                     <small class="cod-eq">Cód: IP104001</small>
                                 </td>
@@ -2387,7 +2400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN VICENTE BLASCO IBAÑEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID104001</small>
                                 </td>
@@ -2417,7 +2429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRREY POVEDA</strong></div> 
                                     <small class="cod-eq">Cód: ID104002</small>
                                 </td>
@@ -2447,7 +2458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL DE PETRER GEDEÓN E ISAÍAS</strong></div> 
                                     <small class="cod-eq">Cód: ID104003</small>
                                 </td>
@@ -2477,7 +2487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CID CAMPEADOR</strong></div> 
                                     <small class="cod-eq">Cód: ID104004</small>
                                 </td>
@@ -2507,7 +2516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP LA FOIA</strong></div> 
                                     <small class="cod-eq">Cód: ID104006</small>
                                 </td>
@@ -2537,7 +2545,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES AZORIN</strong></div> 
                                     <small class="cod-eq">Cód: ID104007</small>
                                 </td>
@@ -2567,7 +2574,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS DE PETANCA PLAZA AMERICA</strong></div> 
                                     <small class="cod-eq">Cód: ID104008</small>
                                 </td>
@@ -2597,7 +2603,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA FÚTBOL CALLE VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: ID104009</small>
                                 </td>
@@ -2627,7 +2632,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. RAMBLA DEL MOLINS</strong></div> 
                                     <small class="cod-eq">Cód: ID104010</small>
                                 </td>
@@ -2657,7 +2661,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RONCESVALLES</strong></div> 
                                     <small class="cod-eq">Cód: ID104011</small>
                                 </td>
@@ -2687,7 +2690,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP REYES CATÓLICOS</strong></div> 
                                     <small class="cod-eq">Cód: ID104012</small>
                                 </td>
@@ -2717,7 +2719,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPOS DE FÚTBOL DEL BARXELL</strong></div> 
                                     <small class="cod-eq">Cód: ID104013</small>
                                 </td>
@@ -2747,7 +2748,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP NOU D'OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: ID104014</small>
                                 </td>
@@ -2777,7 +2777,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA CARRER POETA PACO MOYA</strong></div> 
                                     <small class="cod-eq">Cód: ID104015</small>
                                 </td>
@@ -2807,7 +2806,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES POETA PACO MOLLA</strong></div> 
                                     <small class="cod-eq">Cód: ID104016</small>
                                 </td>
@@ -2837,7 +2835,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP REINA SOFIA</strong></div> 
                                     <small class="cod-eq">Cód: ID104017</small>
                                 </td>
@@ -2867,7 +2864,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO DEL GUIRNEY</strong></div> 
                                     <small class="cod-eq">Cód: ID104018</small>
                                 </td>
@@ -2897,7 +2893,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DE FÚTBOL LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: ID104019</small>
                                 </td>
@@ -2927,7 +2922,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO SAN JERONIMO</strong></div> 
                                     <small class="cod-eq">Cód: ID104020</small>
                                 </td>
@@ -2957,7 +2951,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA SALINETES</strong></div> 
                                     <small class="cod-eq">Cód: ID104021</small>
                                 </td>
@@ -2987,7 +2980,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA CALLE BERENADOR</strong></div> 
                                     <small class="cod-eq">Cód: ID104022</small>
                                 </td>
@@ -3017,7 +3009,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORTIVA CALLE RIO SERPIS</strong></div> 
                                     <small class="cod-eq">Cód: ID104023</small>
                                 </td>
@@ -3047,7 +3038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LA CANAL</strong></div> 
                                     <small class="cod-eq">Cód: ID104024</small>
                                 </td>
@@ -3077,7 +3067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO FÚTBOL CALLE VIZCAYA</strong></div> 
                                     <small class="cod-eq">Cód: ID104025</small>
                                 </td>
@@ -3107,7 +3096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. SANTO DOMINGO SAVIO</strong></div> 
                                     <small class="cod-eq">Cód: ID104026</small>
                                 </td>
@@ -3137,7 +3125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA FUTBITO AVDA MOLINETA</strong></div> 
                                     <small class="cod-eq">Cód: ID104027</small>
                                 </td>
@@ -3167,7 +3154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTAS Y CLUB PETANCA PETRER</strong></div> 
                                     <small class="cod-eq">Cód: ID104028</small>
                                 </td>
@@ -3197,7 +3183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE AVENIDA REINA SOFIA</strong></div> 
                                     <small class="cod-eq">Cód: ID104030</small>
                                 </td>
@@ -3227,7 +3212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>INSTALACIÓN DEPORTIVA L'AVAIOL</strong></div> 
                                     <small class="cod-eq">Cód: ID104031</small>
                                 </td>
@@ -3287,7 +3271,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. DEL DERROCAT</strong></div> 
                                     <small class="cod-eq">Cód: PJ104001</small>
                                 </td>
@@ -3317,7 +3300,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA DE BAIX</strong></div> 
                                     <small class="cod-eq">Cód: PJ104003</small>
                                 </td>
@@ -3347,7 +3329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NORTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104004</small>
                                 </td>
@@ -3377,7 +3358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. DE JUAN GIL ALBERT</strong></div> 
                                     <small class="cod-eq">Cód: PJ104006</small>
                                 </td>
@@ -3407,7 +3387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE VICENTE BLASCO IBAÑEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ104007</small>
                                 </td>
@@ -3437,7 +3416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE MUNICIPAL 9 DE OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104008</small>
                                 </td>
@@ -3467,7 +3445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LA EXPLANADA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104009</small>
                                 </td>
@@ -3497,7 +3474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA UNION DE FESTEJOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104010</small>
                                 </td>
@@ -3527,7 +3503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104011</small>
                                 </td>
@@ -3557,7 +3532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ104012</small>
                                 </td>
@@ -3587,7 +3561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE AMERICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104013</small>
                                 </td>
@@ -3617,7 +3590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL DE TRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104014</small>
                                 </td>
@@ -3647,7 +3619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDINES REY JUAN CARLOS I</strong></div> 
                                     <small class="cod-eq">Cód: PJ104017</small>
                                 </td>
@@ -3677,7 +3648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JOAN FUSTER</strong></div> 
                                     <small class="cod-eq">Cód: PJ104020</small>
                                 </td>
@@ -3707,7 +3677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL POETA FEDERICO GARCÍA LORCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104021</small>
                                 </td>
@@ -3737,7 +3706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZURBARAN</strong></div> 
                                     <small class="cod-eq">Cód: PJ104024</small>
                                 </td>
@@ -3767,7 +3735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDÍN ASOC DE VECINOS PABLO PICASSO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104026</small>
                                 </td>
@@ -3797,7 +3764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RINCON BELLO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104029</small>
                                 </td>
@@ -3827,7 +3793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE GUIRNEY (LA HUERTA)</strong></div> 
                                     <small class="cod-eq">Cód: PJ104032</small>
                                 </td>
@@ -3857,7 +3822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPET</strong></div> 
                                     <small class="cod-eq">Cód: PJ104033</small>
                                 </td>
@@ -3887,7 +3851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN JERÓNIMO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104036</small>
                                 </td>
@@ -3917,7 +3880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CRONISTA HIPOLITO NAVARRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104037</small>
                                 </td>
@@ -3947,7 +3909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN CALLE PUIG CAMPANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104038</small>
                                 </td>
@@ -3977,7 +3938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL SALINETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ104039</small>
                                 </td>
@@ -4007,7 +3967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAPRALA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104040</small>
                                 </td>
@@ -4037,7 +3996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FINCA FERRUSA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104041</small>
                                 </td>
@@ -4067,7 +4025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL PASO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104042</small>
                                 </td>
@@ -4097,7 +4054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SAN CRISPIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ104043</small>
                                 </td>
@@ -4127,7 +4083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE FÉLIX RODRÍGUEZ DE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104044</small>
                                 </td>
@@ -4157,7 +4112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESPACIO NATURAL L'AVAIOL</strong></div> 
                                     <small class="cod-eq">Cód: PJ104045</small>
                                 </td>
@@ -4187,7 +4141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JUNTO PISTAS PETANCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104047</small>
                                 </td>
@@ -4217,7 +4170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PACO LOPEZ PINA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104048</small>
                                 </td>
@@ -4247,7 +4199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDÍN BERTA CÁCERES</strong></div> 
                                     <small class="cod-eq">Cód: PJ104049</small>
                                 </td>
@@ -4277,7 +4228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ104050</small>
                                 </td>
@@ -4307,7 +4257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CALLE MENTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104051</small>
                                 </td>
@@ -4337,7 +4286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN CALLE EL PORTAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ104052</small>
                                 </td>
@@ -4367,7 +4315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE JESÚS TORDESILLAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104053</small>
                                 </td>
@@ -4397,7 +4344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA HISPANOAMERICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104054</small>
                                 </td>
@@ -4427,7 +4373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE BRIGADIER ALGARRA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104055</small>
                                 </td>
@@ -4457,7 +4402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA INTERIOR CALLE JAIME I</strong></div> 
                                     <small class="cod-eq">Cód: PJ104056</small>
                                 </td>
@@ -4487,7 +4431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PERE IV</strong></div> 
                                     <small class="cod-eq">Cód: PJ104057</small>
                                 </td>
@@ -4517,7 +4460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CALLE BERENADOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ104058</small>
                                 </td>
@@ -4547,7 +4489,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRO SOCIAL SAN RAFAEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ104059</small>
                                 </td>
@@ -4577,7 +4518,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE RIU SERPIS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104060</small>
                                 </td>
@@ -4607,7 +4547,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CALLE ALMAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104061</small>
                                 </td>
@@ -4637,7 +4576,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CARRER DE LA FOIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104062</small>
                                 </td>
@@ -4667,7 +4605,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE  PISTA DEPORTIVA LA MOLINETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104063</small>
                                 </td>
@@ -4697,7 +4634,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA TEOFILO DEL VALLE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104064</small>
                                 </td>
@@ -4727,7 +4663,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CARRER VILLENA</strong></div> 
                                     <small class="cod-eq">Cód: PJ104065</small>
                                 </td>
@@ -4757,7 +4692,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LLOMA BADÀ</strong></div> 
                                     <small class="cod-eq">Cód: PJ104066</small>
                                 </td>
@@ -4787,7 +4721,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ILLA TRINITAT</strong></div> 
                                     <small class="cod-eq">Cód: PJ104067</small>
                                 </td>
@@ -4817,7 +4750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ECUADOR CON CALLE CHILE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104068</small>
                                 </td>
@@ -4847,7 +4779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE JOSÉ MARÍA FERRERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104069</small>
                                 </td>
@@ -4877,7 +4808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CARRER MESTRE SERRANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ104070</small>
                                 </td>
@@ -4907,7 +4837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CALLE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ104071</small>
                                 </td>
@@ -4937,7 +4866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BULEVAR AVENIDA FELIPE V</strong></div> 
                                     <small class="cod-eq">Cód: PJ104072</small>
                                 </td>
@@ -4967,7 +4895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE POLIGONO INDUSTRIAL SALINETAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104073</small>
                                 </td>
@@ -4997,7 +4924,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA BIOSALUDABLE - POL. IND. SALINETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ104074</small>
                                 </td>
@@ -5027,7 +4953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA PICNIC P.I. SALINETAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ104075</small>
                                 </td>
@@ -5076,6 +5001,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -5091,7 +5017,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -5182,7 +5108,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -5312,7 +5238,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

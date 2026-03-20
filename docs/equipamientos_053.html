@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE CASTALLA</strong></div> 
                                     <small class="cod-eq">Cód: CC053001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MULTIUSOS. ASOCIACIÓN COMERCIO Y HOSTELERIA</strong></div> 
                                     <small class="cod-eq">Cód: CC053002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC053005</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL C/ DOS DE MAYO</strong></div> 
                                     <small class="cod-eq">Cód: CC053006</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUZGADO DE PAZ</strong></div> 
                                     <small class="cod-eq">Cód: CC053008</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA SUMA</strong></div> 
                                     <small class="cod-eq">Cód: CC053009</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AGENCIA DESARROLLO LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC053010</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC053011</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL" COFRADIA DE LA PRECIOSISIMA SANGRE DE JESUS</strong></div> 
                                     <small class="cod-eq">Cód: CC053013</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL DE ASOCIACIONES( BELENISTAS, FRIBROMIALGIAS.</strong></div> 
                                     <small class="cod-eq">Cód: CC053015</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN DESPERTAR DEFICIENTES</strong></div> 
                                     <small class="cod-eq">Cód: CC053016</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AFA CASTALLA Y COMARCA</strong></div> 
                                     <small class="cod-eq">Cód: CC053017</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL CASTALLA</strong></div> 
                                     <small class="cod-eq">Cód: CC053018</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC053019</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE ASOCIACIÓN DE AMAS DE CASA</strong></div> 
                                     <small class="cod-eq">Cód: CU053001</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU053002</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DEL FESTER</strong></div> 
                                     <small class="cod-eq">Cód: CU053003</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE CULTURAL CASTELLUT</strong></div> 
                                     <small class="cod-eq">Cód: CU053006</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA DE LA NATURALEZA</strong></div> 
                                     <small class="cod-eq">Cód: CU053009</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU053010</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR DEL PENSIONISTA. MULTIUSOS</strong></div> 
                                     <small class="cod-eq">Cód: CU053011</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO HISTÓRICO</strong></div> 
                                     <small class="cod-eq">Cód: CU053013</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASTELL DE CASTALLA</strong></div> 
                                     <small class="cod-eq">Cód: CU053014</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP RICO SAPENA</strong></div> 
                                     <small class="cod-eq">Cód: EN053001</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: EN053002</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MARIA ASUNTA</strong></div> 
                                     <small class="cod-eq">Cód: EN053003</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT MUNTORI</strong></div> 
                                     <small class="cod-eq">Cód: EN053004</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MUNICIPAL DE FORMACION PERSONAS ADULTAS</strong></div> 
                                     <small class="cod-eq">Cód: EN053005</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA SANTA CECILIA</strong></div> 
                                     <small class="cod-eq">Cód: EN053006</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL MUNICIPAL NINOS</strong></div> 
                                     <small class="cod-eq">Cód: EN053007</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCOLA PRIVADA DE MÚSICA TRADICIONAL EL SOGALL</strong></div> 
                                     <small class="cod-eq">Cód: EN053008</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP Nº 2</strong></div> 
                                     <small class="cod-eq">Cód: EN053009</small>
                                 </td>
@@ -1245,7 +1292,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE DE SALUT DE CASTALLA</strong></div> 
                                     <small class="cod-eq">Cód: SA053001</small>
                                 </td>
@@ -1305,7 +1351,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UNIDAD DE RESPIRO AFA CASTALLA Y ONIL</strong></div> 
                                     <small class="cod-eq">Cód: AS053001</small>
                                 </td>
@@ -1335,7 +1380,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEA Y VIVIENDAS TUTELADAS</strong></div> 
                                     <small class="cod-eq">Cód: AS053002</small>
                                 </td>
@@ -1395,7 +1439,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO DE ABASTOS DE CASTALLA</strong></div> 
                                     <small class="cod-eq">Cód: LM053001</small>
                                 </td>
@@ -1455,7 +1498,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCIÓN CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP053001</small>
                                 </td>
@@ -1515,7 +1557,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORI DE LA FOIA</strong></div> 
                                     <small class="cod-eq">Cód: TA053001</small>
                                 </td>
@@ -1545,7 +1586,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO MOYA</strong></div> 
                                     <small class="cod-eq">Cód: TA053002</small>
                                 </td>
@@ -1605,7 +1645,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID053001</small>
                                 </td>
@@ -1635,7 +1674,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP RICO SAPENA</strong></div> 
                                     <small class="cod-eq">Cód: ID053002</small>
                                 </td>
@@ -1665,7 +1703,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. MARIA ASUNTA</strong></div> 
                                     <small class="cod-eq">Cód: ID053003</small>
                                 </td>
@@ -1695,7 +1732,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: ID053004</small>
                                 </td>
@@ -1725,7 +1761,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT MUNTORI</strong></div> 
                                     <small class="cod-eq">Cód: ID053005</small>
                                 </td>
@@ -1755,7 +1790,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA PARQUE ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: ID053006</small>
                                 </td>
@@ -1785,7 +1819,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA PUMPTRACK</strong></div> 
                                     <small class="cod-eq">Cód: ID053007</small>
                                 </td>
@@ -1815,7 +1848,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP Nº 2</strong></div> 
                                     <small class="cod-eq">Cód: ID053008</small>
                                 </td>
@@ -1845,7 +1877,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORTIVA CASTALLA INTERNACIONAL</strong></div> 
                                     <small class="cod-eq">Cód: ID053009</small>
                                 </td>
@@ -1905,7 +1936,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASSEIG BASSA DE LA VILA</strong></div> 
                                     <small class="cod-eq">Cód: PJ053001</small>
                                 </td>
@@ -1935,7 +1965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ053002</small>
                                 </td>
@@ -1965,7 +1994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>XORRET DE CATÍ</strong></div> 
                                     <small class="cod-eq">Cód: PJ053003</small>
                                 </td>
@@ -1995,7 +2023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HORTA DE LA VILA</strong></div> 
                                     <small class="cod-eq">Cód: PJ053004</small>
                                 </td>
@@ -2025,7 +2052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LA CARRASCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ053005</small>
                                 </td>
@@ -2055,7 +2081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL 8 DE ABRIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ053006</small>
                                 </td>
@@ -2085,7 +2110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PLAYMOBIL (PARC BLASCO)</strong></div> 
                                     <small class="cod-eq">Cód: PJ053007</small>
                                 </td>
@@ -2115,7 +2139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA LLAURIA I</strong></div> 
                                     <small class="cod-eq">Cód: PJ053008</small>
                                 </td>
@@ -2145,7 +2168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA LLAURIA II</strong></div> 
                                     <small class="cod-eq">Cód: PJ053009</small>
                                 </td>
@@ -2175,7 +2197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CALLE JORGE JUAN</strong></div> 
                                     <small class="cod-eq">Cód: PJ053010</small>
                                 </td>
@@ -2205,7 +2226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA LLAURIA III</strong></div> 
                                     <small class="cod-eq">Cód: PJ053011</small>
                                 </td>
@@ -2235,7 +2255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DEL CHORRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ053012</small>
                                 </td>
@@ -2265,7 +2284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE ONIL</strong></div> 
                                     <small class="cod-eq">Cód: PJ053013</small>
                                 </td>
@@ -2295,7 +2313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ REBOLTETA DEL PAGO</strong></div> 
                                     <small class="cod-eq">Cód: PJ053014</small>
                                 </td>
@@ -2325,7 +2342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ GOYA</strong></div> 
                                     <small class="cod-eq">Cód: PJ053015</small>
                                 </td>
@@ -2355,7 +2371,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RÍO DUERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ053016</small>
                                 </td>
@@ -2385,7 +2400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN AVENIDA FERNANDO FENOLL BERGUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ053017</small>
                                 </td>
@@ -2415,7 +2429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>GLORIETA DEL CONVENTO FRANCISCANOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ053018</small>
                                 </td>
@@ -2445,7 +2458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ERA DELS CAVALLS</strong></div> 
                                     <small class="cod-eq">Cód: PJ053019</small>
                                 </td>
@@ -2475,7 +2487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BASTÀ</strong></div> 
                                     <small class="cod-eq">Cód: PJ053020</small>
                                 </td>
@@ -2505,7 +2516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE POL. INDUSTRIAL EL RIU</strong></div> 
                                     <small class="cod-eq">Cód: PJ053021</small>
                                 </td>
@@ -2535,7 +2545,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ JUAN XXIII</strong></div> 
                                     <small class="cod-eq">Cód: PJ053022</small>
                                 </td>
@@ -2565,7 +2574,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ GABRIEL MIRÓ</strong></div> 
                                     <small class="cod-eq">Cód: PJ053023</small>
                                 </td>
@@ -2614,6 +2622,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2629,7 +2638,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2720,7 +2729,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2850,7 +2859,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

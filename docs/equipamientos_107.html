@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: CC107007</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC107008</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARKING EL LLAVADOR Y ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC107011</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EQUIPAMIENTO MUNICIPAL LA ALBERCA</strong></div> 
                                     <small class="cod-eq">Cód: CC107012</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL ( ANTIGUO DEPÓSITO)</strong></div> 
                                     <small class="cod-eq">Cód: CC107013</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MUNICIPAL (POLICIA LOCAL)</strong></div> 
                                     <small class="cod-eq">Cód: CC107014</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC107015</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LAVADERO XIRLES</strong></div> 
                                     <small class="cod-eq">Cód: CC107018</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULA  DE  CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU107001</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO MUNICIPAL MULTIUSOS</strong></div> 
                                     <small class="cod-eq">Cód: CU107003</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: CU107008</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA MUSEO GABRIEL MIRÓ</strong></div> 
                                     <small class="cod-eq">Cód: CU107009</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA VIGIA</strong></div> 
                                     <small class="cod-eq">Cód: CU107010</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEMENTERIO LITERARIO</strong></div> 
                                     <small class="cod-eq">Cód: CU107011</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL EL LLAVADOR</strong></div> 
                                     <small class="cod-eq">Cód: CU107012</small>
                                 </td>
@@ -705,7 +769,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANT ROC</strong></div> 
                                     <small class="cod-eq">Cód: EN107002</small>
                                 </td>
@@ -735,7 +798,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL DE PRIMER CICLO PONOIG</strong></div> 
                                     <small class="cod-eq">Cód: EN107003</small>
                                 </td>
@@ -795,7 +857,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE POLOP</strong></div> 
                                     <small class="cod-eq">Cód: SA107001</small>
                                 </td>
@@ -825,7 +886,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR DE CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: SA107002</small>
                                 </td>
@@ -885,7 +945,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA GERIATRICA LES FONTS</strong></div> 
                                     <small class="cod-eq">Cód: AS107001</small>
                                 </td>
@@ -951,7 +1010,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL DE POLOP</strong></div> 
                                     <small class="cod-eq">Cód: ID107002</small>
                                 </td>
@@ -981,7 +1039,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA I GIMNÀS MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID107003</small>
                                 </td>
@@ -1011,7 +1068,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANT ROC</strong></div> 
                                     <small class="cod-eq">Cód: ID107004</small>
                                 </td>
@@ -1041,7 +1097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA DEL PARQUE DE CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: ID107005</small>
                                 </td>
@@ -1071,7 +1126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. TEULERIA II</strong></div> 
                                     <small class="cod-eq">Cód: ID107008</small>
                                 </td>
@@ -1101,7 +1155,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA DEPORTIVA EN URB. ALBERCA</strong></div> 
                                     <small class="cod-eq">Cód: ID107009</small>
                                 </td>
@@ -1161,7 +1214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA PAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ107002</small>
                                 </td>
@@ -1191,7 +1243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA ALBERCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107003</small>
                                 </td>
@@ -1221,7 +1272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EL TOSSALET</strong></div> 
                                     <small class="cod-eq">Cód: PJ107004</small>
                                 </td>
@@ -1251,7 +1301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ107005</small>
                                 </td>
@@ -1281,7 +1330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEULERIA I</strong></div> 
                                     <small class="cod-eq">Cód: PJ107006</small>
                                 </td>
@@ -1311,7 +1359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BALCON DE PONOCH I PAU I PARC.53-54</strong></div> 
                                     <small class="cod-eq">Cód: PJ107008</small>
                                 </td>
@@ -1341,7 +1388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BALCON DE PONOCH II-PAU I PARCELA 48</strong></div> 
                                     <small class="cod-eq">Cód: PJ107009</small>
                                 </td>
@@ -1371,7 +1417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LOS CHORROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ107012</small>
                                 </td>
@@ -1401,7 +1446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA EL VALLE</strong></div> 
                                     <small class="cod-eq">Cód: PJ107013</small>
                                 </td>
@@ -1431,7 +1475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107014</small>
                                 </td>
@@ -1461,7 +1504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CTRA. CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ107016</small>
                                 </td>
@@ -1491,7 +1533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE EL TOSSALET</strong></div> 
                                     <small class="cod-eq">Cód: PJ107017</small>
                                 </td>
@@ -1521,7 +1562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ107018</small>
                                 </td>
@@ -1551,7 +1591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ZONA FOIETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107019</small>
                                 </td>
@@ -1581,7 +1620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZR. EL PONT</strong></div> 
                                     <small class="cod-eq">Cód: PJ107021</small>
                                 </td>
@@ -1611,7 +1649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HORT DE BALDO( ZONA DE BARBACOAS)</strong></div> 
                                     <small class="cod-eq">Cód: PJ107022</small>
                                 </td>
@@ -1641,7 +1678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL LAVADERO DE CHIRLES</strong></div> 
                                     <small class="cod-eq">Cód: PJ107023</small>
                                 </td>
@@ -1671,7 +1707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA PISTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107024</small>
                                 </td>
@@ -1701,7 +1736,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA NUEVA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107025</small>
                                 </td>
@@ -1731,7 +1765,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA PURISIMA</strong></div> 
                                     <small class="cod-eq">Cód: PJ107026</small>
                                 </td>
@@ -1761,7 +1794,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL CALLE AMSTERDAM</strong></div> 
                                     <small class="cod-eq">Cód: PJ107027</small>
                                 </td>
@@ -1810,6 +1842,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1825,7 +1858,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1916,7 +1949,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2046,7 +2079,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

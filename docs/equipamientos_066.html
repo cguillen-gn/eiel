@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: CC066001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE SALUD Y MEDIO AMBIENTE</strong></div> 
                                     <small class="cod-eq">Cód: CC066003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE CULTURA , EDUCACION Y DEPORTES</strong></div> 
                                     <small class="cod-eq">Cód: CC066004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONCEJALIA DE JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: CC066005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA TECNICA</strong></div> 
                                     <small class="cod-eq">Cód: CC066007</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIO DE RECOGIDA DE ANIMALES ABANDONADOS</strong></div> 
                                     <small class="cod-eq">Cód: CC066008</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN</strong></div> 
                                     <small class="cod-eq">Cód: CC066009</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA COMARCAL DE REHABILITACION DE EDIFICIOS Y</strong></div> 
                                     <small class="cod-eq">Cód: CC066010</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JUNTA CENTRAL DE FALLAS</strong></div> 
                                     <small class="cod-eq">Cód: CC066011</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE DE LA POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC066014</small>
                                 </td>
@@ -495,7 +564,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA COLORADA</strong></div> 
                                     <small class="cod-eq">Cód: CC066015</small>
                                 </td>
@@ -525,7 +593,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA CONTRATACION</strong></div> 
                                     <small class="cod-eq">Cód: CC066017</small>
                                 </td>
@@ -555,7 +622,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS PUBLICOS</strong></div> 
                                     <small class="cod-eq">Cód: CC066018</small>
                                 </td>
@@ -585,7 +651,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISMO</strong></div> 
                                     <small class="cod-eq">Cód: CC066019</small>
                                 </td>
@@ -615,7 +680,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS ISTITUTO MUNICIPAL DE SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC066020</small>
                                 </td>
@@ -645,7 +709,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL IDELSA AVENIDA DE SAX, 6 BAJOS</strong></div> 
                                     <small class="cod-eq">Cód: CC066021</small>
                                 </td>
@@ -675,7 +738,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIO PSICOPEDAGOGICO ESCOLAR</strong></div> 
                                     <small class="cod-eq">Cód: CC066022</small>
                                 </td>
@@ -705,7 +767,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS MANCOMUNIDAD INTERMUNICIPAL DEL VALLE DEL</strong></div> 
                                     <small class="cod-eq">Cód: CC066023</small>
                                 </td>
@@ -735,7 +796,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TALLER, ALMACEN JARDINERIA Y ALMACEN FIESTAS</strong></div> 
                                     <small class="cod-eq">Cód: CC066024</small>
                                 </td>
@@ -765,7 +825,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO  FORMACION, SERVICIOS IDELSA Y VIVERO EMPRE</strong></div> 
                                     <small class="cod-eq">Cód: CC066025</small>
                                 </td>
@@ -795,7 +854,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OMIC, AFIC Y OFICINAS MUNICIPAL EN MERCADO CENTRAL</strong></div> 
                                     <small class="cod-eq">Cód: CC066027</small>
                                 </td>
@@ -825,7 +883,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO ALTO</strong></div> 
                                     <small class="cod-eq">Cód: CC066028</small>
                                 </td>
@@ -855,7 +912,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IDELSA (INST. DE DESARROLLO)</strong></div> 
                                     <small class="cod-eq">Cód: CC066030</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V. NUMANCIA, MONTE CALVARIO Y ADY</strong></div> 
                                     <small class="cod-eq">Cód: CU066002</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: CU066004</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN CONTRA EL CÁNCER</strong></div> 
                                     <small class="cod-eq">Cód: CU066005</small>
                                 </td>
@@ -1005,7 +1058,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: CU066006</small>
                                 </td>
@@ -1035,7 +1087,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL SEVERO OCHOA</strong></div> 
                                     <small class="cod-eq">Cód: CU066009</small>
                                 </td>
@@ -1065,7 +1116,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL CALZADO</strong></div> 
                                     <small class="cod-eq">Cód: CU066010</small>
                                 </td>
@@ -1095,7 +1145,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL ANDRES NAVARRO VERA</strong></div> 
                                     <small class="cod-eq">Cód: CU066011</small>
                                 </td>
@@ -1125,7 +1174,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL SAN FRANCISCO DE SALES</strong></div> 
                                     <small class="cod-eq">Cód: CU066012</small>
                                 </td>
@@ -1155,7 +1203,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V. CASCO ANTIGUO</strong></div> 
                                     <small class="cod-eq">Cód: CU066013</small>
                                 </td>
@@ -1185,7 +1232,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V.ZONA CENTRO</strong></div> 
                                     <small class="cod-eq">Cód: CU066014</small>
                                 </td>
@@ -1215,7 +1261,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V. LA PURISIMA</strong></div> 
                                     <small class="cod-eq">Cód: CU066015</small>
                                 </td>
@@ -1245,7 +1290,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO ARQUEOLÓGICO DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: CU066016</small>
                                 </td>
@@ -1275,7 +1319,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL LAVADERO</strong></div> 
                                     <small class="cod-eq">Cód: CU066018</small>
                                 </td>
@@ -1305,7 +1348,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V. SAN FRANCISCO DE SALES</strong></div> 
                                     <small class="cod-eq">Cód: CU066020</small>
                                 </td>
@@ -1335,7 +1377,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FEDERACION A.A.V.V. DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: CU066021</small>
                                 </td>
@@ -1365,7 +1406,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.A.V.V. LA JAUD</strong></div> 
                                     <small class="cod-eq">Cód: CU066022</small>
                                 </td>
@@ -1395,7 +1435,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO POLIVALENTE 'LAS 300'</strong></div> 
                                     <small class="cod-eq">Cód: CU066024</small>
                                 </td>
@@ -1425,7 +1464,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRO CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: CU066026</small>
                                 </td>
@@ -1455,7 +1493,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA PADRE MANJON</strong></div> 
                                     <small class="cod-eq">Cód: CU066029</small>
                                 </td>
@@ -1485,7 +1522,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.S. CUATRO ZONAS</strong></div> 
                                     <small class="cod-eq">Cód: CU066030</small>
                                 </td>
@@ -1515,7 +1551,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.S. BARRIO CALIU</strong></div> 
                                     <small class="cod-eq">Cód: CU066031</small>
                                 </td>
@@ -1545,7 +1580,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION DE ALZHEIMER</strong></div> 
                                     <small class="cod-eq">Cód: CU066033</small>
                                 </td>
@@ -1575,7 +1609,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE ROSAS. JUNTA CENTRAL DE COMPARSA</strong></div> 
                                     <small class="cod-eq">Cód: CU066034</small>
                                 </td>
@@ -1605,7 +1638,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION VETERANOS FUTBOL SAN CRISPIN</strong></div> 
                                     <small class="cod-eq">Cód: CU066035</small>
                                 </td>
@@ -1635,7 +1667,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL FALLA JOSE ANTONIO. LAS TRESCIENTA</strong></div> 
                                     <small class="cod-eq">Cód: CU066036</small>
                                 </td>
@@ -1665,7 +1696,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL 2 FALLA JOSE ANTONIO LAS TRESCIENT</strong></div> 
                                     <small class="cod-eq">Cód: CU066037</small>
                                 </td>
@@ -1695,7 +1725,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL CENTRO EXCURSIONISTA ELDENSE</strong></div> 
                                     <small class="cod-eq">Cód: CU066039</small>
                                 </td>
@@ -1725,7 +1754,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION DE VECINOS FRATERNIDAD</strong></div> 
                                     <small class="cod-eq">Cód: CU066040</small>
                                 </td>
@@ -1755,7 +1783,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUEVA PEÑA TAURINA CULTURAL AMIGOS DEL R</strong></div> 
                                     <small class="cod-eq">Cód: CU066042</small>
                                 </td>
@@ -1785,7 +1812,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL CLUB ALPINO ELDENSE</strong></div> 
                                     <small class="cod-eq">Cód: CU066043</small>
                                 </td>
@@ -1815,7 +1841,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL SOCIAL LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: CU066044</small>
                                 </td>
@@ -1845,7 +1870,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION DE VECINOS ESTACION 4 ZONAS</strong></div> 
                                     <small class="cod-eq">Cód: CU066045</small>
                                 </td>
@@ -1875,7 +1899,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL EN CALLE GONZALEZ BUENO, 6, BAJO</strong></div> 
                                     <small class="cod-eq">Cód: CU066046</small>
                                 </td>
@@ -1905,7 +1928,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AUDITORIO ADOC</strong></div> 
                                     <small class="cod-eq">Cód: CU066047</small>
                                 </td>
@@ -1935,7 +1957,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUNDACIÓN PAURIDES GONZÁLEZ VIDAL</strong></div> 
                                     <small class="cod-eq">Cód: CU066048</small>
                                 </td>
@@ -1965,7 +1986,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE AJEDREZ RUY LOPEZ</strong></div> 
                                     <small class="cod-eq">Cód: CU066049</small>
                                 </td>
@@ -2025,7 +2045,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PINTOR SOROLLA</strong></div> 
                                     <small class="cod-eq">Cód: EN066004</small>
                                 </td>
@@ -2055,7 +2074,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP RICO Y AMAT</strong></div> 
                                     <small class="cod-eq">Cód: EN066005</small>
                                 </td>
@@ -2085,7 +2103,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ANTONIO MACHADO</strong></div> 
                                     <small class="cod-eq">Cód: EN066006</small>
                                 </td>
@@ -2115,7 +2132,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MIGUEL SERVET</strong></div> 
                                     <small class="cod-eq">Cód: EN066007</small>
                                 </td>
@@ -2145,7 +2161,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP SANTO NEGRO</strong></div> 
                                     <small class="cod-eq">Cód: EN066008</small>
                                 </td>
@@ -2175,7 +2190,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PÚBLICO FPA ANTONIO PORPETTA</strong></div> 
                                     <small class="cod-eq">Cód: EN066009</small>
                                 </td>
@@ -2205,7 +2219,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: EN066011</small>
                                 </td>
@@ -2235,7 +2248,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP PADRE MANJON</strong></div> 
                                     <small class="cod-eq">Cód: EN066012</small>
                                 </td>
@@ -2265,7 +2277,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES TORRETA CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: EN066013</small>
                                 </td>
@@ -2295,7 +2306,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE EDUCACION INFANTIL NUEVO ALMAFRA</strong></div> 
                                     <small class="cod-eq">Cód: EN066014</small>
                                 </td>
@@ -2325,7 +2335,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT SAGRADA FAMILIA</strong></div> 
                                     <small class="cod-eq">Cód: EN066015</small>
                                 </td>
@@ -2355,7 +2364,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT SANTA MARIA DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: EN066016</small>
                                 </td>
@@ -2385,7 +2393,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES MONASTIL</strong></div> 
                                     <small class="cod-eq">Cód: EN066019</small>
                                 </td>
@@ -2415,7 +2422,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES LA MELVA</strong></div> 
                                     <small class="cod-eq">Cód: EN066020</small>
                                 </td>
@@ -2445,7 +2451,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA OFICIAL DE IDIOMAS</strong></div> 
                                     <small class="cod-eq">Cód: EN066021</small>
                                 </td>
@@ -2475,7 +2480,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL SANTA INFANCIA</strong></div> 
                                     <small class="cod-eq">Cód: EN066022</small>
                                 </td>
@@ -2505,7 +2509,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL EL PUENTE</strong></div> 
                                     <small class="cod-eq">Cód: EN066023</small>
                                 </td>
@@ -2535,7 +2538,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL EL MIRADOR</strong></div> 
                                     <small class="cod-eq">Cód: EN066024</small>
                                 </td>
@@ -2565,7 +2567,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DE LA SALUD, INFANTIL</strong></div> 
                                     <small class="cod-eq">Cód: EN066026</small>
                                 </td>
@@ -2595,7 +2596,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES VALLE DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: EN066029</small>
                                 </td>
@@ -2625,7 +2625,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA SM CULT ELDENSE STA CECILIA</strong></div> 
                                     <small class="cod-eq">Cód: EN066032</small>
                                 </td>
@@ -2655,7 +2654,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE MIGUEL CERVANTES (ANTIGUO EMILIO CASTELAR)</strong></div> 
                                     <small class="cod-eq">Cód: EN066036</small>
                                 </td>
@@ -2685,7 +2683,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP POETA MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN066038</small>
                                 </td>
@@ -2715,7 +2712,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO MUSICA ANA MARIA SANCHEZ</strong></div> 
                                     <small class="cod-eq">Cód: EN066040</small>
                                 </td>
@@ -2745,7 +2741,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ACADEMIA DE PELUQUERÍA PELOS</strong></div> 
                                     <small class="cod-eq">Cód: EN066041</small>
                                 </td>
@@ -2775,7 +2770,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO EDUCACION INFANTIL MI PRIMERA ESCUELA</strong></div> 
                                     <small class="cod-eq">Cód: EN066042</small>
                                 </td>
@@ -2805,7 +2799,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE DE DANZA SUSANA GARCIA</strong></div> 
                                     <small class="cod-eq">Cód: EN066044</small>
                                 </td>
@@ -2835,7 +2828,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEE MIGUEL DE CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: EN066045</small>
                                 </td>
@@ -2865,7 +2857,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA UNIVERSITARIA DE RELACIONES LABORALES ELDA</strong></div> 
                                     <small class="cod-eq">Cód: EN066046</small>
                                 </td>
@@ -2895,7 +2886,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEFIRE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: EN066047</small>
                                 </td>
@@ -2925,7 +2915,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CSF ELDA - LABORA</strong></div> 
                                     <small class="cod-eq">Cód: EN066048</small>
                                 </td>
@@ -2955,7 +2944,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESC. PRIV. DE MÚSICA CIUDAD DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: EN066049</small>
                                 </td>
@@ -2985,7 +2973,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIVADO EDUCACIÓN INFANTIL DUENDES</strong></div> 
                                     <small class="cod-eq">Cód: EN066050</small>
                                 </td>
@@ -3015,7 +3002,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO PRIV. ED. INF. 1er CICLO TALENTOS</strong></div> 
                                     <small class="cod-eq">Cód: EN066051</small>
                                 </td>
@@ -3045,7 +3031,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CTRO PRIVADO FPE CEDENPRO</strong></div> 
                                     <small class="cod-eq">Cód: EN066052</small>
                                 </td>
@@ -3105,7 +3090,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOSPITAL GENERAL DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: SA066001</small>
                                 </td>
@@ -3135,7 +3119,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE ESPECIALIDADES ELDA</strong></div> 
                                     <small class="cod-eq">Cód: SA066002</small>
                                 </td>
@@ -3165,7 +3148,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD LAS ACACIAS</strong></div> 
                                     <small class="cod-eq">Cód: SA066003</small>
                                 </td>
@@ -3195,7 +3177,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD ELDA (AVDA. SAX)</strong></div> 
                                     <small class="cod-eq">Cód: SA066004</small>
                                 </td>
@@ -3225,7 +3206,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD MARINA ESPANOLA</strong></div> 
                                     <small class="cod-eq">Cód: SA066006</small>
                                 </td>
@@ -3255,7 +3235,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FREMAP ELDA</strong></div> 
                                     <small class="cod-eq">Cód: SA066007</small>
                                 </td>
@@ -3285,7 +3264,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLINICA UMIVALE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: SA066009</small>
                                 </td>
@@ -3315,7 +3293,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MÉDICO LOS ÁNGELES.</strong></div> 
                                     <small class="cod-eq">Cód: SA066010</small>
                                 </td>
@@ -3345,7 +3322,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUX. VIRGEN DE LA CABEZA</strong></div> 
                                     <small class="cod-eq">Cód: SA066011</small>
                                 </td>
@@ -3405,7 +3381,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DE DIA EL CATÍ</strong></div> 
                                     <small class="cod-eq">Cód: AS066001</small>
                                 </td>
@@ -3435,7 +3410,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA P.M.D. DOMUSVI ELDA</strong></div> 
                                     <small class="cod-eq">Cód: AS066002</small>
                                 </td>
@@ -3465,7 +3439,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA ENFERMOS MENTALES "VILLA CONC</strong></div> 
                                     <small class="cod-eq">Cód: AS066003</small>
                                 </td>
@@ -3495,7 +3468,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE ESTIMULACION PARA DIS</strong></div> 
                                     <small class="cod-eq">Cód: AS066004</small>
                                 </td>
@@ -3525,7 +3497,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA PARA DISCAPACITADOS "COLORES"</strong></div> 
                                     <small class="cod-eq">Cód: AS066005</small>
                                 </td>
@@ -3555,7 +3526,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UNIDAD DE CONDUCTAS ADICTIVAS</strong></div> 
                                     <small class="cod-eq">Cód: AS066008</small>
                                 </td>
@@ -3585,7 +3555,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: AS066010</small>
                                 </td>
@@ -3615,7 +3584,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE APANAH</strong></div> 
                                     <small class="cod-eq">Cód: AS066011</small>
                                 </td>
@@ -3645,7 +3613,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE FUNREDIS</strong></div> 
                                     <small class="cod-eq">Cód: AS066012</small>
                                 </td>
@@ -3675,7 +3642,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE ASOC DE FAMILIARES ENFERMOS PSIQUIC</strong></div> 
                                     <small class="cod-eq">Cód: AS066013</small>
                                 </td>
@@ -3705,7 +3671,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE ALZHEIMER</strong></div> 
                                     <small class="cod-eq">Cód: AS066014</small>
                                 </td>
@@ -3735,7 +3700,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEA ELDA</strong></div> 
                                     <small class="cod-eq">Cód: AS066015</small>
                                 </td>
@@ -3795,7 +3759,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO CENTRAL DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: LM066001</small>
                                 </td>
@@ -3825,7 +3788,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO DE SAN FCO. DE SALES</strong></div> 
                                     <small class="cod-eq">Cód: LM066002</small>
                                 </td>
@@ -3885,7 +3847,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COMARCAL DE BOMBEROS DEL VINALOPO</strong></div> 
                                     <small class="cod-eq">Cód: IP066001</small>
                                 </td>
@@ -3915,7 +3876,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA ELDA</strong></div> 
                                     <small class="cod-eq">Cód: IP066003</small>
                                 </td>
@@ -3945,7 +3905,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SEDE PROTECCION CIVIL ELDA</strong></div> 
                                     <small class="cod-eq">Cód: IP066004</small>
                                 </td>
@@ -4005,7 +3964,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO ELDA-PETRER</strong></div> 
                                     <small class="cod-eq">Cód: TA066001</small>
                                 </td>
@@ -4065,7 +4023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO SAN CRISPIN</strong></div> 
                                     <small class="cod-eq">Cód: ID066001</small>
                                 </td>
@@ -4095,7 +4052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPOS LA SISMAT</strong></div> 
                                     <small class="cod-eq">Cód: ID066002</small>
                                 </td>
@@ -4125,7 +4081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID066003</small>
                                 </td>
@@ -4155,7 +4110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB PETANCA LAS TRESCIENTAS</strong></div> 
                                     <small class="cod-eq">Cód: ID066004</small>
                                 </td>
@@ -4185,7 +4139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB VERGEL PETANCA</strong></div> 
                                     <small class="cod-eq">Cód: ID066005</small>
                                 </td>
@@ -4215,7 +4168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB PETANCA BARRIO CALIU</strong></div> 
                                     <small class="cod-eq">Cód: ID066006</small>
                                 </td>
@@ -4245,7 +4197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. ALMAFRA</strong></div> 
                                     <small class="cod-eq">Cód: ID066007</small>
                                 </td>
@@ -4275,7 +4226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: ID066009</small>
                                 </td>
@@ -4305,7 +4255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. MAGALLANES</strong></div> 
                                     <small class="cod-eq">Cód: ID066010</small>
                                 </td>
@@ -4335,7 +4284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. ARRUGA</strong></div> 
                                     <small class="cod-eq">Cód: ID066011</small>
                                 </td>
@@ -4365,7 +4313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. JARDINES DEL VINALOPO</strong></div> 
                                     <small class="cod-eq">Cód: ID066012</small>
                                 </td>
@@ -4395,7 +4342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA TORRETA</strong></div> 
                                     <small class="cod-eq">Cód: ID066013</small>
                                 </td>
@@ -4425,7 +4371,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. PLUTON</strong></div> 
                                     <small class="cod-eq">Cód: ID066014</small>
                                 </td>
@@ -4455,7 +4400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. COCOLICHE</strong></div> 
                                     <small class="cod-eq">Cód: ID066015</small>
                                 </td>
@@ -4485,7 +4429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SAN JOSE OBRERO</strong></div> 
                                     <small class="cod-eq">Cód: ID066016</small>
                                 </td>
@@ -4515,7 +4458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HUERTA NUEVA</strong></div> 
                                     <small class="cod-eq">Cód: ID066017</small>
                                 </td>
@@ -4545,7 +4487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. MATADERO ANTIGUO</strong></div> 
                                     <small class="cod-eq">Cód: ID066018</small>
                                 </td>
@@ -4575,7 +4516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: ID066019</small>
                                 </td>
@@ -4605,7 +4545,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>P.P. AVENIDA CIRCUNVALACION</strong></div> 
                                     <small class="cod-eq">Cód: ID066020</small>
                                 </td>
@@ -4635,7 +4574,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP SANTO NEGRO</strong></div> 
                                     <small class="cod-eq">Cód: ID066021</small>
                                 </td>
@@ -4665,7 +4603,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES MONASTIL</strong></div> 
                                     <small class="cod-eq">Cód: ID066022</small>
                                 </td>
@@ -4695,7 +4632,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MIGUEL SERVET</strong></div> 
                                     <small class="cod-eq">Cód: ID066023</small>
                                 </td>
@@ -4725,7 +4661,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: ID066024</small>
                                 </td>
@@ -4755,7 +4690,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES LA MELVA</strong></div> 
                                     <small class="cod-eq">Cód: ID066025</small>
                                 </td>
@@ -4785,7 +4719,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ANTONIO MACHADO</strong></div> 
                                     <small class="cod-eq">Cód: ID066026</small>
                                 </td>
@@ -4815,7 +4748,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP RICO Y AMAT</strong></div> 
                                     <small class="cod-eq">Cód: ID066027</small>
                                 </td>
@@ -4845,7 +4777,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN ANTONIO GADES</strong></div> 
                                     <small class="cod-eq">Cód: ID066028</small>
                                 </td>
@@ -4875,7 +4806,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP PADRE MANJON</strong></div> 
                                     <small class="cod-eq">Cód: ID066029</small>
                                 </td>
@@ -4905,7 +4835,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT SANTA MARIA DEL CARMEN</strong></div> 
                                     <small class="cod-eq">Cód: ID066030</small>
                                 </td>
@@ -4935,7 +4864,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE JARDIN NUEVA FRATERNIDAD</strong></div> 
                                     <small class="cod-eq">Cód: ID066031</small>
                                 </td>
@@ -4965,7 +4893,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. EL SERAFICO</strong></div> 
                                     <small class="cod-eq">Cód: ID066034</small>
                                 </td>
@@ -4995,7 +4922,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. ESCUELA DE EDUCACION INFANTIL NUEVO ALMAFRA</strong></div> 
                                     <small class="cod-eq">Cód: ID066036</small>
                                 </td>
@@ -5025,7 +4951,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. PINTOR SOROLLA</strong></div> 
                                     <small class="cod-eq">Cód: ID066038</small>
                                 </td>
@@ -5055,7 +4980,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES TORRETA CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: ID066039</small>
                                 </td>
@@ -5085,7 +5009,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO EXCURSIONISTA ELDENSE</strong></div> 
                                     <small class="cod-eq">Cód: ID066042</small>
                                 </td>
@@ -5115,7 +5038,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE CAMPO</strong></div> 
                                     <small class="cod-eq">Cód: ID066043</small>
                                 </td>
@@ -5145,7 +5067,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCUITO PERMANENTE DE AUTOMODELISMO RADIO CONTROL</strong></div> 
                                     <small class="cod-eq">Cód: ID066044</small>
                                 </td>
@@ -5175,7 +5096,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES VALLE DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: ID066045</small>
                                 </td>
@@ -5205,7 +5125,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO CIUDAD DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: ID066046</small>
                                 </td>
@@ -5235,7 +5154,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. EMILIO CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: ID066047</small>
                                 </td>
@@ -5265,7 +5183,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA CUBIERTA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID066048</small>
                                 </td>
@@ -5295,7 +5212,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP POETA MIGUEL HERNANDEZ</strong></div> 
                                     <small class="cod-eq">Cód: ID066049</small>
                                 </td>
@@ -5325,7 +5241,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA ATLETISMO</strong></div> 
                                     <small class="cod-eq">Cód: ID066050</small>
                                 </td>
@@ -5355,7 +5270,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CENTRE PRIVAT SAGRADA FAMILIA</strong></div> 
                                     <small class="cod-eq">Cód: ID066051</small>
                                 </td>
@@ -5385,7 +5299,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCUITO MOTOCROS POLIGONO FINCA LACY</strong></div> 
                                     <small class="cod-eq">Cód: ID066053</small>
                                 </td>
@@ -5415,7 +5328,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUEVO ESTADIO PEPICO AMAT COMPLEJO SOCIODEPORTIVO</strong></div> 
                                     <small class="cod-eq">Cód: ID066054</small>
                                 </td>
@@ -5445,7 +5357,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DE LA SALUD, INFANTIL</strong></div> 
                                     <small class="cod-eq">Cód: ID066055</small>
                                 </td>
@@ -5475,7 +5386,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA POLIDEPORTIVA AVENIDA DE RONDA</strong></div> 
                                     <small class="cod-eq">Cód: ID066056</small>
                                 </td>
@@ -5505,7 +5415,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUMP TRACK</strong></div> 
                                     <small class="cod-eq">Cód: ID066057</small>
                                 </td>
@@ -5535,7 +5444,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE</strong></div> 
                                     <small class="cod-eq">Cód: ID066058</small>
                                 </td>
@@ -5595,7 +5503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA DE CASTELAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ066001</small>
                                 </td>
@@ -5625,7 +5532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE ADOLFO SUAREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ066002</small>
                                 </td>
@@ -5655,7 +5561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>4 ZONAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ066003</small>
                                 </td>
@@ -5685,7 +5590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. DE LA PROSPERIDAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ066004</small>
                                 </td>
@@ -5715,7 +5619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. FELIX RODRIGUEZ DE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ066005</small>
                                 </td>
@@ -5745,7 +5648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN NUEVA FRATERNIDAD</strong></div> 
                                     <small class="cod-eq">Cód: PJ066006</small>
                                 </td>
@@ -5775,7 +5677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ROSALIA DE CASTRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066007</small>
                                 </td>
@@ -5805,7 +5706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN EMUDESA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066008</small>
                                 </td>
@@ -5835,7 +5735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ANGEL VERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066009</small>
                                 </td>
@@ -5865,7 +5764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN LAS ACACIAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ066010</small>
                                 </td>
@@ -5895,7 +5793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIUDAD DE ELDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066011</small>
                                 </td>
@@ -5925,7 +5822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA MUSICAL SANTA CECILIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066013</small>
                                 </td>
@@ -5955,7 +5851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO DE LAS ARENAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ066014</small>
                                 </td>
@@ -5985,7 +5880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE COCOLICHE</strong></div> 
                                     <small class="cod-eq">Cód: PJ066015</small>
                                 </td>
@@ -6015,7 +5909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN SAN FRANCISCO DE SALES</strong></div> 
                                     <small class="cod-eq">Cód: PJ066017</small>
                                 </td>
@@ -6045,7 +5938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA SALVADOR ALLENDE</strong></div> 
                                     <small class="cod-eq">Cód: PJ066018</small>
                                 </td>
@@ -6075,7 +5967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ANTONIO GADES</strong></div> 
                                     <small class="cod-eq">Cód: PJ066021</small>
                                 </td>
@@ -6105,7 +5996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN SEVERO OCHOA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066023</small>
                                 </td>
@@ -6135,7 +6025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN PLAZA DE ESPAÑA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066024</small>
                                 </td>
@@ -6165,7 +6054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE CALIU</strong></div> 
                                     <small class="cod-eq">Cód: PJ066034</small>
                                 </td>
@@ -6195,7 +6083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ALTO DE SAN MIGUEL</strong></div> 
                                     <small class="cod-eq">Cód: PJ066036</small>
                                 </td>
@@ -6225,7 +6112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN HUERTA NUEVA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066038</small>
                                 </td>
@@ -6255,7 +6141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDINES DE LA RIBERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066041</small>
                                 </td>
@@ -6285,7 +6170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE SAN CRISPIN</strong></div> 
                                     <small class="cod-eq">Cód: PJ066044</small>
                                 </td>
@@ -6315,7 +6199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE LA MUSICA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066050</small>
                                 </td>
@@ -6345,7 +6228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LOS TRABAJADORES DEL CALZADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066051</small>
                                 </td>
@@ -6375,7 +6257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA. SAGASTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066055</small>
                                 </td>
@@ -6405,7 +6286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDINES DEL VINALOPO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066058</small>
                                 </td>
@@ -6435,7 +6315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE TRAFICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066063</small>
                                 </td>
@@ -6465,7 +6344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JOSEFINA MANRESA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066066</small>
                                 </td>
@@ -6495,7 +6373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LA PARROQUIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066069</small>
                                 </td>
@@ -6525,7 +6402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE EL MERE</strong></div> 
                                     <small class="cod-eq">Cód: PJ066070</small>
                                 </td>
@@ -6555,7 +6431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE PLUTON</strong></div> 
                                     <small class="cod-eq">Cód: PJ066071</small>
                                 </td>
@@ -6585,7 +6460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN ALCALDE JOSE JOAQUIN GONZALEZ AMA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066072</small>
                                 </td>
@@ -6615,7 +6489,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE RONDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066073</small>
                                 </td>
@@ -6645,7 +6518,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066074</small>
                                 </td>
@@ -6675,7 +6547,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN DE LA JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ066075</small>
                                 </td>
@@ -6705,7 +6576,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VIRGEN DE LA SALUD II</strong></div> 
                                     <small class="cod-eq">Cód: PJ066076</small>
                                 </td>
@@ -6735,7 +6605,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA RODOLFO GUARINOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ066077</small>
                                 </td>
@@ -6765,7 +6634,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PRINCESA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066078</small>
                                 </td>
@@ -6795,7 +6663,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JUAN DE AUSTRIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066079</small>
                                 </td>
@@ -6825,7 +6692,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MIGUEL MATEO PASTOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ066080</small>
                                 </td>
@@ -6855,7 +6721,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DEL MEDITERRÁNEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066081</small>
                                 </td>
@@ -6885,7 +6750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE SAN FRANCISCO DE SALES</strong></div> 
                                     <small class="cod-eq">Cód: PJ066082</small>
                                 </td>
@@ -6915,7 +6779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CARRETERA CIRCUNVALACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ066083</small>
                                 </td>
@@ -6945,7 +6808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN CALLE DOCTOR ARRUGA</strong></div> 
                                     <small class="cod-eq">Cód: PJ066084</small>
                                 </td>
@@ -6975,7 +6837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE CERVANTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ066085</small>
                                 </td>
@@ -7005,7 +6866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JOAN MIRO</strong></div> 
                                     <small class="cod-eq">Cód: PJ066086</small>
                                 </td>
@@ -7035,7 +6895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL AA VV VIRGEN DE LA SALUD</strong></div> 
                                     <small class="cod-eq">Cód: PJ066087</small>
                                 </td>
@@ -7065,7 +6924,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDIN MAESTRO GRANADOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ066088</small>
                                 </td>
@@ -7095,7 +6953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DETRAS DE APANAH</strong></div> 
                                     <small class="cod-eq">Cód: PJ066089</small>
                                 </td>
@@ -7125,7 +6982,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ARQUITECTO GAUDI</strong></div> 
                                     <small class="cod-eq">Cód: PJ066090</small>
                                 </td>
@@ -7155,7 +7011,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA LUIS BRAILLE</strong></div> 
                                     <small class="cod-eq">Cód: PJ066091</small>
                                 </td>
@@ -7185,7 +7040,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE SAN ANTÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ066092</small>
                                 </td>
@@ -7234,6 +7088,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -7249,7 +7104,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -7340,7 +7195,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -7470,7 +7325,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LLAVADORET</strong></div> 
                                     <small class="cod-eq">Cód: CC021001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AYUNTAMIENTO DE BANYERES DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: CC021002</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINAS MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CC021004</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC021005</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TOURIST INFO</strong></div> 
                                     <small class="cod-eq">Cód: CC021006</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACENES BAJO MERCADO</strong></div> 
                                     <small class="cod-eq">Cód: CC021007</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NAVES NIDO PARA EMPRESAS</strong></div> 
                                     <small class="cod-eq">Cód: CC021008</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO MUNICIPAL DE L'ESPARDENYA</strong></div> 
                                     <small class="cod-eq">Cód: CU021001</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SOCIEDAD MUSICAL DE BAÑERES</strong></div> 
                                     <small class="cod-eq">Cód: CU021003</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU021004</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORRE DE LA FONT BONA</strong></div> 
                                     <small class="cod-eq">Cód: CU021006</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DEL CASTILLO</strong></div> 
                                     <small class="cod-eq">Cód: CU021007</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TEATRO PRINCIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU021008</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASAL JUVENTUD</strong></div> 
                                     <small class="cod-eq">Cód: CU021009</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LLAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: CU021010</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO MULTIUSOS ANTIGUO GRUPO ESCOLAR</strong></div> 
                                     <small class="cod-eq">Cód: CU021011</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CU021013</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO VALENCIANO DEL PAPEL</strong></div> 
                                     <small class="cod-eq">Cód: CU021014</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASSOCIACIÓ DISCAPACITATS BANYERES</strong></div> 
                                     <small class="cod-eq">Cód: CU021015</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA SANT JORDI</strong></div> 
                                     <small class="cod-eq">Cód: CU021016</small>
                                 </td>
@@ -825,7 +884,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACIÓN AMAS DE CASA LUCENTUM</strong></div> 
                                     <small class="cod-eq">Cód: CU021017</small>
                                 </td>
@@ -855,7 +913,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ERMITA DEL SANT CRIST</strong></div> 
                                     <small class="cod-eq">Cód: CU021018</small>
                                 </td>
@@ -885,7 +942,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO INTERPRETACIÓN RIO VINALOPÓ</strong></div> 
                                     <small class="cod-eq">Cód: CU021020</small>
                                 </td>
@@ -915,7 +971,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLUB DE CAZA</strong></div> 
                                     <small class="cod-eq">Cód: CU021021</small>
                                 </td>
@@ -945,7 +1000,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DE LA FARMACIA</strong></div> 
                                     <small class="cod-eq">Cód: CU021022</small>
                                 </td>
@@ -975,7 +1029,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ANTIGUO CINE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: CU021023</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FUNDACION RIBERA</strong></div> 
                                     <small class="cod-eq">Cód: EN021003</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES PROFESOR MANUEL BROSETA</strong></div> 
                                     <small class="cod-eq">Cód: EN021005</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP ALFONSO INIESTA</strong></div> 
                                     <small class="cod-eq">Cód: EN021006</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRE PRIVAT D'EDUCACIÓ INFANTIL EL PATIET</strong></div> 
                                     <small class="cod-eq">Cód: EN021007</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORI ELEMENTAL DE MÚSICA</strong></div> 
                                     <small class="cod-eq">Cód: EN021008</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA INFANTIL 1ER CICLO MUNICIPAL L'ESCOLETA</strong></div> 
                                     <small class="cod-eq">Cód: EN021009</small>
                                 </td>
@@ -1215,7 +1262,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FPA MUNICIPAL ALFONSO INIESTA</strong></div> 
                                     <small class="cod-eq">Cód: EN021010</small>
                                 </td>
@@ -1245,7 +1291,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE MÚSICA TINA FERRE</strong></div> 
                                     <small class="cod-eq">Cód: EN021011</small>
                                 </td>
@@ -1305,7 +1350,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE SALUD DE BANYERES DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: SA021002</small>
                                 </td>
@@ -1365,7 +1409,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA Y CENTRO DIA BANYERES MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: AS021002</small>
                                 </td>
@@ -1395,7 +1438,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ASOCIACION ALZHEIMER BANYERES DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: AS021003</small>
                                 </td>
@@ -1425,7 +1467,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TALLER OCUPACIONAL DISCAPACITADOS</strong></div> 
                                     <small class="cod-eq">Cód: AS021004</small>
                                 </td>
@@ -1455,7 +1496,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO OCUPACIONAL Y SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: AS021005</small>
                                 </td>
@@ -1515,7 +1555,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MERCADO MUNICIPAL DE BANYERES</strong></div> 
                                     <small class="cod-eq">Cód: LM021002</small>
                                 </td>
@@ -1575,7 +1614,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA ESPAÑOLA</strong></div> 
                                     <small class="cod-eq">Cód: IP021002</small>
                                 </td>
@@ -1605,7 +1643,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CRUZ ROJA ESPAÑOLA II</strong></div> 
                                     <small class="cod-eq">Cód: IP021003</small>
                                 </td>
@@ -1635,7 +1672,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP021004</small>
                                 </td>
@@ -1665,7 +1701,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>NUEVA SEDE CRUZ ROJA</strong></div> 
                                     <small class="cod-eq">Cód: IP021005</small>
                                 </td>
@@ -1725,7 +1760,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO COMARCAL DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: TA021001</small>
                                 </td>
@@ -1755,7 +1789,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORI SANT JORDI</strong></div> 
                                     <small class="cod-eq">Cód: TA021002</small>
                                 </td>
@@ -1815,7 +1848,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP ALFONSO INIESTA</strong></div> 
                                     <small class="cod-eq">Cód: ID021001</small>
                                 </td>
@@ -1845,7 +1877,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. FUNDACION RIBERA</strong></div> 
                                     <small class="cod-eq">Cód: ID021002</small>
                                 </td>
@@ -1875,7 +1906,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL DE BANYERES DE MARIOLA</strong></div> 
                                     <small class="cod-eq">Cód: ID021003</small>
                                 </td>
@@ -1905,7 +1935,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES PROFESOR MANUEL BROSETA</strong></div> 
                                     <small class="cod-eq">Cód: ID021005</small>
                                 </td>
@@ -1935,7 +1964,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE TIRO OLIMPICO</strong></div> 
                                     <small class="cod-eq">Cód: ID021006</small>
                                 </td>
@@ -1965,7 +1993,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA BALONCESTO</strong></div> 
                                     <small class="cod-eq">Cód: ID021008</small>
                                 </td>
@@ -1995,7 +2022,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISTA SKATE</strong></div> 
                                     <small class="cod-eq">Cód: ID021009</small>
                                 </td>
@@ -2055,7 +2081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SUBIDA DE LA ERMITA</strong></div> 
                                     <small class="cod-eq">Cód: PJ021004</small>
                                 </td>
@@ -2085,7 +2110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MOLÍ L'OMBRIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ021007</small>
                                 </td>
@@ -2115,7 +2139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA JUAN BAUTISTA DOMENECH</strong></div> 
                                     <small class="cod-eq">Cód: PJ021008</small>
                                 </td>
@@ -2145,7 +2168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>VILLA ROSARIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ021009</small>
                                 </td>
@@ -2175,7 +2197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC MUNICIPAL LA S</strong></div> 
                                     <small class="cod-eq">Cód: PJ021010</small>
                                 </td>
@@ -2205,7 +2226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MOROS NOUS</strong></div> 
                                     <small class="cod-eq">Cód: PJ021011</small>
                                 </td>
@@ -2235,7 +2255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIGONO BARRAQUETES</strong></div> 
                                     <small class="cod-eq">Cód: PJ021012</small>
                                 </td>
@@ -2265,7 +2284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA PLATANOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ021013</small>
                                 </td>
@@ -2295,7 +2313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ENRIC VALOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ021014</small>
                                 </td>
@@ -2325,7 +2342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE LA MATETA</strong></div> 
                                     <small class="cod-eq">Cód: PJ021015</small>
                                 </td>
@@ -2355,7 +2371,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL CASTELL</strong></div> 
                                     <small class="cod-eq">Cód: PJ021016</small>
                                 </td>
@@ -2385,7 +2400,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ERMITA SANT JORDI</strong></div> 
                                     <small class="cod-eq">Cód: PJ021017</small>
                                 </td>
@@ -2415,7 +2429,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE JUNTO GERIATRICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ021018</small>
                                 </td>
@@ -2445,7 +2458,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>FONT DEL CAVALLER</strong></div> 
                                     <small class="cod-eq">Cód: PJ021019</small>
                                 </td>
@@ -2475,7 +2487,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE POL. INDUSTRIAL LES MOLINES</strong></div> 
                                     <small class="cod-eq">Cód: PJ021020</small>
                                 </td>
@@ -2505,7 +2516,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ÁREA DE DESCANSO P. INDUSTRIAL LES CREUS</strong></div> 
                                     <small class="cod-eq">Cód: PJ021021</small>
                                 </td>
@@ -2554,6 +2564,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -2569,7 +2580,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -2660,7 +2671,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -2790,7 +2801,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

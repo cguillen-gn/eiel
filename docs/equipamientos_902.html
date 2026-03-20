@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ARCHIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC902002</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE INFORMACIÓN JUVENIL</strong></div> 
                                     <small class="cod-eq">Cód: CC902003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA CONSISTORIAL USO ADMINISTRATIVO</strong></div> 
                                     <small class="cod-eq">Cód: CC902008</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>EDIFICIO DE USOS MULTIPLES</strong></div> 
                                     <small class="cod-eq">Cód: CC902009</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC902010</small>
                                 </td>
@@ -345,7 +419,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACÉN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC902011</small>
                                 </td>
@@ -375,7 +448,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA MUNICIPAL PINAR DE CAMPOVERDE</strong></div> 
                                     <small class="cod-eq">Cód: CC902012</small>
                                 </td>
@@ -405,7 +477,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AULAS DE LOS SERVICIOS MUNICIPALES</strong></div> 
                                     <small class="cod-eq">Cód: CC902013</small>
                                 </td>
@@ -435,7 +506,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SERVICIOS SOCIALES</strong></div> 
                                     <small class="cod-eq">Cód: CC902014</small>
                                 </td>
@@ -465,7 +535,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA MUNICIPAL COSTA TORRE DE LA HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: CC902015</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA-MUSEO GRATINIANO BACHES</strong></div> 
                                     <small class="cod-eq">Cód: CU902001</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>HOGAR DEL PENSIONISTA</strong></div> 
                                     <small class="cod-eq">Cód: CU902003</small>
                                 </td>
@@ -585,7 +652,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AMAS DE CASA</strong></div> 
                                     <small class="cod-eq">Cód: CU902004</small>
                                 </td>
@@ -615,7 +681,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL GREGORIO ORTIZ</strong></div> 
                                     <small class="cod-eq">Cód: CU902006</small>
                                 </td>
@@ -645,7 +710,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>LOCAL MULTIUSOS PINAR DE CAMPOVERDE</strong></div> 
                                     <small class="cod-eq">Cód: CU902008</small>
                                 </td>
@@ -675,7 +739,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO CULTURAL "LA PALOMA"</strong></div> 
                                     <small class="cod-eq">Cód: CU902010</small>
                                 </td>
@@ -705,7 +768,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>UNIÓN MUSICAL HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: CU902011</small>
                                 </td>
@@ -735,7 +797,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BIBLIOTECA MUNICIPAL PINAR DE CAMPOVERDE</strong></div> 
                                     <small class="cod-eq">Cód: CU902012</small>
                                 </td>
@@ -765,7 +826,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU902013</small>
                                 </td>
@@ -795,7 +855,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>MUSEO DE SEMANA SANTA</strong></div> 
                                     <small class="cod-eq">Cód: CU902014</small>
                                 </td>
@@ -855,7 +914,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MARTIN ARTIGOT</strong></div> 
                                     <small class="cod-eq">Cód: EN902001</small>
                                 </td>
@@ -885,7 +943,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: EN902003</small>
                                 </td>
@@ -915,7 +972,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES THIAR</strong></div> 
                                     <small class="cod-eq">Cód: EN902004</small>
                                 </td>
@@ -945,7 +1001,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MEDITERRÁNEO</strong></div> 
                                     <small class="cod-eq">Cód: EN902005</small>
                                 </td>
@@ -975,7 +1030,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP MARÍA MOLINER</strong></div> 
                                     <small class="cod-eq">Cód: EN902006</small>
                                 </td>
@@ -1005,7 +1059,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO FPA MUNICIPAL DE PILAR DE LA HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: EN902007</small>
                                 </td>
@@ -1035,7 +1088,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSERVATORIO PROF MUSICA MARIANA BACHES</strong></div> 
                                     <small class="cod-eq">Cód: EN902008</small>
                                 </td>
@@ -1065,7 +1117,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLO LOS BUHITOS</strong></div> 
                                     <small class="cod-eq">Cód: EN902009</small>
                                 </td>
@@ -1095,7 +1146,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>IES 12 DE OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: EN902011</small>
                                 </td>
@@ -1125,7 +1175,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELA DE MÚSICA ROCK ESPERIENCE</strong></div> 
                                     <small class="cod-eq">Cód: EN902012</small>
                                 </td>
@@ -1155,7 +1204,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I PRIMER CICLO LA PRADERA</strong></div> 
                                     <small class="cod-eq">Cód: EN902013</small>
                                 </td>
@@ -1185,7 +1233,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.P.E.I. PRIMER CICLO BAMBI</strong></div> 
                                     <small class="cod-eq">Cód: EN902014</small>
                                 </td>
@@ -1245,7 +1292,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>C.S.I. PILAR DE LA HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: SA902001</small>
                                 </td>
@@ -1275,7 +1321,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR TORRE DE HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: SA902002</small>
                                 </td>
@@ -1305,7 +1350,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR MIL PALMERAS</strong></div> 
                                     <small class="cod-eq">Cód: SA902003</small>
                                 </td>
@@ -1335,7 +1379,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORIO AUXILIAR PINAR DE CAMPOVERDE</strong></div> 
                                     <small class="cod-eq">Cód: SA902004</small>
                                 </td>
@@ -1365,7 +1408,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CLINICA VIRGEN DEL PILAR S.L.</strong></div> 
                                     <small class="cod-eq">Cód: SA902005</small>
                                 </td>
@@ -1395,7 +1437,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AMPLIACIÓN CENTRO DE SALUD.</strong></div> 
                                     <small class="cod-eq">Cód: SA902006</small>
                                 </td>
@@ -1455,7 +1496,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA 3ª EDAD CASAVERDE</strong></div> 
                                     <small class="cod-eq">Cód: AS902003</small>
                                 </td>
@@ -1485,7 +1525,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO DE DÍA "GREGORIO ORTIZ"</strong></div> 
                                     <small class="cod-eq">Cód: AS902004</small>
                                 </td>
@@ -1515,7 +1554,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RESIDENCIA NTRA SRA DE LAS NIEVES</strong></div> 
                                     <small class="cod-eq">Cód: AS902006</small>
                                 </td>
@@ -1545,7 +1583,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESCUELAS PATERNINAS (ATENCION TEMPRANA)</strong></div> 
                                     <small class="cod-eq">Cód: AS902007</small>
                                 </td>
@@ -1607,7 +1644,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PROTECCION CIVIL</strong></div> 
                                     <small class="cod-eq">Cód: IP902002</small>
                                 </td>
@@ -1637,7 +1673,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALVAMENTO Y SOCORRISMO PLAYA LAS HIGUERICAS</strong></div> 
                                     <small class="cod-eq">Cód: IP902003</small>
                                 </td>
@@ -1697,7 +1732,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO ROCAMER S.A.</strong></div> 
                                     <small class="cod-eq">Cód: TA902001</small>
                                 </td>
@@ -1727,7 +1761,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TANATORIO POMPAS FUNEBRES SAMPER S.L.</strong></div> 
                                     <small class="cod-eq">Cód: TA902002</small>
                                 </td>
@@ -1787,7 +1820,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PISCINA LÚDICA 30 JULIO</strong></div> 
                                     <small class="cod-eq">Cód: ID902001</small>
                                 </td>
@@ -1817,7 +1849,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ESTADIO DE FÚTBOL IKOMAR</strong></div> 
                                     <small class="cod-eq">Cód: ID902002</small>
                                 </td>
@@ -1847,7 +1878,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP VIRGEN DEL PILAR</strong></div> 
                                     <small class="cod-eq">Cód: ID902004</small>
                                 </td>
@@ -1877,7 +1907,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. IES THIAR</strong></div> 
                                     <small class="cod-eq">Cód: ID902005</small>
                                 </td>
@@ -1907,7 +1936,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MARTIN ARTIGOT</strong></div> 
                                     <small class="cod-eq">Cód: ID902006</small>
                                 </td>
@@ -1937,7 +1965,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID902007</small>
                                 </td>
@@ -1967,7 +1994,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIDEPORTIVO EN PINAR DE CAMPOVERDE</strong></div> 
                                     <small class="cod-eq">Cód: ID902008</small>
                                 </td>
@@ -1997,7 +2023,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CAMPO DE FÚTBOL</strong></div> 
                                     <small class="cod-eq">Cód: ID902010</small>
                                 </td>
@@ -2027,7 +2052,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PUERTO DEPORTIVO TORRE DE LA HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: ID902011</small>
                                 </td>
@@ -2057,7 +2081,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MEDITERRANEO</strong></div> 
                                     <small class="cod-eq">Cód: ID902012</small>
                                 </td>
@@ -2087,7 +2110,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP MARIA MOLINER</strong></div> 
                                     <small class="cod-eq">Cód: ID902013</small>
                                 </td>
@@ -2117,7 +2139,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PÁDEL PLACE CLUB</strong></div> 
                                     <small class="cod-eq">Cód: ID902014</small>
                                 </td>
@@ -2147,7 +2168,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>COMPLEJO DEPORTIVO LAS ARTES</strong></div> 
                                     <small class="cod-eq">Cód: ID902015</small>
                                 </td>
@@ -2177,7 +2197,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA RIO MAR</strong></div> 
                                     <small class="cod-eq">Cód: ID902016</small>
                                 </td>
@@ -2207,7 +2226,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CAÑADA DE PRAEZ. C/ PINTORES</strong></div> 
                                     <small class="cod-eq">Cód: ID902017</small>
                                 </td>
@@ -2237,7 +2255,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA DEPORTIVA TORRE DE LA HORADADA</strong></div> 
                                     <small class="cod-eq">Cód: ID902018</small>
                                 </td>
@@ -2267,7 +2284,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RÍO NACIMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: ID902019</small>
                                 </td>
@@ -2297,7 +2313,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CIRCUITO DE CROSS Y CALISTENIA</strong></div> 
                                     <small class="cod-eq">Cód: ID902020</small>
                                 </td>
@@ -2327,7 +2342,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I. D. IES 12 DE OCTUBRE</strong></div> 
                                     <small class="cod-eq">Cód: ID902021</small>
                                 </td>
@@ -2387,7 +2401,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 30 DE JULIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902001</small>
                                 </td>
@@ -2417,7 +2430,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PZA SANTO DOMINGO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902006</small>
                                 </td>
@@ -2447,7 +2459,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ÁREA NATURAL RÍO SECO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902011</small>
                                 </td>
@@ -2477,7 +2488,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ JESÚS NAZARENO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902012</small>
                                 </td>
@@ -2507,7 +2517,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RAMÓN EUGENIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902013</small>
                                 </td>
@@ -2537,7 +2546,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ BÉQUER</strong></div> 
                                     <small class="cod-eq">Cód: PJ902014</small>
                                 </td>
@@ -2567,7 +2575,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RITA ORTUÑO SÁEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902015</small>
                                 </td>
@@ -2597,7 +2604,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ANTONIO ZAPATA PÉREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902016</small>
                                 </td>
@@ -2627,7 +2633,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RITA ORTUÑO SÁEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902017</small>
                                 </td>
@@ -2657,7 +2662,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AMELIO MARTÍNEZ PÉREZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902018</small>
                                 </td>
@@ -2687,7 +2691,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ FERNANDO DE ROJAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902019</small>
                                 </td>
@@ -2717,7 +2720,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RÍO GUADIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902020</small>
                                 </td>
@@ -2747,7 +2749,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RÍO NERVIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902021</small>
                                 </td>
@@ -2777,7 +2778,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE URBANIZACION MIL PALMERAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902022</small>
                                 </td>
@@ -2807,7 +2807,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CIUDAD DE ALMERÍA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902023</small>
                                 </td>
@@ -2837,7 +2836,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ BERGANTÍN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902024</small>
                                 </td>
@@ -2867,7 +2865,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DE CASTELLÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902025</small>
                                 </td>
@@ -2897,7 +2894,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ GALERA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902026</small>
                                 </td>
@@ -2927,7 +2923,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ DE LAS SALINAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902027</small>
                                 </td>
@@ -2957,7 +2952,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MADRE DE DIOS MOJÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902028</small>
                                 </td>
@@ -2987,7 +2981,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ARTEMISA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902029</small>
                                 </td>
@@ -3017,7 +3010,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ JUAN RAMÓN JIMÉNEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902030</small>
                                 </td>
@@ -3047,7 +3039,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ LILA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902031</small>
                                 </td>
@@ -3077,7 +3068,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CATAMARÁN 22</strong></div> 
                                     <small class="cod-eq">Cód: PJ902032</small>
                                 </td>
@@ -3107,7 +3097,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ HELECHO MOJÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902033</small>
                                 </td>
@@ -3137,7 +3126,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ AZUCENA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902034</small>
                                 </td>
@@ -3167,7 +3155,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DE EUROPA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902035</small>
                                 </td>
@@ -3197,7 +3184,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MAR CANTÁBRICO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902036</small>
                                 </td>
@@ -3227,7 +3213,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ SALAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ902037</small>
                                 </td>
@@ -3257,7 +3242,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ARPÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902038</small>
                                 </td>
@@ -3287,7 +3271,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ANTONIO GÁLVEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902039</small>
                                 </td>
@@ -3317,7 +3300,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DE LOS PESCADORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ902040</small>
                                 </td>
@@ -3347,7 +3329,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ BRUSELAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902041</small>
                                 </td>
@@ -3377,7 +3358,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ RÍO SEGURA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902042</small>
                                 </td>
@@ -3407,7 +3387,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ PEÑA DE ÁGUILA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902043</small>
                                 </td>
@@ -3437,7 +3416,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RAMÓN TABUENCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902044</small>
                                 </td>
@@ -3467,7 +3445,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ENELDO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902045</small>
                                 </td>
@@ -3497,7 +3474,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CANELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902046</small>
                                 </td>
@@ -3527,7 +3503,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ DE LAS HIERBAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902047</small>
                                 </td>
@@ -3557,7 +3532,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ESPARTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902048</small>
                                 </td>
@@ -3587,7 +3561,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CENTRAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ902050</small>
                                 </td>
@@ -3617,7 +3590,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RAIMUNDO BENEDICTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902051</small>
                                 </td>
@@ -3647,7 +3619,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE VICTORIA ARTIGOT</strong></div> 
                                     <small class="cod-eq">Cód: PJ902052</small>
                                 </td>
@@ -3677,7 +3648,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DEL AYUNTAMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902053</small>
                                 </td>
@@ -3707,7 +3677,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CATALINA SÁNCHEZ SÁNCHEZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902054</small>
                                 </td>
@@ -3737,7 +3706,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ FLOR DE PASCUA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902055</small>
                                 </td>
@@ -3767,7 +3735,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MARGARITA MOJÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902056</small>
                                 </td>
@@ -3797,7 +3764,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ CATAMARÁN 24</strong></div> 
                                     <small class="cod-eq">Cód: PJ902057</small>
                                 </td>
@@ -3827,7 +3793,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ LANTANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902058</small>
                                 </td>
@@ -3857,7 +3822,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ REMO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902059</small>
                                 </td>
@@ -3887,7 +3851,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ COSTA BLANCA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902060</small>
                                 </td>
@@ -3917,7 +3880,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DUBLÍN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902061</small>
                                 </td>
@@ -3947,7 +3909,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ANTONIO AGUADO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902062</small>
                                 </td>
@@ -3977,7 +3938,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE DE LAS ARTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ902063</small>
                                 </td>
@@ -4007,7 +3967,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ HAMBURGO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902064</small>
                                 </td>
@@ -4037,7 +3996,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE UNIVERSAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ902065</small>
                                 </td>
@@ -4067,7 +4025,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ DE ITALIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902066</small>
                                 </td>
@@ -4097,7 +4054,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AV/ DE COLÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902067</small>
                                 </td>
@@ -4127,7 +4083,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ PERSEO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902068</small>
                                 </td>
@@ -4157,7 +4112,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PEDÁNEO JOSÉ ALBADALEJO MOYA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902069</small>
                                 </td>
@@ -4187,7 +4141,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ NAVEGANTES</strong></div> 
                                     <small class="cod-eq">Cód: PJ902070</small>
                                 </td>
@@ -4217,7 +4170,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PASEO COOPERATIVA AGRÍCOLA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902071</small>
                                 </td>
@@ -4247,7 +4199,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>BULEVAR EN AV CAMILO JOSÉ CELA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902072</small>
                                 </td>
@@ -4277,7 +4228,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ALFAZ DEL PI</strong></div> 
                                     <small class="cod-eq">Cód: PJ902073</small>
                                 </td>
@@ -4307,7 +4257,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DENIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902074</small>
                                 </td>
@@ -4337,7 +4286,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ PÉREZ GALDÓS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902075</small>
                                 </td>
@@ -4367,7 +4315,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PABLO VICTORIA RÍOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902076</small>
                                 </td>
@@ -4397,7 +4344,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DE LA SEGREGACIÓN</strong></div> 
                                     <small class="cod-eq">Cód: PJ902077</small>
                                 </td>
@@ -4427,7 +4373,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE ANDRÉS MURCIA VIUDAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902078</small>
                                 </td>
@@ -4457,7 +4402,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE BARRIO LAS CASICAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902079</small>
                                 </td>
@@ -4487,7 +4431,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ISAAC PERAL</strong></div> 
                                     <small class="cod-eq">Cód: PJ902080</small>
                                 </td>
@@ -4517,7 +4460,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA DE LA IGLESIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902081</small>
                                 </td>
@@ -4547,7 +4489,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ RÍO NACIMIENTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902082</small>
                                 </td>
@@ -4577,7 +4518,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA ANTONIO SÁNCHEZ LOZANO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902083</small>
                                 </td>
@@ -4607,7 +4547,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DEL VELERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902084</small>
                                 </td>
@@ -4637,7 +4576,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MAR ROJO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902085</small>
                                 </td>
@@ -4667,7 +4605,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ ANZUELO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902086</small>
                                 </td>
@@ -4697,7 +4634,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL C/ ALEMANIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902087</small>
                                 </td>
@@ -4727,7 +4663,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ DEL PINO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902088</small>
                                 </td>
@@ -4757,7 +4692,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE LA HUERTA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902089</small>
                                 </td>
@@ -4787,7 +4721,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ AGRICULTORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ902090</small>
                                 </td>
@@ -4817,7 +4750,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE PUBLICO JOSEFA GALVEZ GARCIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902091</small>
                                 </td>
@@ -4847,7 +4779,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO BALTO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902092</small>
                                 </td>
@@ -4877,7 +4808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO C/ DE LAS FLORES</strong></div> 
                                     <small class="cod-eq">Cód: PJ902093</small>
                                 </td>
@@ -4907,7 +4837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PLAZA FLORIDA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902094</small>
                                 </td>
@@ -4937,7 +4866,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO C/ DENIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902095</small>
                                 </td>
@@ -4967,7 +4895,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO AJAX</strong></div> 
                                     <small class="cod-eq">Cód: PJ902096</small>
                                 </td>
@@ -4997,7 +4924,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RAMBLA JESUITAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902097</small>
                                 </td>
@@ -5027,7 +4953,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>RAFAEL ALBERTI</strong></div> 
                                     <small class="cod-eq">Cód: PJ902098</small>
                                 </td>
@@ -5057,7 +4982,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ BRUJAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902099</small>
                                 </td>
@@ -5087,7 +5011,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ BURDEOS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902100</small>
                                 </td>
@@ -5117,7 +5040,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ VARSOVIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902101</small>
                                 </td>
@@ -5147,7 +5069,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVENIDA DE ALEMANIA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902102</small>
                                 </td>
@@ -5177,7 +5098,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JARDÍN CALLE RÍO GUADIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902103</small>
                                 </td>
@@ -5207,7 +5127,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CANINO CANELO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902104</small>
                                 </td>
@@ -5237,7 +5156,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE C/ MAGADALENAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902105</small>
                                 </td>
@@ -5267,7 +5185,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CALLE INVERNADEROS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902106</small>
                                 </td>
@@ -5297,7 +5214,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE INFANTIL CALLE MAGDALENA.</strong></div> 
                                     <small class="cod-eq">Cód: PJ902107</small>
                                 </td>
@@ -5327,7 +5243,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DE LOS SEGUNDAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902108</small>
                                 </td>
@@ -5357,7 +5272,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE BAMBU</strong></div> 
                                     <small class="cod-eq">Cód: PJ902109</small>
                                 </td>
@@ -5387,7 +5301,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DEL TARAY</strong></div> 
                                     <small class="cod-eq">Cód: PJ902110</small>
                                 </td>
@@ -5417,7 +5330,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. DE LUXEMBURGO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902111</small>
                                 </td>
@@ -5447,7 +5359,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE SAN PRUDENCIO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902112</small>
                                 </td>
@@ -5477,7 +5388,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE DEL MAR</strong></div> 
                                     <small class="cod-eq">Cód: PJ902113</small>
                                 </td>
@@ -5507,7 +5417,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE LA PAZ</strong></div> 
                                     <small class="cod-eq">Cód: PJ902114</small>
                                 </td>
@@ -5537,7 +5446,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE AVDA. HORTELANOS SEG.</strong></div> 
                                     <small class="cod-eq">Cód: PJ902115</small>
                                 </td>
@@ -5567,7 +5475,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RONDA DE LEVANTE I</strong></div> 
                                     <small class="cod-eq">Cód: PJ902116</small>
                                 </td>
@@ -5597,7 +5504,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RONDA DE LEVANTE II</strong></div> 
                                     <small class="cod-eq">Cód: PJ902117</small>
                                 </td>
@@ -5627,7 +5533,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE RONDA DE LEVANTE III</strong></div> 
                                     <small class="cod-eq">Cód: PJ902118</small>
                                 </td>
@@ -5657,7 +5562,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE DE LAS HORTALIZAS</strong></div> 
                                     <small class="cod-eq">Cód: PJ902119</small>
                                 </td>
@@ -5687,7 +5591,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE JUAN CARLOS I</strong></div> 
                                     <small class="cod-eq">Cód: PJ902120</small>
                                 </td>
@@ -5717,7 +5620,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE JORGE MANRIQUE</strong></div> 
                                     <small class="cod-eq">Cód: PJ902121</small>
                                 </td>
@@ -5747,7 +5649,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE ORQUIDEA</strong></div> 
                                     <small class="cod-eq">Cód: PJ902122</small>
                                 </td>
@@ -5777,7 +5678,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE LO ROMERO</strong></div> 
                                     <small class="cod-eq">Cód: PJ902123</small>
                                 </td>
@@ -5807,7 +5707,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE CALLE RODRIGUEZ DE LA FUENTE</strong></div> 
                                     <small class="cod-eq">Cód: PJ902124</small>
                                 </td>
@@ -5856,6 +5755,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -5871,7 +5771,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -5962,7 +5862,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -6092,7 +5992,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);

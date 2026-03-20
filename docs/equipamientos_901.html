@@ -113,6 +113,85 @@
             modal.querySelector('img').src = src;
             modal.style.display = 'flex';
         };
+        
+        // 5. MOTOR DE AUTOGUARDADO (LocalStorage)
+        const AutoSave = {
+        getStorageKey() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
+        },
+
+        save() {
+            const formData = {};
+            // Capturar todos los inputs, selects y textareas (excluyendo contraseñas y botones)
+            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
+                if (el.id && !el.id.includes('EmailConfirm')) {
+                    if (el.type === 'checkbox') formData[el.id] = el.checked;
+                    else formData[el.id] = el.value;
+                }
+            });
+
+            // Guardar también las tablas dinámicas si existen (como en Obras o Equipamientos)
+            if (window.colaAdjuntosReq) formData._has_req_files = Object.keys(window.colaAdjuntosReq).length > 0;
+
+            localStorage.setItem(this.getStorageKey(), JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: formData
+            }));
+            
+            this.updateVisualFeedback();
+        },
+
+        restore() {
+            const raw = localStorage.getItem(this.getStorageKey());
+            if (!raw) return;
+
+            const { data } = JSON.parse(raw);
+            Object.entries(data).forEach(([id, val]) => {
+                const el = document.getElementById(id);
+                if (el) {
+                    if (el.type === 'checkbox') el.checked = val;
+                    else {
+                        el.value = val;
+                        // Disparar evento change para lógicas de visibilidad (ej: combos de Agua)
+                        el.dispatchEvent(new Event('change'));
+                    }
+                }
+            });
+            
+            if (data._has_req_files) {
+                Swal.fire({
+                    title: 'Atención',
+                    text: 'Se han recuperado los textos, pero por seguridad debe volver a adjuntar los archivos de los requerimientos.',
+                    icon: 'info'
+                });
+            }
+        },
+
+        clear() {
+            localStorage.removeItem(this.getStorageKey());
+        },
+
+        updateVisualFeedback() {
+            const indicator = document.getElementById('autosave-status');
+            if (indicator) {
+                const now = new Date();
+                indicator.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                indicator.classList.remove('hidden');
+            }
+        }
+    };
+
+    // Modificación en toggleFormFreeze para incluir botones de borrador [cite: 60-61]
+    function toggleFormFreeze(isFrozen) {
+        const elements = document.querySelectorAll('input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add, .btn-borrador');
+        elements.forEach(el => {
+            el.disabled = isFrozen;
+            el.style.opacity = isFrozen ? "0.6" : "1";
+            el.style.pointerEvents = isFrozen ? "none" : "auto";
+        });
+    }
+         
     </script>
 </head>
 <body class="theme-equipamientos">
@@ -195,7 +274,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>AJUNTAMENT DELS POBLETS</strong></div> 
                                     <small class="cod-eq">Cód: CC901001</small>
                                 </td>
@@ -225,7 +303,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>OFICINA DE TURISME</strong></div> 
                                     <small class="cod-eq">Cód: CC901003</small>
                                 </td>
@@ -255,7 +332,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ALMACEN MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: CC901008</small>
                                 </td>
@@ -285,7 +361,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POU DE MIRAFLOR</strong></div> 
                                     <small class="cod-eq">Cód: CC901009</small>
                                 </td>
@@ -315,7 +390,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLICIA LOCAL</strong></div> 
                                     <small class="cod-eq">Cód: CC901010</small>
                                 </td>
@@ -375,7 +449,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA CULTURA</strong></div> 
                                     <small class="cod-eq">Cód: CU901001</small>
                                 </td>
@@ -405,7 +478,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DE LA MUSICA</strong></div> 
                                     <small class="cod-eq">Cód: CU901005</small>
                                 </td>
@@ -435,7 +507,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>TORRE MEDIEVAL MIRARROSA</strong></div> 
                                     <small class="cod-eq">Cód: CU901006</small>
                                 </td>
@@ -465,7 +536,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>SALA MULTIUSOS ANTIGUAS ESCUELAS</strong></div> 
                                     <small class="cod-eq">Cód: CU901007</small>
                                 </td>
@@ -495,7 +565,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CENTRO SOCIAL ANTIGUAS CASAS DE LOS MAES</strong></div> 
                                     <small class="cod-eq">Cód: CU901008</small>
                                 </td>
@@ -525,7 +594,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CASA DEL TRINQUET</strong></div> 
                                     <small class="cod-eq">Cód: CU901009</small>
                                 </td>
@@ -555,7 +623,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>JACIMENT ROMÀ L´ALMADRAVA</strong></div> 
                                     <small class="cod-eq">Cód: CU901010</small>
                                 </td>
@@ -615,7 +682,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CEIP AUSIÀS MARCH</strong></div> 
                                     <small class="cod-eq">Cód: EN901001</small>
                                 </td>
@@ -675,7 +741,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>CONSULTORI AUXILIAR DE ELS POBLETS</strong></div> 
                                     <small class="cod-eq">Cód: SA901001</small>
                                 </td>
@@ -743,7 +808,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>I.D. CEIP AUSIAS MARCH</strong></div> 
                                     <small class="cod-eq">Cód: ID901002</small>
                                 </td>
@@ -773,7 +837,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>POLIESPORTIU MUNICIPAL</strong></div> 
                                     <small class="cod-eq">Cód: ID901003</small>
                                 </td>
@@ -833,7 +896,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE L´AJUNTAMENT</strong></div> 
                                     <small class="cod-eq">Cód: PJ901004</small>
                                 </td>
@@ -863,7 +925,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARC DE MIRAFLOR</strong></div> 
                                     <small class="cod-eq">Cód: PJ901007</small>
                                 </td>
@@ -893,7 +954,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE Nº 9</strong></div> 
                                     <small class="cod-eq">Cód: PJ901009</small>
                                 </td>
@@ -923,7 +983,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE Nº 11</strong></div> 
                                     <small class="cod-eq">Cód: PJ901011</small>
                                 </td>
@@ -953,7 +1012,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>REVOLTES II</strong></div> 
                                     <small class="cod-eq">Cód: PJ901012</small>
                                 </td>
@@ -983,7 +1041,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 13</strong></div> 
                                     <small class="cod-eq">Cód: PJ901013</small>
                                 </td>
@@ -1013,7 +1070,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 14</strong></div> 
                                     <small class="cod-eq">Cód: PJ901014</small>
                                 </td>
@@ -1043,7 +1099,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 15</strong></div> 
                                     <small class="cod-eq">Cód: PJ901015</small>
                                 </td>
@@ -1073,7 +1128,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 16</strong></div> 
                                     <small class="cod-eq">Cód: PJ901016</small>
                                 </td>
@@ -1103,7 +1157,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 18</strong></div> 
                                     <small class="cod-eq">Cód: PJ901018</small>
                                 </td>
@@ -1133,7 +1186,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 19</strong></div> 
                                     <small class="cod-eq">Cód: PJ901019</small>
                                 </td>
@@ -1163,7 +1215,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 22</strong></div> 
                                     <small class="cod-eq">Cód: PJ901022</small>
                                 </td>
@@ -1193,7 +1244,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 23</strong></div> 
                                     <small class="cod-eq">Cód: PJ901023</small>
                                 </td>
@@ -1223,7 +1273,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 24</strong></div> 
                                     <small class="cod-eq">Cód: PJ901024</small>
                                 </td>
@@ -1253,7 +1302,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 25</strong></div> 
                                     <small class="cod-eq">Cód: PJ901025</small>
                                 </td>
@@ -1283,7 +1331,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>A.R. XIRONETS ELS POBLETS</strong></div> 
                                     <small class="cod-eq">Cód: PJ901026</small>
                                 </td>
@@ -1313,7 +1360,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 27</strong></div> 
                                     <small class="cod-eq">Cód: PJ901027</small>
                                 </td>
@@ -1343,7 +1389,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 28</strong></div> 
                                     <small class="cod-eq">Cód: PJ901028</small>
                                 </td>
@@ -1373,7 +1418,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE REVOLTES I</strong></div> 
                                     <small class="cod-eq">Cód: PJ901029</small>
                                 </td>
@@ -1403,7 +1447,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 30</strong></div> 
                                     <small class="cod-eq">Cód: PJ901030</small>
                                 </td>
@@ -1433,7 +1476,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 31</strong></div> 
                                     <small class="cod-eq">Cód: PJ901031</small>
                                 </td>
@@ -1463,7 +1505,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 32</strong></div> 
                                     <small class="cod-eq">Cód: PJ901032</small>
                                 </td>
@@ -1493,7 +1534,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 33</strong></div> 
                                     <small class="cod-eq">Cód: PJ901033</small>
                                 </td>
@@ -1523,7 +1563,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 34</strong></div> 
                                     <small class="cod-eq">Cód: PJ901034</small>
                                 </td>
@@ -1553,7 +1592,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 35</strong></div> 
                                     <small class="cod-eq">Cód: PJ901035</small>
                                 </td>
@@ -1583,7 +1621,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>PARQUE 36</strong></div> 
                                     <small class="cod-eq">Cód: PJ901036</small>
                                 </td>
@@ -1613,7 +1650,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE C/ 17D PTDA BARRANQUETS</strong></div> 
                                     <small class="cod-eq">Cód: PJ901037</small>
                                 </td>
@@ -1643,7 +1679,6 @@
                                     </a>
                                 </td>
                                 <td>
-                                    
                                     <div class="nombre-eq"><strong>ZONA VERDE CAMI GUADIANA</strong></div> 
                                     <small class="cod-eq">Cód: PJ901038</small>
                                 </td>
@@ -1692,6 +1727,7 @@
     
 
     
+    
 <div class="card">
     <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
     <div class="form-group">
@@ -1707,7 +1743,7 @@
         <div class="upload-icon"><i data-lucide="upload-cloud" style="width: 40px; height: 40px; opacity: 0.7;"></i></div>
         <div style="font-weight: 700; font-size: 1.05rem;">Arrastra y suelta archivos aquí</div>
         <div style="font-size: 0.9rem; color: var(--text-secondary);">o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span></div>
-        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p> 
+        <p class="upload-help" style="margin-top: 8px;">(Máx 35 MB / archivo)</p>
         <input type="file" id="fileInput" multiple style="display: none;">
     </div>
     <div id="fileList" class="file-list-container"></div>
@@ -1798,7 +1834,7 @@ document.addEventListener("DOMContentLoaded", () => {
         select.addEventListener('change', () => handleSelectColor(select));
     });
 
-    // Cambios de puntos de estado [cite: 480-481]
+    // Cambios de puntos de estado
     document.querySelectorAll('.select-estado').forEach(sel => {
         sel.addEventListener('change', function() {
             const dot = this.parentNode.querySelector('.status-dot');
@@ -1928,7 +1964,7 @@ window.agregarFilaNuevoEquipamiento = () => {
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
             <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntosNuevos['${idFila}'];">
-                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i> 
+                <i data-lucide=\"trash-2\" style=\"width:18px; color:#ef4444;\"></i>
             </button>
         </td>`;
     tbody.appendChild(tr);
