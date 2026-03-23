@@ -116,57 +116,57 @@
                 });
             }
         };
-
+        
         /* ==========================================================================
-           4. SISTEMA DE AUTOGUARDADO (LocalStorage)
+           5. MOTOR DE BORRADORES
            ========================================================================== */
-        const AutoSave = {
-            getStorageKey() {
-                const formType = window.location.pathname.split("/").pop().split("_")[0];
-                return `draft_${formType}_${window.EIEL_CONFIG.muniCode}`;
-            },
-            save() {
-                const formData = {};
-                document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
-                    if (el.id && !el.id.includes('EmailConfirm')) {
-                        formData[el.id] = el.type === 'checkbox' ? el.checked : el.value;
-                    }
-                });
-                localStorage.setItem(this.getStorageKey(), JSON.stringify({ t: Date.now(), data: formData }));
-                const st = document.getElementById('autosave-status');
-                if (st) {
-                    const now = new Date();
-                    st.textContent = `Autoguardado local: ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        let formIsDirty = false; // Control de cambios sin guardar
+
+        // AVISO DE SALIDA: Evita pérdida accidental de datos
+        window.addEventListener('beforeunload', (e) => {
+            if (formIsDirty) {
+                e.preventDefault();
+                e.returnValue = 'Tiene cambios sin guardar en el formulario.';
+            }
+        });
+
+        // DETECTOR DE CAMBIOS: Activa el botón de guardar al detectar actividad
+        function activarDetectorCambios() {
+            // Escuchar cualquier cambio en inputs, selects y textareas
+            const inputs = document.querySelectorAll('input, select, textarea');
+            inputs.forEach(el => {
+                const handleEvent = () => marcarComoSucio();
+                el.addEventListener('change', handleEvent);
+                el.addEventListener('input', handleEvent);
+            });
+        }
+
+        function marcarComoSucio() {
+            if (!formIsDirty) {
+                formIsDirty = true;
+                const btn = document.getElementById('btnGuardarNube');
+                if (btn) {
+                    btn.disabled = false; // "Enciende" el botón
+                    btn.classList.add('btn-save-active');
+                    btn.title = "Guardar cambios actuales";
                 }
-            },
-            restore() {
-                const raw = localStorage.getItem(this.getStorageKey());
-                if (!raw) return;
-                const { data } = JSON.parse(raw);
-                Object.entries(data).forEach(([id, val]) => {
-                    const el = document.getElementById(id);
-                    if (el) {
-                        if (el.type === 'checkbox') el.checked = val;
-                        else { el.value = val; el.dispatchEvent(new Event('change')); }
-                    }
-                });
-            },
-            clear() { localStorage.removeItem(this.getStorageKey()); }
-        };
+            }
+        }
 
-        /* ==========================================================================
-           5. GESTIÓN DE BORRADORES EN LA NUBE (Google Sheets)
-           ========================================================================== */
+        // GUARDAR BORRADOR: Empaqueta todos los datos con ID
         async function gestionarBorradorNube() {
             const formType = window.location.pathname.split("/").pop().split("_")[0];
             const dataToSave = {};
-            document.querySelectorAll('input:not([type="password"]), select, textarea').forEach(el => {
-                if (el.id && !el.id.includes('EmailConfirm')) {
+            
+            // Solo guardamos elementos con ID (ignorando confirmaciones de email)
+            document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+                if (!el.id.includes('EmailConfirm')) {
                     dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
                 }
             });
 
-            Swal.fire({ title: 'Guardando en la nube...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+            Swal.fire({ title: 'Sincronizando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
 
             try {
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
@@ -179,52 +179,86 @@
                         datos_json: JSON.stringify(dataToSave)
                     }) 
                 });
-                Swal.fire('¡Guardado!', 'El borrador se ha guardado en la nube correctamente.', 'success');
+                
+                // Tras guardar con éxito, volvemos al estado "limpio"
+                formIsDirty = false;
+                const btnSave = document.getElementById('btnGuardarNube');
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.classList.remove('btn-save-active');
+                }
+                
+                Swal.fire('¡Guardado!', 'Los datos se han guardado correctamente.', 'success');
+                verificarBorradoresExistentes(); // Actualizar estado del botón importar
             } catch (error) {
-                Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+                Swal.fire('Error', 'No se pudo guardar el borrador.', 'error');
             }
         }
 
+        // IMPORTAR BORRADOR: Carga inteligente con aviso de compatibilidad
         async function cargarBorradorNube() {
             const formType = window.location.pathname.split("/").pop().split("_")[0];
-            Swal.fire({ title: 'Buscando borradores...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-
             try {
                 const url = `${window.EIEL_CONFIG.urlGenerarPdf}?action=list_drafts&muni=${window.EIEL_CONFIG.muniCode}&tipo=${formType}`;
                 const resp = await fetch(url);
                 const borradores = await resp.json();
 
-                if (!borradores || borradores.length === 0) {
-                    return Swal.fire('Sin borradores', 'No hay versiones previas en la nube para este municipio.', 'info');
-                }
+                if (!borradores || borradores.length === 0) return;
 
                 const options = {};
-                borradores.forEach(b => { options[b.id] = `${b.fecha} - ${b.tecnico}`; });
+                borradores.forEach(b => { options[b.id] = `${b.fecha} (Por: ${b.tecnico})`; });
 
                 const { value: idSel } = await Swal.fire({
-                    title: 'Cargar Borrador',
+                    title: 'Importar Borrador',
                     input: 'select',
                     inputOptions: options,
-                    inputPlaceholder: 'Seleccione una versión',
+                    inputPlaceholder: 'Seleccione una versión para cargar',
                     showCancelButton: true,
-                    confirmButtonText: 'Cargar Datos'
+                    confirmButtonText: 'Cargar esta versión'
                 });
 
                 if (idSel) {
                     const borrador = borradores.find(x => x.id == idSel);
                     const data = JSON.parse(borrador.datos_json);
+                    
+                    let encontrados = 0;
+                    let totalBorrador = Object.keys(data).length;
+
+                    // Recuperación inteligente: solo rellena si el ID existe en el formulario actual
                     Object.entries(data).forEach(([id, val]) => {
                         const el = document.getElementById(id);
                         if (el) {
+                            encontrados++;
                             if (el.type === 'checkbox') el.checked = val;
-                            else { el.value = val; el.dispatchEvent(new Event('change')); }
+                            else { 
+                                el.value = val; 
+                                el.dispatchEvent(new Event('change')); 
+                            }
                         }
                     });
-                    Swal.fire('¡Listo!', 'Los datos se han cargado correctamente.', 'success');
+
+                    if (encontrados < totalBorrador) {
+                        Swal.fire('Importación Parcial', `Se han recuperado ${encontrados} campos. Los datos restantes ya no son compatibles con la versión actual del formulario.`, 'warning');
+                    } else {
+                        Swal.fire('¡Éxito!', 'Borrador cargado correctamente.', 'success');
+                    }
+                    formIsDirty = false; // Resetear estado tras importar
                 }
             } catch (error) {
                 Swal.fire('Error', 'No se pudo recuperar la lista de borradores.', 'error');
             }
+        }
+
+        // VERIFICACIÓN: Muestra el botón de importar solo si hay datos
+        async function verificarBorradoresExistentes() {
+            const formType = window.location.pathname.split("/").pop().split("_")[0];
+            try {
+                const url = `${window.EIEL_CONFIG.urlGenerarPdf}?action=list_drafts&muni=${window.EIEL_CONFIG.muniCode}&tipo=${formType}`;
+                const resp = await fetch(url);
+                const borradores = await resp.json();
+                const btn = document.getElementById('btnImportarNube');
+                if (btn) btn.style.display = (borradores && borradores.length > 0) ? 'flex' : 'none';
+            } catch (e) { console.warn("Error al verificar borradores"); }
         }
 
         /* ==========================================================================
@@ -1696,12 +1730,12 @@
     <div class="conformidad-box">
         <label class="check-label">
             <input type="checkbox" id="checkConformidad" class="check-input">
-            <span class="check-text"><strong>Declaración de veracidad:</strong> Confirmo que los datos introducidos son correctos.</span>
+            <span class="check-text"><strong>Declaración de veracidad:</strong> Como responsable, confirmo que los datos introducidos son correctos y actualizados.</span>
         </label>
     </div>
     
     <button id="btnEnviar" class="btn btn-primary" style="margin-top: 10px;" disabled>
-        <i data-lucide="send"></i> Enviar Formulario Definitivo
+        <i data-lucide="send"></i> Enviar
     </button>
 </div>
 
@@ -1711,11 +1745,19 @@
     </main>
 
     
-    
-<button type="button" class="btn-float-save" onclick="gestionarBorradorNube()" title="Guardar borrador en la nube">
-    <i data-lucide="save" style="width: 20px;"></i>
-    <span style="writing-mode: vertical-rl; text-orientation: mixed; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Guardar borrador</span>
-</button>
+    <div class="sidebar-actions">
+        
+        <button type="button" id="btnGuardarNube" class="btn-sidebar" onclick="gestionarBorradorNube()" disabled>
+            <i data-lucide="save"></i>
+            <span>Guardar Borrador</span>
+        </button>
+
+        
+        <button type="button" id="btnImportarNube" class="btn-sidebar btn-import-active" onclick="cargarBorradorNube()" style="display: none;">
+            <i data-lucide="cloud-download"></i>
+            <span>Importar Borrador</span>
+        </button>
+    </div>
 
     <script>
         /* ==========================================================================
@@ -1740,6 +1782,9 @@
                     });
                 }
             });
+            
+            activarDetectorCambios();
+            verificarBorradoresExistentes();
 
             // Generar iconos Lucide
             if (window.lucide) lucide.createIcons();
