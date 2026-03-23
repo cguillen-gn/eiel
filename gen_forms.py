@@ -176,6 +176,8 @@ def obtener_obras(conn, mun):
             ) 
             -- Se descartan las anuladas
             AND (estado IS NULL OR estado <> 'AN') 
+            -- Se descartan las finalizadas con proyecto
+            AND NOT (estado IS NOT DISTINCT FROM 'FI' AND proyecto IS NOT DISTINCT FROM 'RE')
             AND (
                 mun IN ('') -- Municipios en los que no se desea filtrar obras por algun motivo.
                 OR (
