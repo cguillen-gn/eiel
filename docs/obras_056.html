@@ -118,12 +118,13 @@
         };
         
         /* ==========================================================================
-           5. MOTOR DE BORRADORES
+           5. MOTOR DE BORRADORES (FASE 2: TEXTOS + ADJUNTOS EN LA NUBE)
            ========================================================================== */
 
-        let formIsDirty = false; // Control de cambios sin guardar
+        let formIsDirty = false;
+        let idBorradorOrigen = null; // Guardará el ID para el envío final
 
-        // AVISO DE SALIDA: Evita pérdida accidental de datos
+        // AVISO DE SALIDA
         window.addEventListener('beforeunload', (e) => {
             if (formIsDirty) {
                 e.preventDefault();
@@ -131,14 +132,11 @@
             }
         });
 
-        // DETECTOR DE CAMBIOS: Activa el botón de guardar al detectar actividad
         function activarDetectorCambios() {
-            // Escuchar cualquier cambio en inputs, selects y textareas
             const inputs = document.querySelectorAll('input, select, textarea');
             inputs.forEach(el => {
-                const handleEvent = () => marcarComoSucio();
-                el.addEventListener('change', handleEvent);
-                el.addEventListener('input', handleEvent);
+                el.addEventListener('change', () => marcarComoSucio());
+                el.addEventListener('input', () => marcarComoSucio());
             });
         }
 
@@ -147,55 +145,82 @@
                 formIsDirty = true;
                 const btn = document.getElementById('btnGuardarNube');
                 if (btn) {
-                    btn.disabled = false; // "Enciende" el botón
+                    btn.disabled = false;
                     btn.classList.add('btn-save-active');
-                    btn.title = "Guardar cambios actuales";
                 }
             }
         }
 
-        // GUARDAR BORRADOR: Empaqueta todos los datos con ID
+        // FUNCIÓN: GUARDAR (Sube archivos nuevos a TEMP y guarda JSON)
         async function gestionarBorradorNube() {
             const formType = window.location.pathname.split("/").pop().split("_")[0];
-            const dataToSave = {};
+            const idLoteTemporal = "TEMP_" + Date.now();
             
-            // Solo guardamos elementos con ID (ignorando confirmaciones de email)
-            document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
-                if (!el.id.includes('EmailConfirm')) {
-                    dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
-                }
+            const listaArchivosParaSubir = [];
+            if (typeof archivosGenerales !== 'undefined') {
+                archivosGenerales.forEach(f => {
+                    if (!f.status || f.status !== 'cloud') listaArchivosParaSubir.push({ file: f, seccion: 'GEN_BORRADOR' });
+                });
+            }
+            if (typeof colaAdjuntosReq !== 'undefined') {
+                Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
+                    list.forEach(f => {
+                        if (!f.status || f.status !== 'cloud') listaArchivosParaSubir.push({ file: f, seccion: `REQ_BORRADOR_${parseInt(id)+1}` });
+                    });
+                });
+            }
+
+            Swal.fire({ 
+                title: listaArchivosParaSubir.length > 0 ? 'Sincronizando archivos...' : 'Guardando textos...', 
+                didOpen: () => Swal.showLoading(), 
+                allowOutsideClick: false 
             });
 
-            Swal.fire({ title: 'Sincronizando...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
-
             try {
+                if (listaArchivosParaSubir.length > 0) {
+                    await UploadService.uploadFiles(listaArchivosParaSubir, 'BORRADOR', window.EIEL_CONFIG.muniCode, idLoteTemporal, 2);
+                }
+
+                const dataToSave = { _adjuntos_remotos: [] };
+
+                // Guardar referencias de archivos (locales y nube)
+                if (typeof archivosGenerales !== 'undefined') {
+                    archivosGenerales.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: 'GENERAL' }));
+                }
+                if (typeof colaAdjuntosReq !== 'undefined') {
+                    Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
+                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }));
+                    });
+                }
+
+                document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+                    if (!el.id.includes('EmailConfirm')) {
+                        dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+                    }
+                });
+
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
                     method: 'POST', mode: 'no-cors', 
                     body: JSON.stringify({
                         action: 'save_draft',
                         municipio: window.EIEL_CONFIG.muniCode,
                         tipo_formulario: formType,
-                        tecnico: localStorage.getItem("eiel_user_name") || "Técnico",
+                        id_envio_temporal: idLoteTemporal,
+                        tecnico: localStorage.getItem("eiel_user_name") || "Desconocido",
                         datos_json: JSON.stringify(dataToSave)
                     }) 
                 });
                 
-                // Tras guardar con éxito, volvemos al estado "limpio"
                 formIsDirty = false;
-                const btnSave = document.getElementById('btnGuardarNube');
-                if (btnSave) {
-                    btnSave.disabled = true;
-                    btnSave.classList.remove('btn-save-active');
-                }
-                
-                Swal.fire('¡Guardado!', 'Los datos se han guardado correctamente.', 'success');
-                verificarBorradoresExistentes(); // Actualizar estado del botón importar
+                document.getElementById('btnGuardarNube').disabled = true;
+                Swal.fire('¡Borrador guardado!', 'Textos y archivos sincronizados.', 'success');
+                verificarBorradoresExistentes();
             } catch (error) {
                 Swal.fire('Error', 'No se pudo guardar el borrador.', 'error');
             }
         }
 
-        // IMPORTAR BORRADOR: Carga inteligente con aviso de compatibilidad
+        // FUNCIÓN: IMPORTAR (Recupera textos y reconstruye listas de archivos ☁️)
         async function cargarBorradorNube() {
             const formType = window.location.pathname.split("/").pop().split("_")[0];
             try {
@@ -206,50 +231,64 @@
                 if (!borradores || borradores.length === 0) return;
 
                 const options = {};
-                borradores.forEach(b => { options[b.id] = `${b.fecha} (Por: ${b.tecnico})`; });
+                borradores.forEach(b => { 
+                    const autor = (b.tecnico === "Desconocido" || !b.tecnico) ? "Autor desconocido" : `Técnico: ${b.tecnico}`;
+                    options[b.id] = `${b.fecha} (${autor})`; 
+                });
 
                 const { value: idSel } = await Swal.fire({
                     title: 'Importar Borrador',
                     input: 'select',
                     inputOptions: options,
-                    inputPlaceholder: 'Seleccione una versión para cargar',
+                    inputPlaceholder: 'Seleccione una versión',
                     showCancelButton: true,
-                    confirmButtonText: 'Cargar esta versión'
+                    confirmButtonText: 'Cargar versión'
                 });
 
                 if (idSel) {
                     const borrador = borradores.find(x => x.id == idSel);
                     const data = JSON.parse(borrador.datos_json);
                     
-                    let encontrados = 0;
-                    let totalBorrador = Object.keys(data).length;
-
-                    // Recuperación inteligente: solo rellena si el ID existe en el formulario actual
+                    // 1. Recuperar Textos y Checks
                     Object.entries(data).forEach(([id, val]) => {
+                        if (id === "_adjuntos_remotos") return;
                         const el = document.getElementById(id);
                         if (el) {
-                            encontrados++;
                             if (el.type === 'checkbox') el.checked = val;
-                            else { 
-                                el.value = val; 
-                                el.dispatchEvent(new Event('change')); 
-                            }
+                            else { el.value = val; el.dispatchEvent(new Event('change')); }
                         }
                     });
 
-                    if (encontrados < totalBorrador) {
-                        Swal.fire('Importación Parcial', `Se han recuperado ${encontrados} campos. Los datos restantes ya no son compatibles con la versión actual del formulario.`, 'warning');
-                    } else {
-                        Swal.fire('¡Éxito!', 'Borrador cargado correctamente.', 'success');
+                    // 2. Recuperar Archivos (Marcándolos como 'cloud')
+                    if (data._adjuntos_remotos) {
+                        archivosGenerales = [];
+                        colaAdjuntosReq = {};
+                        data._adjuntos_remotos.forEach(adj => {
+                            const mockFile = { name: adj.name, status: 'cloud' };
+                            if (adj.seccion === 'GENERAL') {
+                                archivosGenerales.push(mockFile);
+                            } else if (adj.seccion.startsWith('REQUERIMIENTO_')) {
+                                const idReq = parseInt(adj.seccion.split('_')[1]) - 1;
+                                if (!colaAdjuntosReq[idReq]) colaAdjuntosReq[idReq] = [];
+                                colaAdjuntosReq[idReq].push(mockFile);
+                            }
+                        });
+                        // Llamar a los renders del formulario hijo (Alumbrado/Obras)
+                        if (typeof renderArchivos === 'function') renderArchivos();
+                        if (typeof renderColaReq === 'function') {
+                            Object.keys(colaAdjuntosReq).forEach(id => renderColaReq(id));
+                        }
                     }
-                    formIsDirty = false; // Resetear estado tras importar
+
+                    idBorradorOrigen = borrador.id_temporal || null; // Guardamos procedencia
+                    formIsDirty = false;
+                    Swal.fire('¡Éxito!', 'Borrador recuperado de la nube.', 'success');
                 }
             } catch (error) {
-                Swal.fire('Error', 'No se pudo recuperar la lista de borradores.', 'error');
+                Swal.fire('Error', 'No se pudieron recuperar los borradores.', 'error');
             }
         }
 
-        // VERIFICACIÓN: Muestra el botón de importar solo si hay datos
         async function verificarBorradoresExistentes() {
             const formType = window.location.pathname.split("/").pop().split("_")[0];
             try {
@@ -1233,19 +1272,18 @@
     </main>
 
     
-    <div class="sidebar-actions">
-        
-        <button type="button" id="btnGuardarNube" class="btn-sidebar" onclick="gestionarBorradorNube()" disabled>
-            <i data-lucide="save"></i>
-            <span>Guardar Borrador</span>
-        </button>
+<div class="sidebar-actions">
+    
+    <button type="button" id="btnGuardarNube" class="btn-sidebar" onclick="gestionarBorradorNube()" disabled title="No hay cambios nuevos">
+        <i data-lucide="save"></i>
+    </button>
 
-        
-        <button type="button" id="btnImportarNube" class="btn-sidebar btn-import-active" onclick="cargarBorradorNube()" style="display: none;">
-            <i data-lucide="cloud-download"></i>
-            <span>Importar Borrador</span>
-        </button>
-    </div>
+    
+    <button type="button" id="btnImportarNube" class="btn-sidebar btn-import-active" onclick="cargarBorradorNube()" style="display: none;" title="Restaurar versión anterior">
+        <i data-lucide="cloud-download"></i>
+    </button>
+</div>
+
 
     <script>
         /* ==========================================================================
