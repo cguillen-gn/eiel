@@ -768,7 +768,7 @@
     
 <button type="button" class="btn-float-save" onclick="gestionarBorradorNube()" title="Guardar borrador en la nube">
     <i data-lucide="save" style="width: 20px;"></i>
-    <span style="writing-mode: vertical-rl; text-orientation: mixed; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Guardar</span>
+    <span style="writing-mode: vertical-rl; text-orientation: mixed; font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Guardar borrador</span>
 </button>
 
     <script>
@@ -879,10 +879,26 @@ function renderColaReq(id) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // A. INICIALIZACIÓN: Crear fila por defecto inmediatamente 
+
+    const updateSelectColor = (el) => {
+        if (el.value !== "") {
+            el.classList.add('has-value');
+        } else {
+            el.classList.remove('has-value');
+        }
+    };
+
+    document.querySelectorAll('.form-select').forEach(sel => updateSelectColor(sel));
+
+    // Delegación de eventos para que funcione también en filas nuevas
+    document.addEventListener('change', (e) => {
+        if (e.target.classList.contains('form-select')) {
+            updateSelectColor(e.target);
+        }
+    });
+
     window.agregarFilaNuevaObra();
 
-    // B. CONFIGURACIÓN DE INPUTS
     const inputObras = document.getElementById('hiddenFileInput');
     if (inputObras) {
         inputObras.addEventListener('change', () => {
@@ -901,43 +917,57 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // C. ENVÍO
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
-    if (checkConf) checkConf.addEventListener('change', () => btnEnviar.disabled = !checkConf.checked);
+    if (checkConf) {
+        checkConf.addEventListener('change', () => {
+            btnEnviar.disabled = !checkConf.checked;
+        });
+    }
 
     btnEnviar.addEventListener("click", async () => {
         const idBatch = "OBRAS_" + Date.now();
-        toggleFormFreeze(true);
+        toggleFormFreeze(true); // Bloquear formulario durante el envío
 
         const listaTareas = [];
-        Object.entries(window.colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
-        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
+        // Preparar archivos de obras y requerimientos
+        Object.entries(window.colaAdjuntos).forEach(([id, list]) => 
+            list.forEach(f => listaTareas.push({ file: f, seccion: id }))
+        );
+        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => 
+            list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }))
+        );
 
-        UIProgress.show(listaTareas.length);
+        UIProgress.show(listaTareas.length); // Mostrar barra de progreso
 
         try {
-            // USAR MOTOR DE LA BASE (concurrencia 3)
+            // Subida de archivos usando el motor de base.html.j2 
             await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
 
             const payload = {
                 tipo_formulario: "obras",
                 id_envio: idBatch,
                 datos_obras: Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
-                    obra: s.dataset.obraId, estado: s.value
+                    obra: s.dataset.obraId, 
+                    estado: s.value
                 })),
                 otras_obras: Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
                     nombre: f.querySelector('.input-nueva-nombre').value,
                     estado: f.querySelector('.input-nueva-estado').value
                 })),
                 requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg, respuesta: area.value
+                    pregunta: area.dataset.msg, 
+                    respuesta: area.value
                 })),
-                contacto: { nombre: document.getElementById("contactoNombre").value, email: document.getElementById("contactoEmail").value }
+                contacto: { 
+                    nombre: document.getElementById("contactoNombre").value, 
+                    email: document.getElementById("contactoEmail").value 
+                }
             };
 
+            // Enviar datos para generar PDF
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
-            UIProgress.complete();
+            UIProgress.complete(); // Finalizar proceso
         } catch (error) {
             console.error(error);
             toggleFormFreeze(false);
