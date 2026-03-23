@@ -207,7 +207,7 @@ def obtener_avisos_personalizados(conn, codigo_ine, fase, tipo_form):
     Recupera los avisos específicos para un municipio y formulario.
     """
     sql = """
-        SELECT mensaje, prioridad, url
+        SELECT id, mensaje, prioridad, url
         FROM coordinador.solicitud_datos_formularios
         WHERE mun = %s 
             AND fase = %s 

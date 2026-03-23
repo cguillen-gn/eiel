@@ -21,8 +21,8 @@
             muniName: "Gorga",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbznrKBN7-adTpPF6M0NLG-U6LTHdRsrROAPetpG1bNHsLpmAFrDcmLQPDnqATt3inzP/exec",
-            urlAdjuntos: "https://script.google.com/macros/s/AKfycbxh5tDIuulcbRsz2ENPZ3Ccy323LVsmlEfsvXujZ1-80aUdWvojhT0H6aX7mkgYKbGL7g/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbxuL74T18bQzeWW_v5c-qmxrVsma3OekePqZC3OxjjOYsaLu-ZigAOgD-C2P9cKKs67zA/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycbzjUkNUBF2ONe1FkjC-1vNjADBK5l78H6YwEjf0CYYAW2Foxgmo4j8VwcogvLLxh7ZgDg/exec",
             hasAvisos: false
         };
 
@@ -153,19 +153,38 @@
 
         // FUNCIÓN: GUARDAR (Sube archivos nuevos a TEMP y guarda JSON)
         async function gestionarBorradorNube() {
-            const formType = window.location.pathname.split("/").pop().split("_")[0];
-            const idLoteTemporal = "TEMP_" + Date.now();
+            const formType = window.location.pathname.split("/").pop().split("_")[0].toUpperCase();
+            
+            // 1. Generar nombre de carpeta descriptivo: TEMP_[CODIGOMUN]_[TIPOFORMULARIO]_[fechahora]
+            const now = new Date();
+            const timestamp = now.getFullYear() + 
+                              String(now.getMonth() + 1).padStart(2, '0') + 
+                              String(now.getDate()).padStart(2, '0') + "-" + 
+                              String(now.getHours()).padStart(2, '0') + 
+                              String(now.getMinutes()).padStart(2, '0') + 
+                              String(now.getSeconds()).padStart(2, '0');
+            
+            const idLoteTemporal = `TEMP_${window.EIEL_CONFIG.muniCode}_${formType}_${timestamp}`;
             
             const listaArchivosParaSubir = [];
+            
+            // Adjuntos generales -> Subcarpeta TEMP_GENERAL
             if (typeof archivosGenerales !== 'undefined') {
                 archivosGenerales.forEach(f => {
-                    if (!f.status || f.status !== 'cloud') listaArchivosParaSubir.push({ file: f, seccion: 'GEN_BORRADOR' });
+                    if (!f.status || f.status !== 'cloud') {
+                        listaArchivosParaSubir.push({ file: f, seccion: 'TEMP_GENERAL' });
+                    }
                 });
             }
+            
+            // Adjuntos de requerimientos -> Subcarpeta TEMP_REQUERIMIENTO_[ID_REAL]
             if (typeof colaAdjuntosReq !== 'undefined') {
                 Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
                     list.forEach(f => {
-                        if (!f.status || f.status !== 'cloud') listaArchivosParaSubir.push({ file: f, seccion: `REQ_BORRADOR_${parseInt(id)+1}` });
+                        if (!f.status || f.status !== 'cloud') {
+                            // 'id' aquí ya debe ser el ID real de la base de datos (ID_tabla_solicitud_datos_formularios)
+                            listaArchivosParaSubir.push({ file: f, seccion: `TEMP_REQUERIMIENTO_${id}` });
+                        }
                     });
                 });
             }
@@ -178,36 +197,40 @@
 
             try {
                 if (listaArchivosParaSubir.length > 0) {
+                    // Subida física a la carpeta temporal en Drive
                     await UploadService.uploadFiles(listaArchivosParaSubir, 'BORRADOR', window.EIEL_CONFIG.muniCode, idLoteTemporal, 2);
                 }
 
+                // 2. Preparar JSON de datos con referencias a adjuntos remotos
                 const dataToSave = { 
                     _adjuntos_remotos: [],
                     _id_lote_temporal: idLoteTemporal
                 };
 
-                // Guardar referencias de archivos (locales y nube)
+                // Guardamos referencias para que al importar sepa dónde "pintar" cada archivo
                 if (typeof archivosGenerales !== 'undefined') {
                     archivosGenerales.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: 'GENERAL' }));
                 }
                 if (typeof colaAdjuntosReq !== 'undefined') {
                     Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
-                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }));
+                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${id}` }));
                     });
                 }
 
+                // Captura de todos los campos del formulario
                 document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
                     if (!el.id.includes('EmailConfirm')) {
                         dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
                     }
                 });
 
+                // 3. Guardar el borrador (JSON) en la hoja de cálculo
                 await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
                     method: 'POST', mode: 'no-cors', 
                     body: JSON.stringify({
                         action: 'save_draft',
                         municipio: window.EIEL_CONFIG.muniCode,
-                        tipo_formulario: formType,
+                        tipo_formulario: formType.toLowerCase(),
                         id_envio_temporal: idLoteTemporal,
                         tecnico: localStorage.getItem("eiel_user_name") || "Desconocido",
                         datos_json: JSON.stringify(dataToSave)
@@ -215,10 +238,16 @@
                 });
                 
                 formIsDirty = false;
-                document.getElementById('btnGuardarNube').disabled = true;
-                Swal.fire('¡Borrador guardado!', 'Textos y archivos sincronizados.', 'success');
+                const btnSave = document.getElementById('btnGuardarNube');
+                if (btnSave) {
+                    btnSave.disabled = true;
+                    btnSave.classList.remove('btn-save-active');
+                }
+
+                Swal.fire('¡Borrador guardado!', 'Textos y archivos sincronizados en carpetas estructuradas.', 'success');
                 verificarBorradoresExistentes();
             } catch (error) {
+                console.error(error);
                 Swal.fire('Error', 'No se pudo guardar el borrador.', 'error');
             }
         }
