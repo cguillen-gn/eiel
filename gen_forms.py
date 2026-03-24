@@ -179,7 +179,7 @@ def obtener_obras(conn, mun):
             -- Se descartan las finalizadas con proyecto
             AND NOT (estado IS NOT DISTINCT FROM 'FI' AND proyecto IS NOT DISTINCT FROM 'RE')
             AND (
-                mun IN ('') -- Municipios en los que no se desea filtrar obras por algun motivo.
+                mun IN ('001','008','016','026','030','033','045','048','051','075','086','088','101','107','112','130','135','136','137') -- Municipios en los que no se desea filtrar obras por algun motivo.
                 OR (
                     -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
                     (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
