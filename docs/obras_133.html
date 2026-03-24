@@ -21,7 +21,7 @@
             muniName: "Torrevieja",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzFQ9IoFDKU1H6DKdr0Us2maaGx6lWhBFG1SDJVhVygeRymCNuwqIqq0PsVhu_eQCopRw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyfmfptkHaLnt0y_71S51R6OOb2rnvjzb0YR5wdCb830xkrhdgRUZBAzM72tzyoLFmJyA/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycbwgq019K2kKTvPEihmsm8s-RhluP5_6GloUjQzS2kGMf7GQp0tvWV9mf4-R2-n0eXHjCw/exec",
             hasAvisos: false
         };
@@ -188,6 +188,18 @@
                     });
                 });
             }
+            
+            // Adjuntos específicos del formulario (Obras, Contadores, etc.)
+            if (typeof window.colaAdjuntos !== 'undefined') {
+                Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                    list.forEach(f => {
+                        if (!f.status || f.status !== 'cloud') {
+                            // Usamos un prefijo genérico ITEM_ o mantenemos la lógica de secciones
+                            listaArchivosParaSubir.push({ file: f, seccion: `TEMP_ITEM_${id}` });
+                        }
+                    });
+                });
+            }
 
             Swal.fire({ 
                 title: listaArchivosParaSubir.length > 0 ? 'Sincronizando archivos...' : 'Guardando textos...', 
@@ -214,6 +226,12 @@
                 if (typeof colaAdjuntosReq !== 'undefined') {
                     Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
                         list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${id}` }));
+                    });
+                }
+                // [NUEVO] Guardar referencias de los archivos de las obras (Seguimiento y Nuevas)
+                if (typeof window.colaAdjuntos !== 'undefined') {
+                    Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `ITEM_${id}` }));
                     });
                 }
 
@@ -295,6 +313,9 @@
                     if (data._adjuntos_remotos) {
                         archivosGenerales = [];
                         colaAdjuntosReq = {};
+                        window.colaAdjuntos = {}; 
+                        window.colaAdjuntosNuevas = {};
+                        
                         data._adjuntos_remotos.forEach(adj => {
                             const mockFile = { name: adj.name, status: 'cloud' };
                             if (adj.seccion === 'GENERAL') {
@@ -303,6 +324,11 @@
                                 const idReq = adj.seccion.split('_')[1];
                                 if (!colaAdjuntosReq[idReq]) colaAdjuntosReq[idReq] = [];
                                 colaAdjuntosReq[idReq].push(mockFile);
+                            } else if (adj.seccion.startsWith('ITEM_') || adj.seccion.startsWith('OBRA_')) {
+                                // Aceptamos tanto ITEM_ como OBRA_ para compatibilidad
+                                const idItem = adj.seccion.replace('ITEM_', '').replace('OBRA_', '');
+                                if (!window.colaAdjuntos[idItem]) window.colaAdjuntos[idItem] = [];
+                                window.colaAdjuntos[idItem].push(mockFile);
                             }
                         });
                         // Llamar a los renders del formulario hijo (Alumbrado/Obras)
@@ -412,12 +438,13 @@
                 <thead>
                     <tr>
                         <th style="width: 5%;" class="td-ubicacion">Id</th>
-                        <th style="width: 60%;">Denominación</th>
+                        <th style="width: 55%;">Denominación</th>
                         <th style="width: 20%;" class="td-ubicacion">Estado</th>
-                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
+                        <th style="width: 20%;" class="td-ubicacion">Documentación</th>
                     </tr>
                 </thead>
                 <tbody>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -438,7 +465,7 @@
                                     data-orden="005"
                                     data-nombre="REURBANIZACIÓN DE LOS SECTORES PLAN PARCIAL MAR AZUL, CONVENIO MAR AZUL Y NÚCLEO DE FERRIS" 
                                     data-plan="None"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -449,18 +476,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133005')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133005" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133005').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133005" style="display:none" multiple onchange="manejarAdjuntoObra('OB133005', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133005" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -488,7 +517,7 @@
                                     data-orden="007"
                                     data-nombre="REHABILITACIÓN DE DIVERSAS CALLES DEL T.M." 
                                     data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2017"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -499,18 +528,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133007')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133007" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133007').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133007" style="display:none" multiple onchange="manejarAdjuntoObra('OB133007', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133007" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -538,7 +569,7 @@
                                     data-orden="011"
                                     data-nombre="REDAC. PROY. OBRA INST. RENOV. ALUMBRADO PÚBL. CASCO URB. Y PARTE RESTO DE LA MATA" 
                                     data-plan="SUBVENCION NOMINATIVA 2019"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -549,18 +580,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133011')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133011" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133011').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133011" style="display:none" multiple onchange="manejarAdjuntoObra('OB133011', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133011" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -588,7 +621,7 @@
                                     data-orden="012"
                                     data-nombre="RENOVACIÓN DEL ALUMBRADO PÚBLICO EN AVDA. BALEARES Y ADYACENTES (CM-66)" 
                                     data-plan="PLAN INVERSIONES FINANCIERAMENTE SOSTENIBLES 2019"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -599,18 +632,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133012')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133012" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133012').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133012" style="display:none" multiple onchange="manejarAdjuntoObra('OB133012', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133012" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -638,7 +673,7 @@
                                     data-orden="013"
                                     data-nombre="RECINTO MULTIUSOS CON DESTINO PRINCIPAL A LA CELEBRACIÓN DEL CERTAMEN INTERNACIONAL DE HABANERAS, ASÍ COMO SUS INFRAESTRUCTURAS COMPLEMENTARIAS" 
                                     data-plan="PLAN PLANIFICA 2020-23 BOP: 20/07/2022"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -649,18 +684,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133013')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133013" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133013').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133013" style="display:none" multiple onchange="manejarAdjuntoObra('OB133013', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133013" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -681,7 +718,7 @@
                                     data-orden="029"
                                     data-nombre="REHABILITACIÓN PARCIAL DEL MUELLE DE LA SAL. TRAMO PASEO VISTALEGRE. TORREVIEJA (ALICANTE)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -696,6 +733,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -716,7 +754,7 @@
                                     data-orden="032"
                                     data-nombre="LA OBRA DE REPARACIÓN INTEGRAL DEL CENTRO MUNICIPAL DE OCIO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -731,6 +769,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -751,7 +790,7 @@
                                     data-orden="033"
                                     data-nombre="CONTRATACIÓN PARA LAS OBRAS DE IMPLANTACIÓN DEL COLEGIO PREFABRICADO INMACULADA" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -766,6 +805,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -786,7 +826,7 @@
                                     data-orden="034"
                                     data-nombre="REFORMA Y ADAPTACIÓN A NUEVAS NECESIDADES DE USO DEL CENTRO PARA PERSONAS CON DIVERSIDAD FUNCIONAL Y CENTRO DE ACOGIDA DE MENORES DELFINA VIUDES DE TORREVIEJA (ALICANTE)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -801,6 +841,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -828,7 +869,7 @@
                                     data-orden="039"
                                     data-nombre="MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES TECNOLÓGICOS 2022 - 2 2022" 
                                     data-plan="IVACE: PARQUES EMPRESARIALES 2022"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -839,18 +880,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133039')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133039" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133039').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133039" style="display:none" multiple onchange="manejarAdjuntoObra('OB133039', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133039" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -871,7 +914,7 @@
                                     data-orden="043"
                                     data-nombre="LAS ACTUACIONES URGENTES EN EL ALUMBRADO PÚBICO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -886,6 +929,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -913,7 +957,7 @@
                                     data-orden="045"
                                     data-nombre="ADAPTACIÓN DE MEJORA DE EFICIENCIA ENERGÉTICA EN LA INSTALACIÓN DE ALUMBRADO PÚBLICO DE LA CV-905 Y OTRAS CALLES" 
                                     data-plan="PLAN +CERCA 2022 BOP: 14/11/2022"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -924,18 +968,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133045')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133045" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133045').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133045" style="display:none" multiple onchange="manejarAdjuntoObra('OB133045', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133045" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -963,7 +1009,7 @@
                                     data-orden="046"
                                     data-nombre="IES NÚMERO 1 - LIBERTAS. REPARACIÓN ESTRUCTURAL Y AMPLIACIÓN." 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -974,18 +1020,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133046')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133046" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133046').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133046" style="display:none" multiple onchange="manejarAdjuntoObra('OB133046', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133046" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1013,7 +1061,7 @@
                                     data-orden="047"
                                     data-nombre="IES LAS LAGUNAS. REMODELACIÓN INTEGRAL DEL CENTRO." 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1024,18 +1072,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133047')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133047" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133047').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133047" style="display:none" multiple onchange="manejarAdjuntoObra('OB133047', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133047" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1063,7 +1113,7 @@
                                     data-orden="048"
                                     data-nombre="CEIP VIRGEN DEL CARMEN. REHABILITACION Y ACONDICIONAMIENTO" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1074,18 +1124,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133048')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133048" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133048').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133048" style="display:none" multiple onchange="manejarAdjuntoObra('OB133048', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133048" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1113,7 +1165,7 @@
                                     data-orden="049"
                                     data-nombre="IES TORREVIGÍA. AMPLIACIÓN. CONSTRUCCIÓN NUEVO AULARIO." 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1124,18 +1176,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133049')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133049" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133049').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133049" style="display:none" multiple onchange="manejarAdjuntoObra('OB133049', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133049" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1163,7 +1217,7 @@
                                     data-orden="050"
                                     data-nombre="IES NÚM. 6. NOVA COSNTRUCCIÓ" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1174,18 +1228,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133050')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133050" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133050').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133050" style="display:none" multiple onchange="manejarAdjuntoObra('OB133050', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133050" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1213,7 +1269,7 @@
                                     data-orden="051"
                                     data-nombre="CEIP NÚM.14. CONSTRUCCIÓ 3EI + 9 EI + 18 EP + MENJ (600, 2T)" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1224,18 +1280,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133051')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133051" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133051').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133051" style="display:none" multiple onchange="manejarAdjuntoObra('OB133051', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133051" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1263,7 +1321,7 @@
                                     data-orden="052"
                                     data-nombre="CEP MAESTRO SALVADOR RUSO. REFORMAS VARIAS: ADECUACIÓN LOGSE (CONSTRUCCIÓN DE GIMNASIO, DOTACIÓN DE ASCENSOR, ..). REPARACIÓN PISTAS DEPORTIVAS" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1274,18 +1332,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133052')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133052" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133052').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133052" style="display:none" multiple onchange="manejarAdjuntoObra('OB133052', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133052" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1313,7 +1373,7 @@
                                     data-orden="053"
                                     data-nombre="CEIP CUBA. REFORMAS VARIAS: DOTARLO DE ASCENSOR, ELIMINACIÓN DE BARRERAS ARQUITECTÓNICAS, SUSTITUCIÓN DEL DEPÓSITO DE GASOIL" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1324,18 +1384,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133053')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133053" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133053').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133053" style="display:none" multiple onchange="manejarAdjuntoObra('OB133053', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133053" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1363,7 +1425,7 @@
                                     data-orden="054"
                                     data-nombre="EI MAESTRO GRATINIANO BACHES. REFORMAS VARIAS: SUSTITUCIÓN DEL DEPÓSITO DE GASOIL, SUSTITUCIÓN DE LA VALLA DEL COLEGIO, DOTAR ZONAS SOMBRA PATIOS EXTERIORES" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1374,18 +1436,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133054')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133054" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133054').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133054" style="display:none" multiple onchange="manejarAdjuntoObra('OB133054', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133054" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1413,7 +1477,7 @@
                                     data-orden="055"
                                     data-nombre="MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES  TECNOLÓGICOS 20232023" 
                                     data-plan="IVACE: PARQUES EMPRESARIALES 2023"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1424,18 +1488,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133055')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133055" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133055').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133055" style="display:none" multiple onchange="manejarAdjuntoObra('OB133055', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133055" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1463,7 +1529,7 @@
                                     data-orden="056"
                                     data-nombre="MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVES TECNOLÓGICOS 20232023" 
                                     data-plan="IVACE: PARQUES EMPRESARIALES 2023"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1474,18 +1540,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133056')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133056" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133056').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133056" style="display:none" multiple onchange="manejarAdjuntoObra('OB133056', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133056" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1506,7 +1574,7 @@
                                     data-orden="058"
                                     data-nombre="CONSTRUCCIÓN DE LAS OBRAS DE LA SENDA PEATONAL DE LA MATA, SEGÚN PROYECTO DEL EXPTE. 2928/2020, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L11-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1521,6 +1589,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1541,7 +1610,7 @@
                                     data-orden="059"
                                     data-nombre="CONSTRUCCIÓN DEL PABELLÓN DE LA MATA, SITUADO EN LA AVENIDA DE LOS DANESES, 14 DE TORREVIEJA (AM-55501-L05-CB), MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1556,6 +1625,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1583,7 +1653,7 @@
                                     data-orden="060"
                                     data-nombre="ALUMBRADO PÚBLICO SUSTITUCIÓN LUMINARIAS LED Y AMPLIACIÓN DE CIRCUITOS" 
                                     data-plan="PLAN +CERCA. 2023. BOP: 26/9/2023."
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1594,18 +1664,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133060')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133060" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133060').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133060" style="display:none" multiple onchange="manejarAdjuntoObra('OB133060', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133060" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1626,7 +1698,7 @@
                                     data-orden="061"
                                     data-nombre="URBANIZACIÓN DESCRITAS EN LOS PROYECTOS APROBADOS EN LOS EXPEDIENTES 1807/2023 Y 1112/2023, SITAS EN EL ENCLAVE 13 (AM-55501-L09-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1641,6 +1713,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1661,7 +1734,7 @@
                                     data-orden="063"
                                     data-nombre="MEJORA EN EL POLÍGONO INDUSTRIAL CASA GRANDE I Y CASA GRANDE II" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1676,6 +1749,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1696,7 +1770,7 @@
                                     data-orden="064"
                                     data-nombre="CONSTRUCCIÓN DE ZONAS DE ASEOS PÚBLICOS MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L02-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1711,6 +1785,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1731,7 +1806,7 @@
                                     data-orden="065"
                                     data-nombre="URBANIZACIÓN PARA LA PUESTA EN MARCHA DEL COLEGIO Nº 14." 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1746,6 +1821,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1766,7 +1842,7 @@
                                     data-orden="066"
                                     data-nombre="CONSTRUCCIÓN DE PISTA DEPORTIVA EN PLAZA DE ORIENTE" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1781,6 +1857,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1801,7 +1878,7 @@
                                     data-orden="067"
                                     data-nombre="CONSTRUCCIÓN DEL ALBERGUE MUNICIPAL DE ANIMALES, SEGÚN PROYECTO REDACTADO EN EL EXPTE. 22259/2020 (AM-55501-L04-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1816,6 +1893,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1843,7 +1921,7 @@
                                     data-orden="068"
                                     data-nombre="CEIP INMACULADA CONCEPCIÓN. REPOSICIÓ 2I+6I+12P+MENJ (400, 2T)" 
                                     data-plan="GVA (Actuaciones centros enseñanza NO EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1854,18 +1932,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133068')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133068" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133068').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133068" style="display:none" multiple onchange="manejarAdjuntoObra('OB133068', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133068" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1886,7 +1966,7 @@
                                     data-orden="069"
                                     data-nombre="OBRAS DE AMPLIACIÓN DE LA PLANTA DESALADORA DE TORREVIEJA (ALICANTE) DESCRITAS EN EL PROYECTO CONSTRUCTIVO DENOMINADO PROYECTO DE AMPLIACIÓN DE LA PLANTA DESALADORA DE TORREVIEJA (ALICANTE)." 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1901,6 +1981,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1921,7 +2002,7 @@
                                     data-orden="070"
                                     data-nombre="OBRAS DE ASFALTADO Y MEJORAS DE ITINERARIOS PEATONALES Y ACCESIBILIDAD, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO, (PROYECTOS DE LOS EXPEDIENTES 23757/2022 Y 37223/2021) (AM-55501-L11-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1932,18 +2013,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133070')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133070" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133070').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133070" style="display:none" multiple onchange="manejarAdjuntoObra('OB133070', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133070" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1971,7 +2054,7 @@
                                     data-orden="071"
                                     data-nombre="MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVESTECNOLÓGICOS 2024 POLÍGONO INDUSTRIAL CASA GRANDE II - TORREVIEJA" 
                                     data-plan="IVACE: PARQUES EMPRESARIALES 2024"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1982,18 +2065,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133071')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133071" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133071').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133071" style="display:none" multiple onchange="manejarAdjuntoObra('OB133071', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133071" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2021,7 +2106,7 @@
                                     data-orden="072"
                                     data-nombre="MEJORA, MODERNIZACIÓN Y DOTACIÓN DE INFRAESTRUCTURAS Y SERVICIOS EN POLÍGONOS, ÁREAS INDUSTRIALES Y ENCLAVESTECNOLÓGICOS 2024- POLÍGONO INDUSTRIAL CASA GRANDE I" 
                                     data-plan="IVACE: PARQUES EMPRESARIALES 2024"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2032,18 +2117,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133072')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133072" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133072').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133072" style="display:none" multiple onchange="manejarAdjuntoObra('OB133072', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133072" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2064,7 +2151,7 @@
                                     data-orden="073"
                                     data-nombre="CONTRATACIÓN DE LAS OBRAS DE REPARACIÓN DEL DIQUE DE LEVANTE SEGÚN PROYECTO DEL EXPEDIENTE 8040/2020, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L12-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2075,18 +2162,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133073')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133073" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133073').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133073" style="display:none" multiple onchange="manejarAdjuntoObra('OB133073', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133073" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2107,7 +2196,7 @@
                                     data-orden="074"
                                     data-nombre="CONTRATACIÓN DE LAS OBRAS DEL CAMBIO CÉSPED ARTIFICIAL DEL ESTADIO MUNICIPAL "NELSON MANDELA", MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO, FINANCIADO PARCIALMENTE MEDIANTE SUBVENCIÓN SOLICITADA EN EL EXPEDIENTE 22269/2022 (AM-55501-L09-CB). EXPD. DEL PROYE" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2118,18 +2207,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133074')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133074" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133074').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133074" style="display:none" multiple onchange="manejarAdjuntoObra('OB133074', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133074" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2150,7 +2241,7 @@
                                     data-orden="075"
                                     data-nombre="EJECUCIÓN DE LAS OBRAS DE REPAVIMENTACIÓN Y REPARACIÓN DEL DIQUE DE LEVANTE SEGÚN PROYECTO APROBADO EN EXPTE. 8040/2020. PRTR. NEXT GENERATION EU." 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2165,6 +2256,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2185,7 +2277,7 @@
                                     data-orden="076"
                                     data-nombre="CONTRATACIÓN DE LAS OBRAS DE TERMINACIÓN DEL PABELLÓN BLANCO, SEGÚN PROYECTO EN EXPTE. 22127/2021, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM-55501-L03-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2196,18 +2288,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133076')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133076" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133076').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133076" style="display:none" multiple onchange="manejarAdjuntoObra('OB133076', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133076" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2228,7 +2322,7 @@
                                     data-orden="077"
                                     data-nombre="CONTRATACIÓN DE LAS OBRAS DE ACCESO PROVISIONAL AL PUERTO DE TORREVIEJA SEGÚN PROYECTO OBRANTE EN EL EXPEDIENTE 61634/2022 (2024-E-RE-4159), MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO (AM55501-L08-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2239,18 +2333,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133077')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133077" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133077').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133077" style="display:none" multiple onchange="manejarAdjuntoObra('OB133077', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133077" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2278,7 +2374,7 @@
                                     data-orden="078"
                                     data-nombre="ACTUACIÓN SOBRE LA FÁBRICA DE HIELO PARA LA RESTAURACIÓN Y PUESTA EN VALOR DEL EDIFICIO Y UBICACIÓN DE LA CONCEJALÍA DE TURISMO" 
                                     data-plan="PLAN PLANIFICA 2024-27 BOP: 14/06/2024"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2289,18 +2385,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133078')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133078" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133078').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133078" style="display:none" multiple onchange="manejarAdjuntoObra('OB133078', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133078" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2321,7 +2419,7 @@
                                     data-orden="079"
                                     data-nombre="OBRAS DE URBANIZACIÓN PARA LA PUESTA EN MARCHA DEL IES Nº 6 (SECCIÓN DEL IES 6 TORREVIGÍA) SITA EN CALLE MARGARITA S/N" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2332,18 +2430,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133079')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133079" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133079').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133079" style="display:none" multiple onchange="manejarAdjuntoObra('OB133079', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133079" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2364,7 +2464,7 @@
                                     data-orden="080"
                                     data-nombre="REPARACIÓN, SANEADO, PINTADO Y PROTECCIÓN DEL ALUMBRADO PÚBLICO EN DIFERENTES ZONAS DEL MUNICIPIO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2375,18 +2475,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133080')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133080" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133080').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133080" style="display:none" multiple onchange="manejarAdjuntoObra('OB133080', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133080" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2407,7 +2509,7 @@
                                     data-orden="081"
                                     data-nombre="OBRAS PARA LA MEJORA DE LA EFICIENCIA ENERGÉTICA DEL ALUMBRADO PÚBLICO SEGÚN PROYECTOS DE LOS EXPEDIENTES 21917/2022 Y 55992/2022" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2418,18 +2520,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133081')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133081" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133081').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133081" style="display:none" multiple onchange="manejarAdjuntoObra('OB133081', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133081" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2450,7 +2554,7 @@
                                     data-orden="082"
                                     data-nombre="OBRAS DE URBANIZACIÓN DEL PUERTO DE TORREVIEJA Y ZONAS ADYACENTES, RECUPERACIÓN DEL MUELLE MÍNGUEZ Y REMODELACIÓN DE SU ENTORNO PORTUARIO (AM-55501-L10-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2461,18 +2565,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133082')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133082" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133082').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133082" style="display:none" multiple onchange="manejarAdjuntoObra('OB133082', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133082" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2500,7 +2606,7 @@
                                     data-orden="083"
                                     data-nombre="REHABILITACIÓN DEL CENTRO DE INTERPRETACIÓN DE LA INDUSTRIA SALINERA. PRTR. NEXT GENERATION EU." 
                                     data-plan="PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2511,18 +2617,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133083')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133083" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133083').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133083" style="display:none" multiple onchange="manejarAdjuntoObra('OB133083', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133083" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2543,7 +2651,7 @@
                                     data-orden="084"
                                     data-nombre="CONTRATACIÓN DE LA OBRA CIVIL DE LA EBAR “HOMBRE DEL MAR”, SEGÚN PROYECTO DEL EXPTE. 61634/2022 (AM-55501-L08-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2554,18 +2662,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133084')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133084" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133084').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133084" style="display:none" multiple onchange="manejarAdjuntoObra('OB133084', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133084" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2586,7 +2696,7 @@
                                     data-orden="085"
                                     data-nombre="REPARACIÓN DE LAS PISTAS DE PÁDEL EN LA CIUDAD DEPORTIVA SEGÚN PROYECTO DEL EXPEDIENTE 70512/2022, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2597,18 +2707,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133085')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133085" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133085').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133085" style="display:none" multiple onchange="manejarAdjuntoObra('OB133085', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133085" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2629,7 +2741,7 @@
                                     data-orden="086"
                                     data-nombre="CONSTRUCCIÓN Y EXPLOTACIÓN DE UN CENTRO DE OCIO Y EL DIQUE DE LEVANTE, SEGÚN PROYECTO DEL EXPTE. 61634/2022 (AM-55501-L05-CB)" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2640,18 +2752,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133086')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133086" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133086').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133086" style="display:none" multiple onchange="manejarAdjuntoObra('OB133086', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133086" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2672,7 +2786,7 @@
                                     data-orden="087"
                                     data-nombre="DIVERSAS OBRAS DESCRITAS EN MEMORIAS TÉCNICAS DE INTERVENCIONES EN EL ALUMBRADO PÚBLICO, SEGÚN EXPEDIENTE 60354/2021, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2683,18 +2797,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133087')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133087" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133087').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133087" style="display:none" multiple onchange="manejarAdjuntoObra('OB133087', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133087" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2722,7 +2838,7 @@
                                     data-orden="088"
                                     data-nombre="LUMINARIAS EN LA SENDA PEATONAL DE LA MATA-PARAJE NATURAL MUNICIPAL MOLINO DEL AGUA" 
                                     data-plan="PLAN TERRITORIAL DE SOSTENIBILIDAD TURÍSTICA EN DESTINO COMUNITAT VALENCIANA 2021 (PTSTD CV 21)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2733,18 +2849,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133088')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133088" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133088').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133088" style="display:none" multiple onchange="manejarAdjuntoObra('OB133088', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133088" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2765,7 +2883,7 @@
                                     data-orden="089"
                                     data-nombre="INFRAESTRUCTURA PARA LA AMPLIACIÓN DEL COLEGIO Nº 14." 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2776,18 +2894,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133089')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133089" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133089').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133089" style="display:none" multiple onchange="manejarAdjuntoObra('OB133089', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133089" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2808,7 +2928,7 @@
                                     data-orden="090"
                                     data-nombre="REFUERZO DEL ALUMBRADO PÚBLICO EN PLAZA DE ORIENTE." 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2819,18 +2939,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133090')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133090" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133090').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133090" style="display:none" multiple onchange="manejarAdjuntoObra('OB133090', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133090" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2851,7 +2973,7 @@
                                     data-orden="091"
                                     data-nombre="SUMINISTRO Y COLOCACIÓN DE DOS ZONAS DE CALISTENIA ENTRE CALLE EMIL Y CALLE SANTA PETRA DE TORREVIEJA" 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2862,18 +2984,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133091')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133091" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133091').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133091" style="display:none" multiple onchange="manejarAdjuntoObra('OB133091', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133091" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2894,7 +3018,7 @@
                                     data-orden="092"
                                     data-nombre="MODIFICACIÓN DE LA ROTONDA DE ACCESO AL RECINTO D MERCADOS EN AVDA. DELFINA VIUDES." 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2905,18 +3029,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133092')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133092" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133092').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133092" style="display:none" multiple onchange="manejarAdjuntoObra('OB133092', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133092" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2937,7 +3063,7 @@
                                     data-orden="093"
                                     data-nombre="CONDUCCIÓN DE PLUVIALES EN EL ÁMBITO DE LA CALA DE LA ZORRA." 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2948,18 +3074,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133093')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133093" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133093').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133093" style="display:none" multiple onchange="manejarAdjuntoObra('OB133093', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133093" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -2980,7 +3108,7 @@
                                     data-orden="094"
                                     data-nombre="CONSOLIDACIÓN Y REHABILITACIÓN DEL ANTIGUO PARVULARIO LA PURÍSIMA Y EL EDIFICIO USADO POR LA CORAL TORREVEJENSE FRANCISCO VALLEJOS PARA DESTINARLO A LA PROYECCIÓN ESTRATÉGICA SOCIOECONÓMICA." 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -2991,18 +3119,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133094')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133094" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133094').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133094" style="display:none" multiple onchange="manejarAdjuntoObra('OB133094', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133094" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3023,7 +3153,7 @@
                                     data-orden="095"
                                     data-nombre="REHABILITACIÓN DEL EDIFICIO SITO EN AZORÍN, R. CÉSPEDES, CHAPAPRIETA Y P. ISABEL II, "LA PLASA", MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3034,18 +3164,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133095')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133095" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133095').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133095" style="display:none" multiple onchange="manejarAdjuntoObra('OB133095', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133095" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3066,7 +3198,7 @@
                                     data-orden="096"
                                     data-nombre="REPARACIONES EN LA CASA DE LA TERCERA EDAD DE LA CALLE SAN PASCUAL" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3077,18 +3209,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133096')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133096" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133096').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133096" style="display:none" multiple onchange="manejarAdjuntoObra('OB133096', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133096" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3109,7 +3243,7 @@
                                     data-orden="097"
                                     data-nombre="ADAPTACIÓN DE DOS PLANTAS DEL CENTRO MUNICIPAL PARA DESTINARLAS A CENTRO DE FORMACIÓN Y CENTRO DE OCIO JUVENIL, TRAMITACIÓN ANTICIPADA DEL GASTO." 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3120,18 +3254,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133097')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133097" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133097').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133097" style="display:none" multiple onchange="manejarAdjuntoObra('OB133097', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133097" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3152,7 +3288,7 @@
                                     data-orden="098"
                                     data-nombre="CONTRATACIÓN DE OBRAS DE ADAPTACIÓN DE LA PARCELA SITA EN LA URB. MAR AZUL, CALLES NARVÁEZ Y AVDA. CONQUISTADORES PARA INSTALACIÓN DEL COLEGIO Nº 16, POR URGENCIA" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3163,18 +3299,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133098')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133098" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133098').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133098" style="display:none" multiple onchange="manejarAdjuntoObra('OB133098', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133098" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3195,7 +3333,7 @@
                                     data-orden="099"
                                     data-nombre="CONTRATACIÓN DE LAS OBRAS DE AMPLIACIÓN DEL CEMENTERIO DE TORREVIEJA, CONSISTENTES EN LA CONSTRUCCIÓN DE NUEVOS NICHOS" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3206,18 +3344,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133099')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133099" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133099').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133099" style="display:none" multiple onchange="manejarAdjuntoObra('OB133099', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133099" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3238,7 +3378,7 @@
                                     data-orden="100"
                                     data-nombre="CONTRATACIÓN DE LA REFORMA DE ADECUACIÓN DE OFICINAS DE DEPENDENCIAS MUNICIPALES C/ CLEMENTE GOSÁLVEZ, 26 BAJO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3249,18 +3389,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133100')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133100" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133100').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133100" style="display:none" multiple onchange="manejarAdjuntoObra('OB133100', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133100" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3281,7 +3423,7 @@
                                     data-orden="101"
                                     data-nombre="CONTRATACIÓN DE LA EJECUCIÓN DE OBRAS INCLUIDAS EN EL PLAN REASFALTADO Y ACCESIBILIDAD 2025, MEDIANTE TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3292,18 +3434,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133101')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133101" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133101').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133101" style="display:none" multiple onchange="manejarAdjuntoObra('OB133101', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133101" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -3324,7 +3468,7 @@
                                     data-orden="102"
                                     data-nombre="OBRAS DE REURBANIZACIÓN DE LA PLAYA DE LOS LOCOS, TRAMITACIÓN ANTICIPADA DEL GASTO" 
                                     data-plan="Procedente de volcado de licitaciones de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -3335,15 +3479,16 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB133102')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB133102" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB133102').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB133102" style="display:none" multiple onchange="manejarAdjuntoObra('OB133102', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB133102" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
@@ -3498,14 +3643,75 @@
 
     
 <script>
-// 1. ESTADO GLOBAL
-window.colaAdjuntos = {};
-window.colaAdjuntosReq = {};
+
+// 1. ESTADO GLOBAL (Unificado para sincronización con borradores)
+window.colaAdjuntos = {};    // Para obras (Seguimiento y Nuevas)
+window.colaAdjuntosReq = {}; // Para requerimientos
 let idObraActual = null;
 let reqIdActual = null;
 let contadorNuevas = 0;
 
-// 2. FUNCIONES GLOBALES
+// 2. FUNCIONES DE GESTIÓN DE ADJUNTOS (Seguimiento y Nuevas Obras)
+window.gestionarAdjuntos = function(id) {
+    idObraActual = id;
+    const input = document.getElementById('hiddenFileInput');
+    if (input) input.click();
+};
+
+window.manejarAdjuntoObra = function(idObra, input) {
+    if (!input.files.length) return;
+    if (!window.colaAdjuntos[idObra]) window.colaAdjuntos[idObra] = [];
+    
+    window.colaAdjuntos[idObra].push(...Array.from(input.files));
+    renderAdjuntos(idObra);
+    marcarComoSucio(); // Activa el botón de guardar borrador en base.html.j2
+    input.value = ""; 
+};
+
+window.renderAdjuntos = function(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_${id}`);
+    if (!contenedor) return;
+    
+    const archivos = window.colaAdjuntos[id] || [];
+    contenedor.innerHTML = archivos.map((f, i) => {
+        const isCloud = f.status === 'cloud';
+        return `
+            <div class="file-item" style="font-size:0.75rem; display:flex; justify-content:space-between; align-items:center; ${isCloud ? 'border-left: 3px solid #10b981; background: #f0fdf4;' : 'border: 1px solid #e2e8f0;'}">
+                <span>${isCloud ? '☁️' : '📄'} ${f.name.substring(0,15)}${f.name.length > 15 ? '...' : ''}</span>
+                <button type="button" onclick="window.colaAdjuntos['${id}'].splice(${i},1); renderAdjuntos('${id}'); marcarComoSucio();" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px;"></i>
+                </button>
+            </div>`;
+    }).join("");
+    if (window.lucide) lucide.createIcons();
+};
+
+// 3. FUNCIONES DE GESTIÓN DE REQUERIMIENTOS
+window.gestionarAdjuntosReq = function(id) {
+    reqIdActual = id;
+    const input = document.getElementById('hiddenInputReq');
+    if (input) input.click();
+};
+
+window.renderColaReq = function(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
+    
+    const archivos = window.colaAdjuntosReq[id] || [];
+    contenedor.innerHTML = archivos.map((f, i) => {
+        const isCloud = f.status === 'cloud';
+        return `
+            <div class="file-item" style="font-size:0.75rem; display:flex; justify-content:space-between; align-items:center; ${isCloud ? 'border-left: 3px solid #10b981; background: #f0fdf4;' : 'border: 1px solid #e2e8f0;'}">
+                <span>${isCloud ? '☁️' : '📎'} ${f.name.substring(0,15)}...</span>
+                <button type="button" onclick="window.colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}'); marcarComoSucio();" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px;"></i>
+                </button>
+            </div>`;
+    }).join("");
+    if (window.lucide) lucide.createIcons();
+};
+
+// 4. FUNCIONES DE FILAS DINÁMICAS (Otras Obras)
 window.agregarFilaNuevaObra = function() {
     const tbody = document.getElementById('bodyNuevasObras');
     if (!tbody) return;
@@ -3517,76 +3723,39 @@ window.agregarFilaNuevaObra = function() {
     tr.innerHTML = `
         <td><input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Calle Mayor"></td>
         <td><select class="form-select input-nueva-estado"><option value="">Seleccionar...</option><option value="No iniciada">No iniciada</option><option value="En ejecución">En ejecución</option><option value="Paralizada">Paralizada</option><option value="Finalizada">Finalizada</option></select></td>
-        <td><textarea class="form-input" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
+        <td><textarea class="form-input input-nueva-obs" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
         <td style="text-align:center;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('${idT}')"><i data-lucide="paperclip"></i> Adjuntar</button>
-            <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500;">Máx 35 MB / archivo</div>
-            <div id="lista_adjuntos_${idT}" class="file-list-container" style="margin-top: 5px;"></div>
+            <div id="lista_adjuntos_${idT}" class="file-list-container mini-file-list" style="margin-top: 5px;"></div>
         </td>
         <td style="text-align:center;">
             <button type="button" onclick="this.closest('tr').remove()" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
         </td>`;
     tbody.appendChild(tr);
     if (window.lucide) lucide.createIcons();
+    marcarComoSucio();
 };
 
-window.gestionarAdjuntos = function(id) {
-    idObraActual = id;
-    const input = document.getElementById('hiddenFileInput');
-    if (input) input.click();
-};
-
-window.gestionarAdjuntosReq = function(id) {
-    reqIdActual = id;
-    const input = document.getElementById('hiddenInputReq');
-    if (input) input.click();
-};
-
-function renderAdjuntos(id) {
-    const contenedor = document.getElementById(`lista_adjuntos_${id}`);
-    if (!contenedor) return;
-    contenedor.innerHTML = (window.colaAdjuntos[id] || []).map(f => `
-        <div class="file-item" style="font-size:0.7rem; border:1px solid #e2e8f0; margin-bottom:2px; padding:2px; border-radius:4px; display:flex; justify-content:space-between;">
-            <span>📄 ${f.name.substring(0,12)}...</span>
-        </div>`).join("");
-}
-
-function renderColaReq(id) {
-    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
-    if (!contenedor) return;
-    contenedor.innerHTML = (window.colaAdjuntosReq[id] || []).map(f => `
-        <div class="file-item" style="font-size:0.75rem; padding:4px; border:1px solid #e2e8f0; border-radius:6px;">
-            <span>📄 ${f.name}</span>
-        </div>`).join("");
-}
-
+// 5. INICIALIZACIÓN Y EVENTOS
 document.addEventListener("DOMContentLoaded", () => {
-
     const updateSelectColor = (el) => {
-        if (el.value !== "") {
-            el.classList.add('has-value');
-        } else {
-            el.classList.remove('has-value');
-        }
+        el.value !== "" ? el.classList.add('has-value') : el.classList.remove('has-value');
     };
 
     document.querySelectorAll('.form-select').forEach(sel => updateSelectColor(sel));
-
-    // Delegación de eventos para que funcione también en filas nuevas
     document.addEventListener('change', (e) => {
-        if (e.target.classList.contains('form-select')) {
-            updateSelectColor(e.target);
-        }
+        if (e.target.classList.contains('form-select')) updateSelectColor(e.target);
     });
 
-    window.agregarFilaNuevaObra();
-
+    // Listeners de Inputs de Archivos
     const inputObras = document.getElementById('hiddenFileInput');
     if (inputObras) {
         inputObras.addEventListener('change', () => {
             if (!idObraActual) return;
-            window.colaAdjuntos[idObraActual] = [...(window.colaAdjuntos[idObraActual] || []), ...Array.from(inputObras.files)];
+            if (!window.colaAdjuntos[idObraActual]) window.colaAdjuntos[idObraActual] = [];
+            window.colaAdjuntos[idObraActual].push(...Array.from(inputObras.files));
             renderAdjuntos(idObraActual);
+            marcarComoSucio();
         });
     }
 
@@ -3594,69 +3763,95 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             if (reqIdActual === null) return;
-            window.colaAdjuntosReq[reqIdActual] = [...(window.colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            if (!window.colaAdjuntosReq[reqIdActual]) window.colaAdjuntosReq[reqIdActual] = [];
+            window.colaAdjuntosReq[reqIdActual].push(...Array.from(inputReq.files));
             renderColaReq(reqIdActual);
+            marcarComoSucio();
         });
     }
 
+    // Lógica de Envío
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
     if (checkConf) {
-        checkConf.addEventListener('change', () => {
-            btnEnviar.disabled = !checkConf.checked;
-        });
+        checkConf.addEventListener('change', () => { btnEnviar.disabled = !checkConf.checked; });
     }
 
     btnEnviar.addEventListener("click", async () => {
+        const email = document.getElementById("contactoEmail").value;
+        const emailConfirm = document.getElementById("contactoEmailConfirm").value;
+        if (email !== emailConfirm) return Swal.fire("Error", "Los correos electrónicos no coinciden.", "error");
+
         const idBatch = "OBRAS_" + Date.now();
-        toggleFormFreeze(true); // Bloquear formulario durante el envío
+        toggleFormFreeze(true);
 
         const listaTareas = [];
-        // Preparar archivos de obras y requerimientos
-        Object.entries(window.colaAdjuntos).forEach(([id, list]) => 
-            list.forEach(f => listaTareas.push({ file: f, seccion: id }))
-        );
-        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => 
-            list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }))
-        );
 
-        UIProgress.show(listaTareas.length); // Mostrar barra de progreso
+        // Recolectar Archivos Generales
+        if (typeof archivosGenerales !== 'undefined') {
+            archivosGenerales.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: 'GENERAL' }); });
+        }
+
+        // Recolectar Archivos de Requerimientos
+        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => {
+            list.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${id}` }); });
+        });
+
+        // Recolectar Archivos de Obras (Seguimiento y Nuevas)
+        Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+            list.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: `OBRA_${id}` }); });
+        });
+
+        UIProgress.show(listaTareas.length);
 
         try {
-            // Subida de archivos usando el motor de base.html.j2 
-            await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
+            if (listaTareas.length > 0) {
+                await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 1);
+            }
 
             const payload = {
                 tipo_formulario: "obras",
                 id_envio: idBatch,
-                datos_obras: Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
-                    obra: s.dataset.obraId, 
+                id_borrador_procedencia: idBorradorOrigen, // ID del borrador para la promoción de archivos
+                muni_code: window.EIEL_CONFIG.muniCode,
+                datos_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
+                    id_obra: s.dataset.obraId,
                     estado: s.value
-                })),
-                otras_obras: Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
+                }))),
+                otras_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
                     nombre: f.querySelector('.input-nueva-nombre').value,
-                    estado: f.querySelector('.input-nueva-estado').value
-                })),
-                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg, 
+                    estado: f.querySelector('.input-nueva-estado').value,
+                    observaciones: f.querySelector('.input-nueva-obs').value
+                }))),
+                respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                    pregunta: area.dataset.msg,
+                    id: area.dataset.id,
                     respuesta: area.value
-                })),
+                }))),
+                observaciones: document.getElementById("observaciones").value,
                 contacto: { 
                     nombre: document.getElementById("contactoNombre").value, 
-                    email: document.getElementById("contactoEmail").value 
+                    departamento: document.getElementById("contactoDepartamento").value,
+                    email: email 
                 }
             };
 
-            // Enviar datos para generar PDF
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
-            UIProgress.complete(); // Finalizar proceso
+            formIsDirty = false;
+            UIProgress.complete();
         } catch (error) {
             console.error(error);
             toggleFormFreeze(false);
-            Swal.fire("Error", "Fallo en el envío.", "error");
+            Swal.fire("Error", "Hubo un fallo en el proceso de envío.", "error");
         }
     });
 });
+
+// Función de apoyo para base.html.j2: Renderiza todas las colas al importar borrador
+window.renderArchivos = function() {
+    Object.keys(window.colaAdjuntos).forEach(id => renderAdjuntos(id));
+    Object.keys(window.colaAdjuntosReq).forEach(id => renderColaReq(id));
+};
 </script>
 
 </body>

@@ -21,7 +21,7 @@
             muniName: "Benilloba",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzFQ9IoFDKU1H6DKdr0Us2maaGx6lWhBFG1SDJVhVygeRymCNuwqIqq0PsVhu_eQCopRw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyfmfptkHaLnt0y_71S51R6OOb2rnvjzb0YR5wdCb830xkrhdgRUZBAzM72tzyoLFmJyA/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycbwgq019K2kKTvPEihmsm8s-RhluP5_6GloUjQzS2kGMf7GQp0tvWV9mf4-R2-n0eXHjCw/exec",
             hasAvisos: false
         };
@@ -188,6 +188,18 @@
                     });
                 });
             }
+            
+            // Adjuntos específicos del formulario (Obras, Contadores, etc.)
+            if (typeof window.colaAdjuntos !== 'undefined') {
+                Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                    list.forEach(f => {
+                        if (!f.status || f.status !== 'cloud') {
+                            // Usamos un prefijo genérico ITEM_ o mantenemos la lógica de secciones
+                            listaArchivosParaSubir.push({ file: f, seccion: `TEMP_ITEM_${id}` });
+                        }
+                    });
+                });
+            }
 
             Swal.fire({ 
                 title: listaArchivosParaSubir.length > 0 ? 'Sincronizando archivos...' : 'Guardando textos...', 
@@ -214,6 +226,12 @@
                 if (typeof colaAdjuntosReq !== 'undefined') {
                     Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
                         list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${id}` }));
+                    });
+                }
+                // [NUEVO] Guardar referencias de los archivos de las obras (Seguimiento y Nuevas)
+                if (typeof window.colaAdjuntos !== 'undefined') {
+                    Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `ITEM_${id}` }));
                     });
                 }
 
@@ -295,6 +313,9 @@
                     if (data._adjuntos_remotos) {
                         archivosGenerales = [];
                         colaAdjuntosReq = {};
+                        window.colaAdjuntos = {}; 
+                        window.colaAdjuntosNuevas = {};
+                        
                         data._adjuntos_remotos.forEach(adj => {
                             const mockFile = { name: adj.name, status: 'cloud' };
                             if (adj.seccion === 'GENERAL') {
@@ -303,6 +324,11 @@
                                 const idReq = adj.seccion.split('_')[1];
                                 if (!colaAdjuntosReq[idReq]) colaAdjuntosReq[idReq] = [];
                                 colaAdjuntosReq[idReq].push(mockFile);
+                            } else if (adj.seccion.startsWith('ITEM_') || adj.seccion.startsWith('OBRA_')) {
+                                // Aceptamos tanto ITEM_ como OBRA_ para compatibilidad
+                                const idItem = adj.seccion.replace('ITEM_', '').replace('OBRA_', '');
+                                if (!window.colaAdjuntos[idItem]) window.colaAdjuntos[idItem] = [];
+                                window.colaAdjuntos[idItem].push(mockFile);
                             }
                         });
                         // Llamar a los renders del formulario hijo (Alumbrado/Obras)
@@ -412,12 +438,13 @@
                 <thead>
                     <tr>
                         <th style="width: 5%;" class="td-ubicacion">Id</th>
-                        <th style="width: 60%;">Denominación</th>
+                        <th style="width: 55%;">Denominación</th>
                         <th style="width: 20%;" class="td-ubicacion">Estado</th>
-                        <th style="width: 15%;" class="td-ubicacion">Documentación</th>
+                        <th style="width: 20%;" class="td-ubicacion">Documentación</th>
                     </tr>
                 </thead>
                 <tbody>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -445,7 +472,7 @@
                                     data-orden="022"
                                     data-nombre="MEJORA ACCESO AL CASCO URBANO DESDE LA CTRA. CV- 70 POR LA AVDA. DE LA DIPUTACIÓN" 
                                     data-plan="PLAN +CERCA 2020 BOP: 25/06/2021"
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -456,18 +483,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035022')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035022" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035022').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035022" style="display:none" multiple onchange="manejarAdjuntoObra('OB035022', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035022" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -488,7 +517,7 @@
                                     data-orden="026"
                                     data-nombre="OBRAS DE REPARACIÓN DE LOS CAMINOS ACCESO AL SALT Y SENDA DELS PESCADORS, EN BENILLOBA" 
                                     data-plan="Procedente de volcado de contratos menores de contrataciondelestado.es"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -499,18 +528,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035026')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035026" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035026').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035026" style="display:none" multiple onchange="manejarAdjuntoObra('OB035026', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035026" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -538,7 +569,7 @@
                                     data-orden="029"
                                     data-nombre="INSTALACIÓN DE LUMINARIAS SOLARES EN EL CAMÍ DEL CALVARI" 
                                     data-plan="ADQUISICIÓN E INSTALACIÓN DE LUMINARIAS SOLARES EN VÍAS Y CAMINOS, POB. <5000 HAB., 2021 BOP: 19/10/2021"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -549,18 +580,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035029')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035029" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035029').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035029" style="display:none" multiple onchange="manejarAdjuntoObra('OB035029', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035029" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -588,7 +621,7 @@
                                     data-orden="034"
                                     data-nombre="REPARACIÓN SIMPLE EN VARIOS TRAMOS DEL CAMINO DE LA CONDOMINA." 
                                     data-plan="REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2022 BOP: 26/8/2022"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -599,18 +632,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035034')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035034" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035034').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035034" style="display:none" multiple onchange="manejarAdjuntoObra('OB035034', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035034" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -638,7 +673,7 @@
                                     data-orden="038"
                                     data-nombre="AMPLIACIÓN MEJORAS EN EL ACCESO ESTE AL CASCO URBANO DESDE LA CTRA. CV- 70" 
                                     data-plan="PLAN +CERCA 2022 BOP: 14/11/2022"
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -649,18 +684,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035038')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035038" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035038').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035038" style="display:none" multiple onchange="manejarAdjuntoObra('OB035038', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035038" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -688,7 +725,7 @@
                                     data-orden="039"
                                     data-nombre="RED DE PLUVIALES EN LA AVDA. DE ALCOY" 
                                     data-plan="PLAN +CERCA 2022 BOP: 14/11/2022"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -703,6 +740,7 @@
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -730,7 +768,7 @@
                                     data-orden="040"
                                     data-nombre="MEJORA DEL ALUMBRADO PÚBLICO EN CALLES CERVANTES, LOPE DE VEGA, COLÓN, LA COMARCA, SANTA ANA, LA TAPIA, SAN MIGUEL, SAN JOAQUÍN" 
                                     data-plan="PLAN +CERCA 2022 BOP: 14/11/2022"
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -741,18 +779,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035040')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035040" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035040').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035040" style="display:none" multiple onchange="manejarAdjuntoObra('OB035040', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035040" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -780,7 +820,7 @@
                                     data-orden="043"
                                     data-nombre="CEIP VIRGEN DE LOS DOLORES. ACTUACIONES REFERIDAS A REPARACION DE CUBIERTAS, MUROS, ALBARDILLAS Y FACHADA" 
                                     data-plan="GVA (PROGRAMA EDIFICANT)"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -791,18 +831,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035043')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035043" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035043').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035043" style="display:none" multiple onchange="manejarAdjuntoObra('OB035043', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035043" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -830,7 +872,7 @@
                                     data-orden="046"
                                     data-nombre="REPARACIÓN SIMPLE EN VARIOS TRAMOS DEL CAMINO RODACANTERS" 
                                     data-plan="REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2023 LÍNEAS 1 Y 2, 1ER PERIODO. BOP: 05/06/2023"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -841,18 +883,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035046')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035046" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035046').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035046" style="display:none" multiple onchange="manejarAdjuntoObra('OB035046', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035046" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -880,7 +924,7 @@
                                     data-orden="048"
                                     data-nombre="CONSTRUCCIÓN DE NUEVOS NICHOS EN EL CEMENTERIO MUNICIPAL" 
                                     data-plan="PLAN +CERCA. 2023. BOP: 26/9/2023."
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -891,18 +935,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035048')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035048" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035048').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035048" style="display:none" multiple onchange="manejarAdjuntoObra('OB035048', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035048" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -930,7 +976,7 @@
                                     data-orden="049"
                                     data-nombre="RENOVACIÓN JUEGOS INFANTILES EN PARQUES MUNICIPALES" 
                                     data-plan="PLAN +CERCA. 2023. BOP: 26/9/2023."
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -941,18 +987,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035049')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035049" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035049').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035049" style="display:none" multiple onchange="manejarAdjuntoObra('OB035049', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035049" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -980,7 +1028,7 @@
                                     data-orden="054"
                                     data-nombre="INSTALACIÓN DE LUMINARIAS SOLARES EN LOS CAMINOS RODACANTERS Y LA TEULERÍA" 
                                     data-plan="ADQUISICIÓN DE LUMINARIAS Y ELEM, DE SEG. VIAL EN VÍAS Y CAMINOS, POB.  <5000 HAB. 2022 BOP: 19/08/2022"
-                                    [cite_start]data-original="Finalizada">
+                                    data-original="Finalizada">
                                 <option value="" >Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -991,18 +1039,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035054')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035054" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035054').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035054" style="display:none" multiple onchange="manejarAdjuntoObra('OB035054', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035054" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1030,7 +1080,7 @@
                                     data-orden="057"
                                     data-nombre="BACHEO DE LOS CAMINOS LES NEVES Y RODACANTERS" 
                                     data-plan="REPARACIONES Y CONSERVACIÓN DE CAMINOS DE TIT. NO PROVINCIAL POB. <5000 HAB. 2024 LÍNEAS 1 Y 2. BOP: 18/07/2024"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1041,18 +1091,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035057')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035057" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035057').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035057" style="display:none" multiple onchange="manejarAdjuntoObra('OB035057', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035057" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1080,7 +1132,7 @@
                                     data-orden="059"
                                     data-nombre="ELIMINACIÓN DE BARRERAS EN EL HOGAR DEL JUBILADO" 
                                     data-plan="ACCESIBILIDAD CASAS CONSISTORIALES Y EDIF. PÚBLICOS DESTINADOS A 3ª EDAD, DISCAPACIDAD O DIVERSIDAD FUNCIONAL Y A OTROS USOS PÚBLICOS 2024. DOGV: 17/07/2024"
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1091,18 +1143,20 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035059')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035059" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035059').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035059" style="display:none" multiple onchange="manejarAdjuntoObra('OB035059', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035059" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
+                    
                     
                     
                     <tr class="fila-obra">
@@ -1130,7 +1184,7 @@
                                     data-orden="061"
                                     data-nombre="SUMINISTRO SEÑALIZACIÓN VIAL Y CÁMARAS DE VIDEOVIGILANCIA" 
                                     data-plan="INVERSIONES EN CAMINOS DE TIT. MUNICIPAL A EJEC. POR LOS AYTOS. 2025. LINEA C. BOP: 23/07/2025."
-                                    [cite_start]data-original="">
+                                    data-original="">
                                 <option value="" selected>Seleccionar...</option>
                                 <option value="No iniciada">No iniciada</option>
                                 <option value="En ejecución">En ejecución</option>
@@ -1141,15 +1195,16 @@
                         </td>
                         <td class="td-ubicacion">
                             
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('OB035061')">
-                                    <i data-lucide="paperclip"></i> Adjuntar
-                                </button>
-                                
-<div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500; white-space: nowrap;">
-    Máx 35 MB / archivo
-</div>
-
-                                <div id="lista_adjuntos_OB035061" class="file-list-container" style="margin-top: 5px;"></div>
+                                <div class="adjuntos-obra-wrapper">
+                                    
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('file_obra_OB035061').click()">
+                                        <i data-lucide="paperclip"></i> Adjuntar
+                                    </button>
+                                    <input type="file" id="file_obra_OB035061" style="display:none" multiple onchange="manejarAdjuntoObra('OB035061', this)">
+                                    
+                                    
+                                    <div id="lista_adjuntos_OB035061" class="file-list-container mini-file-list" style="margin-top: 8px;"></div>
+                                </div>
                             
                         </td>
                     </tr>
@@ -1304,14 +1359,75 @@
 
     
 <script>
-// 1. ESTADO GLOBAL
-window.colaAdjuntos = {};
-window.colaAdjuntosReq = {};
+
+// 1. ESTADO GLOBAL (Unificado para sincronización con borradores)
+window.colaAdjuntos = {};    // Para obras (Seguimiento y Nuevas)
+window.colaAdjuntosReq = {}; // Para requerimientos
 let idObraActual = null;
 let reqIdActual = null;
 let contadorNuevas = 0;
 
-// 2. FUNCIONES GLOBALES
+// 2. FUNCIONES DE GESTIÓN DE ADJUNTOS (Seguimiento y Nuevas Obras)
+window.gestionarAdjuntos = function(id) {
+    idObraActual = id;
+    const input = document.getElementById('hiddenFileInput');
+    if (input) input.click();
+};
+
+window.manejarAdjuntoObra = function(idObra, input) {
+    if (!input.files.length) return;
+    if (!window.colaAdjuntos[idObra]) window.colaAdjuntos[idObra] = [];
+    
+    window.colaAdjuntos[idObra].push(...Array.from(input.files));
+    renderAdjuntos(idObra);
+    marcarComoSucio(); // Activa el botón de guardar borrador en base.html.j2
+    input.value = ""; 
+};
+
+window.renderAdjuntos = function(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_${id}`);
+    if (!contenedor) return;
+    
+    const archivos = window.colaAdjuntos[id] || [];
+    contenedor.innerHTML = archivos.map((f, i) => {
+        const isCloud = f.status === 'cloud';
+        return `
+            <div class="file-item" style="font-size:0.75rem; display:flex; justify-content:space-between; align-items:center; ${isCloud ? 'border-left: 3px solid #10b981; background: #f0fdf4;' : 'border: 1px solid #e2e8f0;'}">
+                <span>${isCloud ? '☁️' : '📄'} ${f.name.substring(0,15)}${f.name.length > 15 ? '...' : ''}</span>
+                <button type="button" onclick="window.colaAdjuntos['${id}'].splice(${i},1); renderAdjuntos('${id}'); marcarComoSucio();" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px;"></i>
+                </button>
+            </div>`;
+    }).join("");
+    if (window.lucide) lucide.createIcons();
+};
+
+// 3. FUNCIONES DE GESTIÓN DE REQUERIMIENTOS
+window.gestionarAdjuntosReq = function(id) {
+    reqIdActual = id;
+    const input = document.getElementById('hiddenInputReq');
+    if (input) input.click();
+};
+
+window.renderColaReq = function(id) {
+    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
+    if (!contenedor) return;
+    
+    const archivos = window.colaAdjuntosReq[id] || [];
+    contenedor.innerHTML = archivos.map((f, i) => {
+        const isCloud = f.status === 'cloud';
+        return `
+            <div class="file-item" style="font-size:0.75rem; display:flex; justify-content:space-between; align-items:center; ${isCloud ? 'border-left: 3px solid #10b981; background: #f0fdf4;' : 'border: 1px solid #e2e8f0;'}">
+                <span>${isCloud ? '☁️' : '📎'} ${f.name.substring(0,15)}...</span>
+                <button type="button" onclick="window.colaAdjuntosReq['${id}'].splice(${i},1); renderColaReq('${id}'); marcarComoSucio();" class="btn-danger-icon">
+                    <i data-lucide="trash-2" style="width:14px;"></i>
+                </button>
+            </div>`;
+    }).join("");
+    if (window.lucide) lucide.createIcons();
+};
+
+// 4. FUNCIONES DE FILAS DINÁMICAS (Otras Obras)
 window.agregarFilaNuevaObra = function() {
     const tbody = document.getElementById('bodyNuevasObras');
     if (!tbody) return;
@@ -1323,76 +1439,39 @@ window.agregarFilaNuevaObra = function() {
     tr.innerHTML = `
         <td><input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Calle Mayor"></td>
         <td><select class="form-select input-nueva-estado"><option value="">Seleccionar...</option><option value="No iniciada">No iniciada</option><option value="En ejecución">En ejecución</option><option value="Paralizada">Paralizada</option><option value="Finalizada">Finalizada</option></select></td>
-        <td><textarea class="form-input" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
+        <td><textarea class="form-input input-nueva-obs" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
         <td style="text-align:center;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('${idT}')"><i data-lucide="paperclip"></i> Adjuntar</button>
-            <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 4px; font-weight: 500;">Máx 35 MB / archivo</div>
-            <div id="lista_adjuntos_${idT}" class="file-list-container" style="margin-top: 5px;"></div>
+            <div id="lista_adjuntos_${idT}" class="file-list-container mini-file-list" style="margin-top: 5px;"></div>
         </td>
         <td style="text-align:center;">
             <button type="button" onclick="this.closest('tr').remove()" class="btn-danger-icon"><i data-lucide="trash-2" style="width:16px; color:#ef4444;"></i></button>
         </td>`;
     tbody.appendChild(tr);
     if (window.lucide) lucide.createIcons();
+    marcarComoSucio();
 };
 
-window.gestionarAdjuntos = function(id) {
-    idObraActual = id;
-    const input = document.getElementById('hiddenFileInput');
-    if (input) input.click();
-};
-
-window.gestionarAdjuntosReq = function(id) {
-    reqIdActual = id;
-    const input = document.getElementById('hiddenInputReq');
-    if (input) input.click();
-};
-
-function renderAdjuntos(id) {
-    const contenedor = document.getElementById(`lista_adjuntos_${id}`);
-    if (!contenedor) return;
-    contenedor.innerHTML = (window.colaAdjuntos[id] || []).map(f => `
-        <div class="file-item" style="font-size:0.7rem; border:1px solid #e2e8f0; margin-bottom:2px; padding:2px; border-radius:4px; display:flex; justify-content:space-between;">
-            <span>📄 ${f.name.substring(0,12)}...</span>
-        </div>`).join("");
-}
-
-function renderColaReq(id) {
-    const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
-    if (!contenedor) return;
-    contenedor.innerHTML = (window.colaAdjuntosReq[id] || []).map(f => `
-        <div class="file-item" style="font-size:0.75rem; padding:4px; border:1px solid #e2e8f0; border-radius:6px;">
-            <span>📄 ${f.name}</span>
-        </div>`).join("");
-}
-
+// 5. INICIALIZACIÓN Y EVENTOS
 document.addEventListener("DOMContentLoaded", () => {
-
     const updateSelectColor = (el) => {
-        if (el.value !== "") {
-            el.classList.add('has-value');
-        } else {
-            el.classList.remove('has-value');
-        }
+        el.value !== "" ? el.classList.add('has-value') : el.classList.remove('has-value');
     };
 
     document.querySelectorAll('.form-select').forEach(sel => updateSelectColor(sel));
-
-    // Delegación de eventos para que funcione también en filas nuevas
     document.addEventListener('change', (e) => {
-        if (e.target.classList.contains('form-select')) {
-            updateSelectColor(e.target);
-        }
+        if (e.target.classList.contains('form-select')) updateSelectColor(e.target);
     });
 
-    window.agregarFilaNuevaObra();
-
+    // Listeners de Inputs de Archivos
     const inputObras = document.getElementById('hiddenFileInput');
     if (inputObras) {
         inputObras.addEventListener('change', () => {
             if (!idObraActual) return;
-            window.colaAdjuntos[idObraActual] = [...(window.colaAdjuntos[idObraActual] || []), ...Array.from(inputObras.files)];
+            if (!window.colaAdjuntos[idObraActual]) window.colaAdjuntos[idObraActual] = [];
+            window.colaAdjuntos[idObraActual].push(...Array.from(inputObras.files));
             renderAdjuntos(idObraActual);
+            marcarComoSucio();
         });
     }
 
@@ -1400,69 +1479,95 @@ document.addEventListener("DOMContentLoaded", () => {
     if (inputReq) {
         inputReq.addEventListener('change', () => {
             if (reqIdActual === null) return;
-            window.colaAdjuntosReq[reqIdActual] = [...(window.colaAdjuntosReq[reqIdActual] || []), ...Array.from(inputReq.files)];
+            if (!window.colaAdjuntosReq[reqIdActual]) window.colaAdjuntosReq[reqIdActual] = [];
+            window.colaAdjuntosReq[reqIdActual].push(...Array.from(inputReq.files));
             renderColaReq(reqIdActual);
+            marcarComoSucio();
         });
     }
 
+    // Lógica de Envío
     const btnEnviar = document.getElementById("btnEnviar");
     const checkConf = document.getElementById("checkConformidad");
     if (checkConf) {
-        checkConf.addEventListener('change', () => {
-            btnEnviar.disabled = !checkConf.checked;
-        });
+        checkConf.addEventListener('change', () => { btnEnviar.disabled = !checkConf.checked; });
     }
 
     btnEnviar.addEventListener("click", async () => {
+        const email = document.getElementById("contactoEmail").value;
+        const emailConfirm = document.getElementById("contactoEmailConfirm").value;
+        if (email !== emailConfirm) return Swal.fire("Error", "Los correos electrónicos no coinciden.", "error");
+
         const idBatch = "OBRAS_" + Date.now();
-        toggleFormFreeze(true); // Bloquear formulario durante el envío
+        toggleFormFreeze(true);
 
         const listaTareas = [];
-        // Preparar archivos de obras y requerimientos
-        Object.entries(window.colaAdjuntos).forEach(([id, list]) => 
-            list.forEach(f => listaTareas.push({ file: f, seccion: id }))
-        );
-        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => 
-            list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` }))
-        );
 
-        UIProgress.show(listaTareas.length); // Mostrar barra de progreso
+        // Recolectar Archivos Generales
+        if (typeof archivosGenerales !== 'undefined') {
+            archivosGenerales.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: 'GENERAL' }); });
+        }
+
+        // Recolectar Archivos de Requerimientos
+        Object.entries(window.colaAdjuntosReq).forEach(([id, list]) => {
+            list.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${id}` }); });
+        });
+
+        // Recolectar Archivos de Obras (Seguimiento y Nuevas)
+        Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+            list.forEach(f => { if (!f.status || f.status !== 'cloud') listaTareas.push({ file: f, seccion: `OBRA_${id}` }); });
+        });
+
+        UIProgress.show(listaTareas.length);
 
         try {
-            // Subida de archivos usando el motor de base.html.j2 
-            await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 3);
+            if (listaTareas.length > 0) {
+                await UploadService.uploadFiles(listaTareas, 'OBRAS', window.EIEL_CONFIG.muniCode, idBatch, 1);
+            }
 
             const payload = {
                 tipo_formulario: "obras",
                 id_envio: idBatch,
-                datos_obras: Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
-                    obra: s.dataset.obraId, 
+                id_borrador_procedencia: idBorradorOrigen, // ID del borrador para la promoción de archivos
+                muni_code: window.EIEL_CONFIG.muniCode,
+                datos_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
+                    id_obra: s.dataset.obraId,
                     estado: s.value
-                })),
-                otras_obras: Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
+                }))),
+                otras_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
                     nombre: f.querySelector('.input-nueva-nombre').value,
-                    estado: f.querySelector('.input-nueva-estado').value
-                })),
-                requerimientos: Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg, 
+                    estado: f.querySelector('.input-nueva-estado').value,
+                    observaciones: f.querySelector('.input-nueva-obs').value
+                }))),
+                respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                    pregunta: area.dataset.msg,
+                    id: area.dataset.id,
                     respuesta: area.value
-                })),
+                }))),
+                observaciones: document.getElementById("observaciones").value,
                 contacto: { 
                     nombre: document.getElementById("contactoNombre").value, 
-                    email: document.getElementById("contactoEmail").value 
+                    departamento: document.getElementById("contactoDepartamento").value,
+                    email: email 
                 }
             };
 
-            // Enviar datos para generar PDF
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
-            UIProgress.complete(); // Finalizar proceso
+            formIsDirty = false;
+            UIProgress.complete();
         } catch (error) {
             console.error(error);
             toggleFormFreeze(false);
-            Swal.fire("Error", "Fallo en el envío.", "error");
+            Swal.fire("Error", "Hubo un fallo en el proceso de envío.", "error");
         }
     });
 });
+
+// Función de apoyo para base.html.j2: Renderiza todas las colas al importar borrador
+window.renderArchivos = function() {
+    Object.keys(window.colaAdjuntos).forEach(id => renderAdjuntos(id));
+    Object.keys(window.colaAdjuntosReq).forEach(id => renderColaReq(id));
+};
 </script>
 
 </body>

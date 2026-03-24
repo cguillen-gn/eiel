@@ -21,7 +21,7 @@
             muniName: "Los Montesinos",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzFQ9IoFDKU1H6DKdr0Us2maaGx6lWhBFG1SDJVhVygeRymCNuwqIqq0PsVhu_eQCopRw/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyfmfptkHaLnt0y_71S51R6OOb2rnvjzb0YR5wdCb830xkrhdgRUZBAzM72tzyoLFmJyA/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycbwgq019K2kKTvPEihmsm8s-RhluP5_6GloUjQzS2kGMf7GQp0tvWV9mf4-R2-n0eXHjCw/exec",
             hasAvisos: false
         };
@@ -188,6 +188,18 @@
                     });
                 });
             }
+            
+            // Adjuntos específicos del formulario (Obras, Contadores, etc.)
+            if (typeof window.colaAdjuntos !== 'undefined') {
+                Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                    list.forEach(f => {
+                        if (!f.status || f.status !== 'cloud') {
+                            // Usamos un prefijo genérico ITEM_ o mantenemos la lógica de secciones
+                            listaArchivosParaSubir.push({ file: f, seccion: `TEMP_ITEM_${id}` });
+                        }
+                    });
+                });
+            }
 
             Swal.fire({ 
                 title: listaArchivosParaSubir.length > 0 ? 'Sincronizando archivos...' : 'Guardando textos...', 
@@ -214,6 +226,12 @@
                 if (typeof colaAdjuntosReq !== 'undefined') {
                     Object.entries(colaAdjuntosReq).forEach(([id, list]) => {
                         list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `REQUERIMIENTO_${id}` }));
+                    });
+                }
+                // [NUEVO] Guardar referencias de los archivos de las obras (Seguimiento y Nuevas)
+                if (typeof window.colaAdjuntos !== 'undefined') {
+                    Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                        list.forEach(f => dataToSave._adjuntos_remotos.push({ name: f.name, seccion: `ITEM_${id}` }));
                     });
                 }
 
@@ -295,6 +313,9 @@
                     if (data._adjuntos_remotos) {
                         archivosGenerales = [];
                         colaAdjuntosReq = {};
+                        window.colaAdjuntos = {}; 
+                        window.colaAdjuntosNuevas = {};
+                        
                         data._adjuntos_remotos.forEach(adj => {
                             const mockFile = { name: adj.name, status: 'cloud' };
                             if (adj.seccion === 'GENERAL') {
@@ -303,6 +324,11 @@
                                 const idReq = adj.seccion.split('_')[1];
                                 if (!colaAdjuntosReq[idReq]) colaAdjuntosReq[idReq] = [];
                                 colaAdjuntosReq[idReq].push(mockFile);
+                            } else if (adj.seccion.startsWith('ITEM_') || adj.seccion.startsWith('OBRA_')) {
+                                // Aceptamos tanto ITEM_ como OBRA_ para compatibilidad
+                                const idItem = adj.seccion.replace('ITEM_', '').replace('OBRA_', '');
+                                if (!window.colaAdjuntos[idItem]) window.colaAdjuntos[idItem] = [];
+                                window.colaAdjuntos[idItem].push(mockFile);
                             }
                         });
                         // Llamar a los renders del formulario hijo (Alumbrado/Obras)
