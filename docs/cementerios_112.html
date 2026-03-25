@@ -319,14 +319,19 @@
                     // 1. Recuperar Textos y Checks
                     Object.entries(data).forEach(([id, val]) => {
                         if (id === "_adjuntos_remotos" || id.startsWith('swal2-')) return;
+                        
                         const el = document.getElementById(id);
                         
-                        // CORRECCIÓN: Si el elemento es un input de archivos, saltamos para evitar el error de seguridad
-                        if (el.type === 'checkbox') el.checked = val;
-                            else { 
+                        // CORRECCIÓN CRÍTICA: Validar que el elemento existe y NO es un input de archivos
+                        if (el && el.type !== 'file') {
+                            if (el.type === 'checkbox') {
+                                el.checked = val;
+                            } else { 
                                 el.value = val; 
+                                // El bubbles: true es correcto para que se entere el detector de colores
                                 el.dispatchEvent(new Event('change', { bubbles: true })); 
                             }
+                        }
                     });
 
                     // 2. Recuperar Archivos (Marcándolos como 'cloud')
