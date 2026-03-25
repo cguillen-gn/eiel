@@ -241,9 +241,10 @@
 
                 // Captura de todos los campos del formulario
                 document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
-                    // Solo guardamos si NO es un email de confirmación y NO es de SweetAlert
-                    if (!el.id.includes('EmailConfirm') && !el.id.startsWith('swal2-')) {
-                        dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
+                    const id = el.id;
+                    // CORRECCIÓN: Filtramos también los campos de tipo 'file' para evitar errores de seguridad
+                    if (!id.includes('EmailConfirm') && !id.startsWith('swal2-') && el.type !== 'file') {
+                        dataToSave[id] = el.type === 'checkbox' ? el.checked : el.value;
                     }
                 });
 
@@ -307,11 +308,13 @@
                     // CORRECCIÓN: Primero avisamos a Obras para que cree las filas dinámicas
                     window.dispatchEvent(new CustomEvent('after_import_draft', { detail: data }));
                     
-                    // Ahora ya podemos rellenar los valores (incluyendo los de las filas recién creadas)
+                    // 1. Recuperar Textos y Checks
                     Object.entries(data).forEach(([id, val]) => {
                         if (id === "_adjuntos_remotos" || id.startsWith('swal2-')) return;
                         const el = document.getElementById(id);
-                        if (el) {
+                        
+                        // CORRECCIÓN: Si el elemento es un input de archivos, saltamos para evitar el error de seguridad
+                        if (el && el.type !== 'file') {
                             if (el.type === 'checkbox') el.checked = val;
                             else { el.value = val; el.dispatchEvent(new Event('change')); }
                         }
