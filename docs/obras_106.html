@@ -21,8 +21,8 @@
             muniName: "Planes",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwEZiCntVpEk9zWJiedfI4E5Od-FCKibXmcFb1uwCLycg7uj0by7pQK5vGBVF8Orf-Z/exec",
-            urlAdjuntos: "https://script.google.com/macros/s/AKfycbwbWcSwn-OH-JOwht1ZVNaFZm6kRHwcy6TyQdFhKsCs8jxnXHk1JkP0Z2m0LvX7nv38EA/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbwR-0gIx47fNQRmGp_Z2fESj4BBTBMC9kAFXHOW9BJChCFlu4zNrmvbQxm1HDDOrLlQVQ/exec",
+            urlAdjuntos: "https://script.google.com/macros/s/AKfycbzyzgmb5VaZFkaPTrEFn77YTaRFywddfqK7x1iQFIEiP1YurBoaijU2DeUthNgg23uRAA/exec",
             hasAvisos: false
         };
 
@@ -1130,19 +1130,29 @@ document.addEventListener("DOMContentLoaded", () => {
                 muni_display: window.EIEL_CONFIG.muniName,
                 id_borrador_procedencia: idBorradorOrigen, // ID del borrador para la promoción de archivos
                 muni_code: window.EIEL_CONFIG.muniCode,
-                datos_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.select-estado-obra')).map(s => ({
-                    id: s.dataset.obraId,
-                    nombre: s.dataset.nombre,
-                    plan: s.dataset.plan,
-                    orden: s.dataset.orden,
-                    estado: s.value,
-                    modificado: s.value !== s.dataset.original
-                }))),
-                otras_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
-                    nombre: f.querySelector('.input-nueva-nombre').value,
-                    estado: f.querySelector('.input-nueva-estado').value,
-                    observaciones: f.querySelector('.input-nueva-obs').value
-                }))),
+                datos_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.select-estado-obra')).map(s => {
+                    const id = s.dataset.obraId;
+                    return {
+                        id: id,
+                        nombre: s.dataset.nombre,
+                        plan: s.dataset.plan,
+                        orden: s.dataset.orden,
+                        estado: s.value,
+                        modificado: s.value !== s.dataset.original,
+                        // Añadimos los nombres de los archivos separados por punto y coma
+                        archivos: (window.colaAdjuntos[id] || []).map(f => f.name).join(';')
+                    };
+                    })),
+                otras_obras_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => {
+                    const idT = f.id.replace('fila_', ''); // Extraemos el ID (NUEVA_1, etc)
+                    return {
+                        nombre: f.querySelector('.input-nueva-nombre').value,
+                        estado: f.querySelector('.input-nueva-estado').value,
+                        observaciones: f.querySelector('.input-nueva-obs').value,
+                        // Añadimos también los archivos de las obras nuevas
+                        archivos: (window.colaAdjuntos[idT] || []).map(f => f.name).join(';')
+                    };
+                })),
                 respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
                     pregunta: area.dataset.msg,
                     id: area.dataset.id,
