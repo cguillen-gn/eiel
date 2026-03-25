@@ -21,7 +21,7 @@
             muniName: "Monóvar / Monòver",
             fase: "2026",
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
-            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbyfmfptkHaLnt0y_71S51R6OOb2rnvjzb0YR5wdCb830xkrhdgRUZBAzM72tzyoLFmJyA/exec",
+            urlGenerarPdf: "https://script.google.com/macros/s/AKfycbx8uCRjaRaZEkPjX1R5YAYE2joMC_-UZ7Dgr9lWeZzfwcAwpW6fioV7Wb-dYCwoeshe1Q/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycbwgq019K2kKTvPEihmsm8s-RhluP5_6GloUjQzS2kGMf7GQp0tvWV9mf4-R2-n0eXHjCw/exec",
             hasAvisos: false
         };
@@ -195,14 +195,14 @@
             
             // Adjuntos específicos del formulario (Obras, Contadores, etc.)
             if (typeof window.colaAdjuntos !== 'undefined') {
-                Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
-                    list.forEach(f => {
-                        if (!f.status || f.status !== 'cloud') {
-                            // Usamos un prefijo genérico ITEM_ o mantenemos la lógica de secciones
-                            listaArchivosParaSubir.push({ file: f, seccion: `TEMP_ITEM_${id}` });
-                        }
+                    Object.entries(window.colaAdjuntos).forEach(([id, list]) => {
+                        list.forEach(f => {
+                            if (!f.status || f.status !== 'cloud') {
+                                // CAMBIADO: Usamos OBRA_ para que coincida con el metadato
+                                listaArchivosParaSubir.push({ file: f, seccion: `TEMP_OBRA_${id}` });
+                            }
+                        });
                     });
-                });
             }
 
             Swal.fire({ 
@@ -241,7 +241,8 @@
 
                 // Captura de todos los campos del formulario
                 document.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
-                    if (!el.id.includes('EmailConfirm')) {
+                    // Solo guardamos si NO es un email de confirmación y NO es de SweetAlert
+                    if (!el.id.includes('EmailConfirm') && !el.id.startsWith('swal2-')) {
                         dataToSave[el.id] = el.type === 'checkbox' ? el.checked : el.value;
                     }
                 });
@@ -303,18 +304,18 @@
                     const borrador = borradores.find(x => x.id == idSel);
                     const data = JSON.parse(borrador.datos_json);
                     
-                    // 1. Recuperar Textos y Checks
+                    // CORRECCIÓN: Primero avisamos a Obras para que cree las filas dinámicas
+                    window.dispatchEvent(new CustomEvent('after_import_draft', { detail: data }));
+                    
+                    // Ahora ya podemos rellenar los valores (incluyendo los de las filas recién creadas)
                     Object.entries(data).forEach(([id, val]) => {
-                        if (id === "_adjuntos_remotos") return;
+                        if (id === "_adjuntos_remotos" || id.startsWith('swal2-')) return;
                         const el = document.getElementById(id);
                         if (el) {
                             if (el.type === 'checkbox') el.checked = val;
                             else { el.value = val; el.dispatchEvent(new Event('change')); }
                         }
                     });
-                    
-                    // Disparamos aviso para que Obras reconstruya sus filas dinámicas
-                    window.dispatchEvent(new CustomEvent('after_import_draft', { detail: data }));
 
                     // 2. Recuperar Archivos (Marcándolos como 'cloud')
                     if (data._adjuntos_remotos) {
