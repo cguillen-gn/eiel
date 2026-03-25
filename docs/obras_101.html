@@ -153,6 +153,10 @@
 
         // FUNCIÓN: GUARDAR (Sube archivos nuevos a TEMP y guarda JSON)
         async function gestionarBorradorNube() {
+            
+            // Disparamos un aviso por si el formulario hijo tiene que preparar algo (como Obras)
+            window.dispatchEvent(new CustomEvent('before_save_draft'));
+            
             const formType = window.location.pathname.split("/").pop().split("_")[0].toUpperCase();
             
             // 1. Generar nombre de carpeta descriptivo: TEMP_[CODIGOMUN]_[TIPOFORMULARIO]_[fechahora]
@@ -308,6 +312,9 @@
                             else { el.value = val; el.dispatchEvent(new Event('change')); }
                         }
                     });
+                    
+                    // Disparamos aviso para que Obras reconstruya sus filas dinámicas
+                    window.dispatchEvent(new CustomEvent('after_import_draft', { detail: data }));
 
                     // 2. Recuperar Archivos (Marcándolos como 'cloud')
                     if (data._adjuntos_remotos) {
@@ -901,6 +908,8 @@
                     
                 </tbody>
             </table>
+            
+            <input type="hidden" id="json_otras_obras_borrador">
         </div>
     </div>
 
@@ -1118,7 +1127,7 @@ window.renderColaReq = function(id) {
 };
 
 // 4. FUNCIONES DE FILAS DINÁMICAS (Otras Obras)
-window.agregarFilaNuevaObra = function() {
+window.agregarFilaNuevaObra = function(datos = null) {
     const tbody = document.getElementById('bodyNuevasObras');
     if (!tbody) return;
 
@@ -1126,10 +1135,22 @@ window.agregarFilaNuevaObra = function() {
     const idT = `NUEVA_${contadorNuevas}`;
     const tr = document.createElement('tr');
     tr.id = `fila_${idT}`; tr.className = 'fila-nueva-obra';
+
+    // Si vienen datos del borrador, los usamos
+    const nombre = datos ? datos.nombre : "";
+    const estado = datos ? datos.estado : "";
+    const obs = datos ? datos.observaciones : "";
+
     tr.innerHTML = `
-        <td><input type="text" class="form-input input-nueva-nombre" placeholder="Ej: Calle Mayor"></td>
-        <td><select class="form-select input-nueva-estado"><option value="">Seleccionar...</option><option value="No iniciada">No iniciada</option><option value="En ejecución">En ejecución</option><option value="Paralizada">Paralizada</option><option value="Finalizada">Finalizada</option></select></td>
-        <td><textarea class="form-input input-nueva-obs" rows="1" style="min-height: 40px; height: 40px; resize: none;"></textarea></td>
+        <td><input type="text" class="form-input input-nueva-nombre" value="${nombre}"></td>
+        <td><select class="form-select input-nueva-estado">
+            <option value="">Seleccionar...</option>
+            <option value="No iniciada" ${estado === 'No iniciada' ? 'selected' : ''}>No iniciada</option>
+            <option value="En ejecución" ${estado === 'En ejecución' ? 'selected' : ''}>En ejecución</option>
+            <option value="Paralizada" ${estado === 'Paralizada' ? 'selected' : ''}>Paralizada</option>
+            <option value="Finalizada" ${estado === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
+        </select></td>
+        <td><textarea class="form-input input-nueva-obs" rows="1" style="min-height: 40px; height: 40px; resize: none;">${obs}</textarea></td>
         <td style="text-align:center;">
             <button type="button" class="btn btn-secondary btn-sm" onclick="window.gestionarAdjuntos('${idT}')"><i data-lucide="paperclip"></i> Adjuntar</button>
             <div id="lista_adjuntos_${idT}" class="file-list-container mini-file-list" style="margin-top: 5px;"></div>
@@ -1258,6 +1279,27 @@ window.renderArchivos = function() {
     Object.keys(window.colaAdjuntos).forEach(id => renderAdjuntos(id));
     Object.keys(window.colaAdjuntosReq).forEach(id => renderColaReq(id));
 };
+
+// Antes de guardar, volcamos las filas dinámicas al campo oculto con ID
+window.addEventListener('before_save_draft', () => {
+    const filas = Array.from(document.querySelectorAll('.fila-nueva-obra')).map(f => ({
+        nombre: f.querySelector('.input-nueva-nombre').value,
+        estado: f.querySelector('.input-nueva-estado').value,
+        observaciones: f.querySelector('.input-nueva-obs').value
+    }));
+    document.getElementById('json_otras_obras_borrador').value = JSON.stringify(filas);
+});
+
+// Al importar, si detectamos el campo oculto, reconstruimos las filas antes de los adjuntos
+window.addEventListener('after_import_draft', (e) => {
+    const data = e.detail;
+    if (data.json_otras_obras_borrador) {
+        document.getElementById('bodyNuevasObras').innerHTML = ""; // Limpiar
+        const filas = JSON.parse(data.json_otras_obras_borrador);
+        filas.forEach(f => window.agregarFilaNuevaObra(f));
+    }
+});
+
 </script>
 
 </body>
