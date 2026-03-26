@@ -2673,59 +2673,59 @@ document.addEventListener("DOMContentLoaded", () => {
         const listaTareas = [];
         archivosGenerales.forEach(f => listaTareas.push({ file: f, seccion: 'GENERAL' }));
         Object.entries(colaAdjuntosReq).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `REQUERIMIENTO_${parseInt(id)+1}` })));
-        Object.entries(colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: id })));
+        Object.entries(colaAdjuntos).forEach(([id, list]) => list.forEach(f => listaTareas.push({ file: f, seccion: `NUEVO_EQ_${id}` })));
 
         UIProgress.show(listaTareas.length);
         try {
             await UploadService.uploadFiles(listaTareas, 'EQUIPAMIENTOS', window.EIEL_CONFIG.muniCode, idBatch, 1);
             
             const payload = {
-                tipo_formulario: "equipamientos",
-                id_envio: idBatch,
-                // Datos de identificación necesarios para el servidor y la mudanza
-                muni_code: window.EIEL_CONFIG.muniCode,
-                muni_display: window.EIEL_CONFIG.muniName,
-                id_borrador_procedencia: idBorradorOrigen, 
-                
-                // Equipamientos existentes (Seguimiento)
-                datos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
-                    const sel = tr.querySelector('.select-estado');
-                    return {
-                        id: tr.dataset.id, 
-                        estado: sel.value, 
-                        obs: tr.querySelector('.txt-obs-eq').value.trim(),
-                        // Esta línea es la que activa la negrita en el PDF al comparar el valor actual con el original
-                        modificado: sel.value !== sel.dataset.original 
-                    };
-                })),
+            tipo_formulario: "equipamientos",
+            id_envio: idBatch,
+            muni_code: window.EIEL_CONFIG.muniCode,
+            muni_display: window.EIEL_CONFIG.muniName,
+            id_borrador_procedencia: idBorradorOrigen, 
+            
+            // Equipamientos existentes (Corregido para evitar 'undefined' en el PDF)
+            datos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
+                const sel = tr.querySelector('.select-estado');
+                return {
+                    id: tr.dataset.id, 
+                    // Obtenemos el nombre y la categoría para que el PDF los use correctamente
+                    nombre: tr.querySelector('.nombre-eq strong').textContent,
+                    categoria: tr.closest('details').querySelector('.acc-title-box span').textContent,
+                    estado: sel.value, 
+                    obs: tr.querySelector('.txt-obs-eq').value.trim(),
+                    modificado: sel.value !== sel.dataset.original 
+                };
+            })),
 
-                // Nuevos Equipamientos (Filas dinámicas)
-                nuevos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(f => {
-                    const idF = f.id.replace('fila_', ''); // Extraemos el ID (NUEVO_EQ_1, etc.)
-                    return {
-                        nombre: f.querySelector('.new-deno').value,
-                        ubica: f.querySelector('.new-ubica').value,
-                        uso: f.querySelector('.new-uso').value,
-                        estado: f.querySelector('.new-estado').value,
-                        observaciones: f.querySelector('.new-obs-fila').value,
-                        // Enviamos la lista de nombres de archivos para que aparezcan en el PDF
-                        archivo: (window.colaAdjuntos[idF] || []).map(file => file.name).join('; ')
-                    };
-                })),
+            // Nuevos Equipamientos (Corregido para mostrar adjuntos en el PDF)
+            nuevos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(f => {
+                // Obtenemos el ID numérico de la fila
+                const idF = f.id.replace('fila_NUEVO_EQ_', ''); 
+                return {
+                    nombre: f.querySelector('.new-deno').value,
+                    direccion: f.querySelector('.new-ubica').value, // Cambiado de 'ubica' a 'direccion' para el PDF
+                    uso: f.querySelector('.new-uso').value,
+                    estado: f.querySelector('.new-estado').value,
+                    observaciones: f.querySelector('.new-obs-fila').value,
+                    // Enviamos los nombres de los archivos para la columna 'Docs' del PDF
+                    archivo: (window.colaAdjuntos[idF] || []).map(file => file.name).join('; ')
+                };
+            })),
 
-                // Respuestas a los requerimientos específicos
-                respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
-                    pregunta: area.dataset.msg,
-                    id: area.dataset.id,
-                    respuesta: area.value
-                }))),
+            respuestas_requerimientos_json: JSON.stringify(Array.from(document.querySelectorAll('.txt-resp-req')).map(area => ({
+                pregunta: area.dataset.msg,
+                id: area.dataset.id,
+                respuesta: area.value
+            }))),
 
-                // Campos globales del formulario
-                observaciones: document.getElementById("observaciones").value,
-                nombre_contacto: document.getElementById("contactoNombre").value,
-                email_contacto: document.getElementById("contactoEmail").value,
-                departamento_contacto: document.getElementById("contactoDepartamento").value
-            };
+            observaciones: document.getElementById("observaciones").value,
+            nombre_contacto: document.getElementById("contactoNombre").value,
+            email_contacto: document.getElementById("contactoEmail").value,
+            departamento_contacto: document.getElementById("contactoDepartamento").value
+        };
             
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
@@ -2779,17 +2779,18 @@ function renderFilaAdjuntos(idFila) {
 
 window.agregarFilaNuevoEquipamiento = (datos = null) => {
     contadorNuevosEq++;
-    const idFila = `NUEVO_EQ_${contadorNuevosEq}`;
+    // Usamos solo el número como ID interno para evitar conflictos con el motor de la base
+    const idFila = contadorNuevosEq; 
     const tbody = document.getElementById('tbodyNuevos');
     if (!tbody) return;
-    
+
     const tr = document.createElement('tr');
-    tr.id = `fila_${idFila}`; 
+    // El ID del elemento HTML sí lleva el prefijo para ser único
+    tr.id = `fila_NUEVO_EQ_${idFila}`; 
     tr.className = 'fila-nuevo-eq';
 
-    // Usamos los datos si vienen del borrador, si no, vacío
     const deno = datos ? datos.nombre : "";
-    const ubica = datos ? datos.ubica : "";
+    const ubica = datos ? (datos.ubica || datos.direccion) : "";
     const uso = datos ? datos.uso : "";
     const estado = datos ? datos.estado : "";
     const obs = datos ? datos.observaciones : "";
@@ -2820,7 +2821,7 @@ window.agregarFilaNuevoEquipamiento = (datos = null) => {
             <div id="lista_adjuntos_${idFila}" class="file-list-container" style="margin-top:8px;"></div>
         </td>
         <td style="text-align: center; vertical-align: top; padding: 12px 8px;">
-            <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_${idFila}').remove(); delete colaAdjuntos['${idFila}'];">
+            <button type="button" class="btn-danger-icon" onclick="document.getElementById('fila_NUEVO_EQ_${idFila}').remove(); delete window.colaAdjuntos['${idFila}'];">
                 <i data-lucide="trash-2" style="width:18px; color:#ef4444;"></i>
             </button>
         </td>`;
@@ -2852,8 +2853,11 @@ window.addEventListener('after_import_draft', (e) => {
     const data = e.detail;
     if (data.json_nuevos_eq_borrador) {
         document.getElementById('tbodyNuevos').innerHTML = ""; // Limpiamos actuales
+        
+        // --- CORRECCIÓN CRÍTICA: Reiniciamos el contador para que los IDs coincidan con el borrador ---
+        contadorNuevosEq = 0; 
+        
         const filas = JSON.parse(data.json_nuevos_eq_borrador);
-        // Llamamos a la función de agregar fila pasando los datos del borrador
         filas.forEach(f => window.agregarFilaNuevoEquipamiento(f));
     }
 });
