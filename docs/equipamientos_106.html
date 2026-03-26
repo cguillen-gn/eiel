@@ -2110,11 +2110,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 id_borrador_procedencia: idBorradorOrigen, 
                 
                 // Equipamientos existentes (Seguimiento)
-                datos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-equip')).map(tr => ({
-                    id: tr.dataset.id, 
-                    estado: tr.querySelector('.select-estado').value, 
-                    obs: tr.querySelector('.txt-obs-eq').value.trim()
-                }))),
+                datos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
+                    const sel = tr.querySelector('.select-estado');
+                    return {
+                        id: tr.dataset.id, 
+                        estado: sel.value, 
+                        obs: tr.querySelector('.txt-obs-eq').value.trim(),
+                        // Esta línea es la que activa la negrita en el PDF al comparar el valor actual con el original
+                        modificado: sel.value !== sel.dataset.original 
+                    };
+                })),
 
                 // Nuevos Equipamientos (Filas dinámicas)
                 nuevos_equipamientos_json: JSON.stringify(Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(f => {
@@ -2153,12 +2158,32 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-function renderArchivos() {
+window.renderArchivos = function() {
+    // 1. Renderizar archivos generales
     const fileList = document.getElementById("fileList");
-    if (!fileList) return;
-    fileList.innerHTML = archivosGenerales.map((f, i) => `<div class="file-item"><span>📄 ${f.name}</span><button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos();" class="btn-danger-icon"><i data-lucide="trash-2"></i></button></div>`).join("");
+    if (fileList) {
+        fileList.innerHTML = archivosGenerales.map((f, i) => {
+            const isCloud = f.status === 'cloud';
+            return `
+            <div class="file-item" style="${isCloud ? 'border-left: 3px solid #10b981; background: #f0fdf4;' : ''}">
+                <span>${isCloud ? '☁️' : '📄'} ${f.name}</span>
+                <button type="button" onclick="archivosGenerales.splice(${i},1); renderArchivos(); marcarComoSucio();" class="btn-danger-icon">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </div>`;
+        }).join("");
+    }
+
+    // 2. Renderizar adjuntos de cada fila dinámica (Nuevos Equipamientos)
+    // Esto es lo que faltaba para que se vean los nombres al importar
+    Object.keys(window.colaAdjuntos).forEach(idFila => {
+        if (typeof renderFilaAdjuntos === 'function') {
+            renderFilaAdjuntos(idFila);
+        }
+    });
+
     if (window.lucide) lucide.createIcons();
-}
+};
 
 function renderColaReq(id) {
     const contenedor = document.getElementById(`lista_adjuntos_req_${id}`);
