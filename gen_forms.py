@@ -234,8 +234,9 @@ def obtener_avisos_personalizados(conn, codigo_ine, fase, tipo_form):
 # --- OBTENCION DE CEMENTERIOS ---
 def obtener_cementerios(conn, mun):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+        # Se quitan cementerios de confesiones religiosas menos en Benasau
         cur.execute(
-            "SELECT nombre FROM cementerio WHERE fase = (SELECT max(fase) FROM geonet_fase) AND mun = %s AND (titular is null or titular <> 'CR') ORDER BY nombre;", (mun,))
+            "SELECT nombre FROM cementerio WHERE fase = (SELECT max(fase) FROM geonet_fase) AND mun = %s AND (mun = '022' or (titular is null or titular <> 'CR')) ORDER BY nombre;", (mun,))
         return [{"nombre": r["nombre"] or "Sin nombre"} for r in cur.fetchall()]
 
 def copiar_assets():
