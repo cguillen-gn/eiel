@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
     <title>{% block title %}EIEL - Encuesta de Infraestructuras{% endblock %}</title>
-    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -14,7 +13,9 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL (Consolidada)
+        /**
+         * [1] CONFIGURACIÓN GLOBAL INYECTADA DESDE PYTHON
+         */
         window.EIEL_CONFIG = {
             muniCode: "{{ muni_code }}",
             muniName: "{{ muni_display }}",
@@ -22,76 +23,229 @@
             urlLogger: "{{ url_logger }}",
             urlGenerarPdf: "{{ url_generar_pdf }}",
             urlAdjuntos: "{{ url_adjuntos }}",
-            // Detectamos el tipo de formulario desde el nombre del archivo para el JS
-            tipoFormulario: "{{ request_path.split('/')[-1].split('_')[0] | upper if request_path else '' }}",
+            tipoFicha: "{% block tipo_ficha %}{% endblock %}",
             isTest: localStorage.getItem("eiel_is_test") === "true"
         };
+
+        /**
+         * [2] GESTOR DE ESTADO Y ARCHIVOS
+         */
+        window.archivosAEnviar = []; // Cola global de archivos
+
+        const EIEL_Manager = {
+            init() {
+                this.checkAuth();
+                this.logAccess();
+                document.addEventListener('DOMContentLoaded', () => {
+                    lucide.createIcons();
+                    this.setupLogout();
+                });
+            },
+
+            checkAuth() {
+                if (!localStorage.getItem("eiel_muni_code") && !window.EIEL_CONFIG.isTest) {
+                    window.location.href = "index.html";
+                }
+            },
+
+            setupLogout() {
+                const btn = document.getElementById('btnLogout');
+                if (btn) {
+                    btn.onclick = () => {
+                        localStorage.clear();
+                        window.location.href = 'index.html';
+                    };
+                }
+            },
+
+            // Registro de acceso silencioso
+            logAccess() {
+                if (window.location.protocol === 'file:' || !window.EIEL_CONFIG.urlLogger) return;
+                const payload = {
+                    municipio: window.EIEL_CONFIG.isTest ? "(PRUEBAS) " + window.EIEL_CONFIG.muniName : window.EIEL_CONFIG.muniName,
+                    codigo: window.EIEL_CONFIG.muniCode,
+                    fase: window.EIEL_CONFIG.fase,
+                    tipo: window.EIEL_CONFIG.tipoFicha.toUpperCase(),
+                    ua: navigator.userAgent,
+                    contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial",
+                    departamento: localStorage.getItem("eiel_user_dept") || "N/A",
+                    email: localStorage.getItem("eiel_user_email") || "N/A"
+                };
+                fetch(window.EIEL_CONFIG.urlLogger, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            },
+
+            // Subida individual de archivo a Google Drive
+            async uploadFile(file, seccion) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const payload = {
+                            municipio: window.EIEL_CONFIG.muniCode,
+                            tipo: window.EIEL_CONFIG.tipoFicha,
+                            seccion: seccion,
+                            id_envio: Date.now(),
+                            filename: file.name,
+                            mimeType: file.type,
+                            base64: e.target.result.split(',')[1]
+                        };
+                        try {
+                            await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                body: JSON.stringify(payload)
+                            });
+                            resolve();
+                        } catch (err) { reject(err); }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+        };
+
+        /**
+         * [3] UTILIDADES DE INTERFAZ (UI)
+         */
+        const UIProgress = {
+            show() { document.getElementById('uploadOverlay').classList.remove('hidden'); },
+            hide() { document.getElementById('uploadOverlay').classList.add('hidden'); },
+            update(percent, text) {
+                const bar = document.getElementById('progressBar');
+                const note = document.getElementById('progressNote');
+                if (bar) bar.style.width = percent + '%';
+                if (note && text) note.innerText = text;
+            },
+            complete() {
+                this.update(100, "¡Todo correcto!");
+                setTimeout(() => {
+                    this.hide();
+                    Swal.fire({ icon: 'success', title: 'Enviado', text: 'La información se ha registrado correctamente.', confirmButtonColor: '#0080ad' });
+                }, 500);
+            }
+        };
+
+        // Manejador de archivos para las zonas de carga
+        window.handleFiles = function(files, seccion) {
+            const container = document.getElementById(`file-list-${seccion}`);
+            Array.from(files).forEach(file => {
+                window.archivosAEnviar.push({ file, seccion });
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `<span><i data-lucide="file-text" style="width:14px"></i> ${file.name}</span>`;
+                container.appendChild(item);
+            });
+            lucide.createIcons();
+        };
+
+        /**
+         * [4] LÓGICA MAESTRA DE ENVÍO
+         */
+        window.enviarFormularioGlobal = async function(getDataCallback) {
+            const btn = document.getElementById('btnEnviar');
+            const nombre = document.getElementById('contacto_nombre').value.trim();
+            const depto = document.getElementById('contacto_depto').value.trim();
+            const email = document.getElementById('contacto_email').value.trim();
+            
+            if (!nombre) return Swal.fire("Atención", "Debe indicar el nombre del técnico.", "warning");
+
+            try {
+                btn.disabled = true;
+                UIProgress.show();
+
+                // 1. Guardar contacto en caché local
+                localStorage.setItem("eiel_user_name", nombre);
+                localStorage.setItem("eiel_user_dept", depto);
+                localStorage.setItem("eiel_user_email", email);
+
+                // 2. Subida de adjuntos (si hay)
+                if (window.archivosAEnviar.length > 0) {
+                    for (let i = 0; i < window.archivosAEnviar.length; i++) {
+                        const item = window.archivosAEnviar[i];
+                        UIProgress.update(10 + ((i / window.archivosAEnviar.length) * 60), `Subiendo: ${item.file.name}`);
+                        await EIEL_Manager.uploadFile(item.file, item.seccion);
+                    }
+                }
+
+                // 3. Recopilar datos del hijo y montar payload
+                UIProgress.update(80, "Generando PDF y enviando informe...");
+                const datosHijo = getDataCallback();
+                
+                // Recopilar respuestas a requerimientos (si existen)
+                const respuestasReq = {};
+                document.querySelectorAll('.req-respuesta').forEach(el => {
+                    if(el.value.trim()) respuestasReq[el.dataset.reqid] = el.value;
+                });
+
+                const payload = {
+                    ...datosHijo,
+                    TIPO_FORMULARIO: window.EIEL_CONFIG.tipoFicha,
+                    NOMBRE_CONTACTO: nombre,
+                    DEPARTAMENTO_CONTACTO: depto,
+                    EMAIL_CONTACTO: email,
+                    OBSERVACIONES: document.getElementById('observaciones').value,
+                    FECHA_ENVIO: new Date().toLocaleString('es-ES'),
+                    MUNICIPIO_CODIGO: window.EIEL_CONFIG.muniCode,
+                    MUNICIPIO_NOMBRE: window.EIEL_CONFIG.muniName,
+                    NOMBRES_ADJUNTOS: window.archivosAEnviar.map(a => a.file.name),
+                    RESPUESTAS_REQUERIMIENTOS: JSON.stringify(respuestasReq)
+                };
+
+                // 4. Petición final al Apps Script de PDF
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify(payload)
+                });
+
+                UIProgress.complete();
+                setTimeout(() => location.reload(), 2000);
+
+            } catch (error) {
+                UIProgress.hide();
+                Swal.fire("Error", "No se pudo procesar el envío: " + error.message, "error");
+                btn.disabled = false;
+            }
+        };
+
+        // Iniciar Manager
+        EIEL_Manager.init();
     </script>
 </head>
+<body class="theme-{% block body_class %}{% endblock %}">
 
-{# 2. CLASE DINÁMICA EN EL BODY PARA TEMAS #}
-{% set tipo_slug = request_path.split('/')[-1].split('_')[0] | lower if request_path else 'default' %}
-<body class="theme-{{ tipo_slug }}">
-
-    <div class="container">
-        <header class="main-header">
-            <div class="header-content">
-                <div class="header-icon-circle">
-                    {% block header_icon %}{% endblock %}
-                </div>
-                <div class="header-text">
-                    <span class="fase-badge">Fase {{ fase_actual }}</span>
-                    <h1>{% block header_title %}{% endblock %}</h1>
-                    <p class="muni-name">{{ muni_display }} ({{ muni_code }})</p>
-                </div>
-            </div>
-            
-            <button onclick="window.location.href='index.html'" class="btn-back">
-                <i data-lucide="arrow-left"></i>
-                <span>Volver al menú</span>
-            </button>
-        </header>
-
-        <main class="content-wrapper">
-            {% block content %}{% endblock %}
-        </main>
-
-        <footer class="main-footer">
-            <p>&copy; {{ fase_actual }} - Encuesta de Infraestructura y Equipamientos Locales</p>
-        </footer>
-    </div>
-
-    <div id="progressOverlay" class="overlay hidden">
+    <div id="uploadOverlay" class="overlay hidden">
         <div class="progress-card">
-            <div class="spinner"></div>
-            <h3 id="progressText">Enviando información...</h3>
+            <h3>Procesando Información</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px;">Por favor, no cierre esta ventana.</p>
             <div class="progress-bar-container">
-                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                <div id="progressBar" class="progress-bar"></div>
             </div>
-            <p class="progress-note">Por favor, no cierre la ventana hasta finalizar.</p>
+            <p id="progressNote" style="font-size: 0.85rem; color: var(--theme-color); font-weight: 500;">Iniciando...</p>
         </div>
     </div>
 
-    <script src="js/form-handler.js"></script>
-    
-    {% block scripts %}{% endblock %}
+    <div class="container">
+        <header class="header">
+            <div class="header-title-group">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+                    <span style="color: var(--theme-color); display: flex;">{% block header_icon %}{% endblock %}</span>
+                    <h1>{% block header_title %}{% endblock %}</h1>
+                </div>
+                <div class="header-muni">{{ muni_display }} ({{ muni_code }})</div>
+            </div>
+            <div class="fase-badge">{% block bloque_fase %}{% endblock %}</div>
+        </header>
 
-    {# Lógica del Logger de accesos (se mantiene igual pero al final) #}
-    <script>
-    (function() {
-        if (window.location.protocol === 'file:') return;
-        if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
-            const payload = {
-                municipio: window.EIEL_CONFIG.isTest ? "(PRUEBAS) " + window.EIEL_CONFIG.muniName : window.EIEL_CONFIG.muniName,
-                codigo: window.EIEL_CONFIG.muniCode,
-                fase: window.EIEL_CONFIG.fase,
-                tipo: window.EIEL_CONFIG.tipoFormulario,
-                ua: navigator.userAgent,
-                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
-            };
-            fetch(window.EIEL_CONFIG.urlLogger, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-        }
-    })();
-    </script>
+        <form id="mainForm">
+            {% block content %}{% endblock %}
+        </form>
+
+        <div style="margin-top: 3rem; display: flex; justify-content: center;">
+            <button type="button" id="btnLogout" class="btn btn-outline">
+                <i data-lucide="arrow-left" style="width:16px"></i> Volver al Listado
+            </button>
+        </div>
+    </div>
+
+    {% block scripts %}{% endblock %}
 </body>
 </html>

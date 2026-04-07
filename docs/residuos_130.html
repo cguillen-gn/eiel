@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
     <title>EIEL - Gestión de Residuos</title>
-    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     
+    <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
@@ -14,7 +13,9 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL (Consolidada)
+        /**
+         * [1] CONFIGURACIÓN GLOBAL INYECTADA DESDE PYTHON
+         */
         window.EIEL_CONFIG = {
             muniCode: "130",
             muniName: "Tollos",
@@ -22,267 +23,427 @@
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
             urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzLZ7x2cAW28eyaCDk0ZVr7tIHYShSQp4Jet8_1Pda8hoySHvOGwOa-mMwZ8d0cJmJe/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
-            // Detectamos el tipo de formulario desde el nombre del archivo para el JS
-            tipoFormulario: "",
+            tipoFicha: "residuos",
             isTest: localStorage.getItem("eiel_is_test") === "true"
         };
+
+        /**
+         * [2] GESTOR DE ESTADO Y ARCHIVOS
+         */
+        window.archivosAEnviar = []; // Cola global de archivos
+
+        const EIEL_Manager = {
+            init() {
+                this.checkAuth();
+                this.logAccess();
+                document.addEventListener('DOMContentLoaded', () => {
+                    lucide.createIcons();
+                    this.setupLogout();
+                });
+            },
+
+            checkAuth() {
+                if (!localStorage.getItem("eiel_muni_code") && !window.EIEL_CONFIG.isTest) {
+                    window.location.href = "index.html";
+                }
+            },
+
+            setupLogout() {
+                const btn = document.getElementById('btnLogout');
+                if (btn) {
+                    btn.onclick = () => {
+                        localStorage.clear();
+                        window.location.href = 'index.html';
+                    };
+                }
+            },
+
+            // Registro de acceso silencioso
+            logAccess() {
+                if (window.location.protocol === 'file:' || !window.EIEL_CONFIG.urlLogger) return;
+                const payload = {
+                    municipio: window.EIEL_CONFIG.isTest ? "(PRUEBAS) " + window.EIEL_CONFIG.muniName : window.EIEL_CONFIG.muniName,
+                    codigo: window.EIEL_CONFIG.muniCode,
+                    fase: window.EIEL_CONFIG.fase,
+                    tipo: window.EIEL_CONFIG.tipoFicha.toUpperCase(),
+                    ua: navigator.userAgent,
+                    contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial",
+                    departamento: localStorage.getItem("eiel_user_dept") || "N/A",
+                    email: localStorage.getItem("eiel_user_email") || "N/A"
+                };
+                fetch(window.EIEL_CONFIG.urlLogger, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            },
+
+            // Subida individual de archivo a Google Drive
+            async uploadFile(file, seccion) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const payload = {
+                            municipio: window.EIEL_CONFIG.muniCode,
+                            tipo: window.EIEL_CONFIG.tipoFicha,
+                            seccion: seccion,
+                            id_envio: Date.now(),
+                            filename: file.name,
+                            mimeType: file.type,
+                            base64: e.target.result.split(',')[1]
+                        };
+                        try {
+                            await fetch(window.EIEL_CONFIG.urlAdjuntos, {
+                                method: 'POST',
+                                mode: 'no-cors',
+                                body: JSON.stringify(payload)
+                            });
+                            resolve();
+                        } catch (err) { reject(err); }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+        };
+
+        /**
+         * [3] UTILIDADES DE INTERFAZ (UI)
+         */
+        const UIProgress = {
+            show() { document.getElementById('uploadOverlay').classList.remove('hidden'); },
+            hide() { document.getElementById('uploadOverlay').classList.add('hidden'); },
+            update(percent, text) {
+                const bar = document.getElementById('progressBar');
+                const note = document.getElementById('progressNote');
+                if (bar) bar.style.width = percent + '%';
+                if (note && text) note.innerText = text;
+            },
+            complete() {
+                this.update(100, "¡Todo correcto!");
+                setTimeout(() => {
+                    this.hide();
+                    Swal.fire({ icon: 'success', title: 'Enviado', text: 'La información se ha registrado correctamente.', confirmButtonColor: '#0080ad' });
+                }, 500);
+            }
+        };
+
+        // Manejador de archivos para las zonas de carga
+        window.handleFiles = function(files, seccion) {
+            const container = document.getElementById(`file-list-${seccion}`);
+            Array.from(files).forEach(file => {
+                window.archivosAEnviar.push({ file, seccion });
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `<span><i data-lucide="file-text" style="width:14px"></i> ${file.name}</span>`;
+                container.appendChild(item);
+            });
+            lucide.createIcons();
+        };
+
+        /**
+         * [4] LÓGICA MAESTRA DE ENVÍO
+         */
+        window.enviarFormularioGlobal = async function(getDataCallback) {
+            const btn = document.getElementById('btnEnviar');
+            const nombre = document.getElementById('contacto_nombre').value.trim();
+            const depto = document.getElementById('contacto_depto').value.trim();
+            const email = document.getElementById('contacto_email').value.trim();
+            
+            if (!nombre) return Swal.fire("Atención", "Debe indicar el nombre del técnico.", "warning");
+
+            try {
+                btn.disabled = true;
+                UIProgress.show();
+
+                // 1. Guardar contacto en caché local
+                localStorage.setItem("eiel_user_name", nombre);
+                localStorage.setItem("eiel_user_dept", depto);
+                localStorage.setItem("eiel_user_email", email);
+
+                // 2. Subida de adjuntos (si hay)
+                if (window.archivosAEnviar.length > 0) {
+                    for (let i = 0; i < window.archivosAEnviar.length; i++) {
+                        const item = window.archivosAEnviar[i];
+                        UIProgress.update(10 + ((i / window.archivosAEnviar.length) * 60), `Subiendo: ${item.file.name}`);
+                        await EIEL_Manager.uploadFile(item.file, item.seccion);
+                    }
+                }
+
+                // 3. Recopilar datos del hijo y montar payload
+                UIProgress.update(80, "Generando PDF y enviando informe...");
+                const datosHijo = getDataCallback();
+                
+                // Recopilar respuestas a requerimientos (si existen)
+                const respuestasReq = {};
+                document.querySelectorAll('.req-respuesta').forEach(el => {
+                    if(el.value.trim()) respuestasReq[el.dataset.reqid] = el.value;
+                });
+
+                const payload = {
+                    ...datosHijo,
+                    TIPO_FORMULARIO: window.EIEL_CONFIG.tipoFicha,
+                    NOMBRE_CONTACTO: nombre,
+                    DEPARTAMENTO_CONTACTO: depto,
+                    EMAIL_CONTACTO: email,
+                    OBSERVACIONES: document.getElementById('observaciones').value,
+                    FECHA_ENVIO: new Date().toLocaleString('es-ES'),
+                    MUNICIPIO_CODIGO: window.EIEL_CONFIG.muniCode,
+                    MUNICIPIO_NOMBRE: window.EIEL_CONFIG.muniName,
+                    NOMBRES_ADJUNTOS: window.archivosAEnviar.map(a => a.file.name),
+                    RESPUESTAS_REQUERIMIENTOS: JSON.stringify(respuestasReq)
+                };
+
+                // 4. Petición final al Apps Script de PDF
+                await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
+                    method: "POST",
+                    mode: "no-cors",
+                    body: JSON.stringify(payload)
+                });
+
+                UIProgress.complete();
+                setTimeout(() => location.reload(), 2000);
+
+            } catch (error) {
+                UIProgress.hide();
+                Swal.fire("Error", "No se pudo procesar el envío: " + error.message, "error");
+                btn.disabled = false;
+            }
+        };
+
+        // Iniciar Manager
+        EIEL_Manager.init();
     </script>
 </head>
+<body class="theme-residuos">
 
-
-
-<body class="theme-default">
-
-    <div class="container">
-        <header class="main-header">
-            <div class="header-content">
-                <div class="header-icon-circle">
-                    <i data-lucide="recycle"></i>
-                </div>
-                <div class="header-text">
-                    <span class="fase-badge">Fase 2026</span>
-                    <h1>GESTIÓN DE RESIDUOS</h1>
-                    <p class="muni-name">Tollos (130)</p>
-                </div>
-            </div>
-            
-            <button onclick="window.location.href='index.html'" class="btn-back">
-                <i data-lucide="arrow-left"></i>
-                <span>Volver al menú</span>
-            </button>
-        </header>
-
-        <main class="content-wrapper">
-            
-
-
-
-<div class="card card-info">
-    <h4><i data-lucide="info"></i> Instrucciones</h4>
-    <ul>
-        
-            <li>Rellene los datos de producción y gestión para cada tipo de residuo.</li>
-        
-            <li>Si no dispone de algún dato exacto, aporte una estimación o justifíquelo en <strong>Observaciones</strong>.</li>
-        
-    </ul>
-</div>
-
-
-
-
-
-
-
-
-<div class="card">
-    <h2 class="section-title"><i data-lucide="trash"></i>Recogida de Residuos</h2>
-    <div class="table-wrapper">
-        <table class="data-table" id="tablaResiduos">
-            <thead>
-                <tr>
-                    <th style="width: 25%;">Tipo de Residuo</th>
-                    <th style="width: 20%;">Producción (T/Año)</th>
-                    <th style="width: 15%;">Nº Contenedores</th>
-                    <th style="width: 20%;">Periodicidad</th>
-                    <th style="width: 20%;">Destino</th>
-                </tr>
-            </thead>
-            <tbody>
-                
-                
-                
-                
-                <tr>
-                    <td style="font-weight: 600;">🟡 Plásticos y Envases</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_envases" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_envases" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_envases">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_envases" placeholder="Planta / Vertedero"></td>
-                </tr>
-                
-                <tr>
-                    <td style="font-weight: 600;">🔵 Papel y Cartón</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_papel" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_papel" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_papel">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_papel" placeholder="Planta / Vertedero"></td>
-                </tr>
-                
-                <tr>
-                    <td style="font-weight: 600;">🟢 Vidrio</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_vidrio" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_vidrio" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_vidrio">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_vidrio" placeholder="Planta / Vertedero"></td>
-                </tr>
-                
-                <tr>
-                    <td style="font-weight: 600;">🪑 Voluminosos / Enseres</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_voluminosos" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_voluminosos" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_voluminosos">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_voluminosos" placeholder="Planta / Vertedero"></td>
-                </tr>
-                
-                <tr>
-                    <td style="font-weight: 600;">🔘 Resto (No selectiva)</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_resto" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_resto" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_resto">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_resto" placeholder="Planta / Vertedero"></td>
-                </tr>
-                
-            </tbody>
-        </table>
-    </div>
-
-    <div style="margin-top: 1.5rem;">
-        <label class="form-label" for="personasLimpieza">Nº Personas adscritas a limpieza viaria:</label>
-        <input type="number" class="form-control" id="personasLimpieza" placeholder="Indique el número de operarios">
-    </div>
-</div>
-
-
-
-<div class="card">
-    <h2 class="section-title"><i data-lucide="message-square-more"></i> Observaciones Finales</h2>
-    <p class="form-help" style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-        Utilice este espacio para aclaraciones generales sobre toda la información enviada en este formulario.
-    </p>
-    <textarea id="observaciones" class="form-control" rows="4" placeholder="Escriba sus observaciones aquí..."></textarea>
-</div>
-
-
-<div class="card" style="border-top: 4px solid var(--primary); background: #f8fafc;">
-    <div class="conformidad-container" style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.5rem;">
-        <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 3px; cursor: pointer;">
-        <label for="checkConformidad" style="font-size: 0.95rem; cursor: pointer; color: var(--text-primary);">
-            Confirmo que los datos introducidos han sido revisados y son correctos según la situación actual del municipio.
-        </label>
-    </div>
-    
-    <div class="form-actions" style="text-align: right;">
-        <button type="button" id="btnEnviar" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem;" disabled>
-            <i data-lucide="send"></i> Enviar Información
-        </button>
-    </div>
-</div>
-
-
-
-        </main>
-
-        <footer class="main-footer">
-            <p>&copy; 2026 - Encuesta de Infraestructura y Equipamientos Locales</p>
-        </footer>
-    </div>
-
-    <div id="progressOverlay" class="overlay hidden">
+    <div id="uploadOverlay" class="overlay hidden">
         <div class="progress-card">
-            <div class="spinner"></div>
-            <h3 id="progressText">Enviando información...</h3>
+            <h3>Procesando Información</h3>
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px;">Por favor, no cierre esta ventana.</p>
             <div class="progress-bar-container">
-                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                <div id="progressBar" class="progress-bar"></div>
             </div>
-            <p class="progress-note">Por favor, no cierre la ventana hasta finalizar.</p>
+            <p id="progressNote" style="font-size: 0.85rem; color: var(--theme-color); font-weight: 500;">Iniciando...</p>
         </div>
     </div>
 
-    <script src="js/form-handler.js"></script>
+    <div class="container">
+        <header class="header">
+            <div class="header-title-group">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 4px;">
+                    <span style="color: var(--theme-color); display: flex;"><i data-lucide="recycle"></i></span>
+                    <h1>GESTIÓN DE RESIDUOS</h1>
+                </div>
+                <div class="header-muni">Tollos (130)</div>
+            </div>
+            <div class="fase-badge">Fase 2026</div>
+        </header>
+
+        <form id="mainForm">
+            
     
+<div class="card card-info">
+    <h4><i data-lucide="info"></i> Instrucciones</h4>
+    <ul><li>Rellene los datos requeridos y justifique cualquier dato en Observaciones.</li></ul>
+</div>
+
+
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="trash"></i>Recogida de Residuos - Año 2025</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Tipo de Residuo</th>
+                        <th style="width: 20%;">Producción (T/año)</th>
+                        <th style="width: 15%;">Nº Contenedores</th>
+                        <th style="width: 20%;">Periodicidad</th>
+                        <th style="width: 25%;">Destino (Vertedero/Planta)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                    
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Envases</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_envases" name="prod_envases" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_envases" name="cont_envases" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_envases" name="period_envases">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_envases" name="dest_envases" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Papel y Cartón</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_papel" name="prod_papel" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_papel" name="cont_papel" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_papel" name="period_papel">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_papel" name="dest_papel" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Vidrio</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_vidrio" name="prod_vidrio" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_vidrio" name="cont_vidrio" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_vidrio" name="period_vidrio">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_vidrio" name="dest_vidrio" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Pilas</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_pilas" name="prod_pilas" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_pilas" name="cont_pilas" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_pilas" name="period_pilas">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_pilas" name="dest_pilas" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Voluminosos</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_voluminosos" name="prod_voluminosos" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_voluminosos" name="cont_voluminosos" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_voluminosos" name="period_voluminosos">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_voluminosos" name="dest_voluminosos" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                    <tr>
+                        <td style="font-weight: 500;">Resto</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_resto" name="prod_resto" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_resto" name="cont_resto" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_resto" name="period_resto">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_resto" name="dest_resto" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="sparkles"></i>Limpieza Viaria</h2>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Nº de personas destinadas a limpieza viaria:</label>
+                <input type="number" class="form-input" name="personas_limpieza" id="personasLimpieza">
+            </div>
+        </div>
+    </div>
+
+    
+
+
+    
+<div class="card">
+    <h2 class="section-title"><i data-lucide="user-check"></i> Información de Contacto y Otros Adjuntos</h2>
+    <div class="card-body">
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">Nombre del Técnico:</label>
+                <input type="text" id="contacto_nombre" class="form-input" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Departamento:</label>
+                <input type="text" id="contacto_depto" class="form-input" placeholder="Ej: Urbanismo">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email de contacto:</label>
+            <input type="email" id="contacto_email" class="form-input" placeholder="correo@municipio.es">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Observaciones Generales:</label>
+            <textarea id="observaciones" class="form-textarea" rows="3"></textarea>
+        </div>
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label">Documentación Adicional (Planos, Memorias...):</label>
+            <div class="upload-zone" onclick="document.getElementById('file-general').click()">
+                <i data-lucide="upload-cloud"></i>
+                <p>Haga clic para adjuntar archivos</p>
+                <input type="file" id="file-general" class="hidden" multiple onchange="handleFiles(this.files, 'GENERAL')">
+            </div>
+            <div id="file-list-GENERAL" class="file-list-container"></div>
+        </div>
+    </div>
+</div>
+
+    
+<div class="card" style="border: none; background: transparent; box-shadow: none;">
+    <div class="form-group" style="display: flex; align-items: flex-start; gap: 10px; background: #fff; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+        <input type="checkbox" id="checkConformidad" style="margin-top: 4px; cursor: pointer;">
+        <label for="checkConformidad" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+            Confirmo que los datos introducidos son correctos y cuento con la autorización para remitir esta información técnica.
+        </label>
+    </div>
+    <button type="button" id="btnEnviar" class="btn btn-primary" disabled style="margin-top: 1rem;">
+        <i data-lucide="send"></i> Enviar Información
+    </button>
+</div>
+
+
+        </form>
+
+        <div style="margin-top: 3rem; display: flex; justify-content: center;">
+            <button type="button" id="btnLogout" class="btn btn-outline">
+                <i data-lucide="arrow-left" style="width:16px"></i> Volver al Listado
+            </button>
+        </div>
+    </div>
+
     
 <script>
-/**
- * LÓGICA ESPECÍFICA DEL FORMULARIO DE RESIDUOS
- */
 document.addEventListener('DOMContentLoaded', () => {
+    const btnEnviar = document.getElementById('btnEnviar');
+    const checkConf = document.getElementById('checkConformidad');
     
-    document.getElementById('btnEnviar').addEventListener('click', () => {
-        processSubmit(() => {
-            // Recogemos los datos de la tabla de forma estructurada
-            const tipos = ['envases', 'papel', 'vidrio', 'voluminosos', 'resto'];
-            const datosResiduos = tipos.map(t => {
-                return {
-                    tipo: t,
-                    produccion: document.getElementById(`prod_${t}`).value || 0,
-                    contenedores: document.getElementById(`cont_${t}`).value || 0,
-                    periodicidad: document.getElementById(`period_${t}`).value || 'N/A',
-                    destino: document.getElementById(`dest_${t}`).value || 'N/A'
-                };
-            });
+    ['nombre', 'depto', 'email'].forEach(f => document.getElementById(`contacto_${f}`).value = localStorage.getItem(`eiel_user_${f}`) || "");
 
-            return {
-                datos_residuos_json: JSON.stringify(datosResiduos),
-                personas_limpieza: document.getElementById('personasLimpieza').value || 0
-            };
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
+
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            const formData = new FormData(document.getElementById('mainForm'));
+            return Object.fromEntries(formData.entries());
         });
-    });
+    };
 });
 </script>
 
-
-    
-    <script>
-    (function() {
-        if (window.location.protocol === 'file:') return;
-        if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
-            const payload = {
-                municipio: window.EIEL_CONFIG.isTest ? "(PRUEBAS) " + window.EIEL_CONFIG.muniName : window.EIEL_CONFIG.muniName,
-                codigo: window.EIEL_CONFIG.muniCode,
-                fase: window.EIEL_CONFIG.fase,
-                tipo: window.EIEL_CONFIG.tipoFormulario,
-                ua: navigator.userAgent,
-                contacto: localStorage.getItem("eiel_user_name") || "Acceso inicial"
-            };
-            fetch(window.EIEL_CONFIG.urlLogger, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-        }
-    })();
-    </script>
 </body>
 </html>

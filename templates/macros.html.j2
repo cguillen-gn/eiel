@@ -1,87 +1,86 @@
-{# ==========================================================================
-   MACROS DE COMPONENTES REUTILIZABLES - EIEL
-   ========================================================================== #}
-
-{# 1. SECCIÓN DE INSTRUCCIONES #}
-{% macro render_instrucciones(items) %}
+{# Bloque de Instrucciones #}
+{% macro render_instrucciones(texto="Rellene los datos requeridos y justifique cualquier dato en Observaciones.") %}
 <div class="card card-info">
     <h4><i data-lucide="info"></i> Instrucciones</h4>
-    <ul>
-        {% for item in items %}
-            <li>{{ item | safe }}</li>
-        {% endfor %}
-    </ul>
+    <ul><li>{{ texto }}</li></ul>
 </div>
 {% endmacro %}
 
-{# 2. SECCIÓN DE REQUERIMIENTOS (INFORMACIÓN SOLICITADA) #}
+{# Bloque de Requerimientos (Información solicitada) #}
 {% macro render_requerimientos(avisos) %}
 {% if avisos and avisos|length > 0 %}
 <div class="card card-requerimientos">
-    <h2 class="section-title">
-        <i data-lucide="circle-plus"></i> Información solicitada
-    </h2>
-    <p class="form-help" style="margin-bottom: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
-        Se ha detectado falta de información o incidencias que requieren solución. Responda a cada punto y adjunte documentación si es necesario.
-    </p>
-
-    <div class="requerimientos-list">
-        {% for aviso in avisos %}
-        {% set req_id = loop.index0 %}
-        <div class="aviso-item">
-            <div class="aviso-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                <span class="aviso-tag">REQUERIMIENTO #{{ req_id + 1 }}</span>
-            </div>
-            <p class="aviso-texto">{{ aviso.descripcion }}</p>
-            
-            <div class="aviso-body" style="margin-top: 1rem;">
-                <label class="form-label" style="font-size: 0.85rem;">Su respuesta / justificación:</label>
-                <textarea class="form-control req-respuesta" 
-                          id="req_desc_{{ req_id }}" 
-                          rows="2"
-                          placeholder="Escriba aquí la respuesta..."></textarea>
-                
-                <div class="adjunto-req-container" style="margin-top: 1rem;">
-                    <input type="file" id="file_req_{{ req_id }}" class="hidden" 
-                           onchange="handleFileSelectReq(event, {{ req_id }})">
-                    <label class="btn" for="file_req_{{ req_id }}" style="background: #f1f5f9; border: 1px dashed var(--border); width: 100%; justify-content: center;">
-                        <i data-lucide="paperclip"></i> Adjuntar documento (opcional)
-                    </label>
-                    <div id="file_list_req_{{ req_id }}" class="file-list-container" style="margin-top: 0.5rem;"></div>
+    <div class="requerimientos-content">
+        <h2 class="section-title"><i data-lucide="circle-plus"></i> Información solicitada</h2>
+        <p style="margin-bottom: 1.5rem; font-size: 0.9rem; color: var(--text-secondary);">Responda a cada punto y adjunte documentación si es necesario.</p>
+        <ul style="list-style: none;">
+            {% for aviso in avisos %}
+            <li class="aviso-item">
+                <div class="aviso-text">{{ aviso.mensaje }}</div>
+                <div class="form-group">
+                    <textarea class="form-textarea req-respuesta" data-reqid="{{ loop.index0 }}" placeholder="Su respuesta..."></textarea>
                 </div>
-            </div>
-        </div>
-        {% endfor %}
+                <div class="upload-zone" onclick="document.getElementById('file-req-{{ loop.index0 }}').click()">
+                    <i data-lucide="upload-cloud"></i>
+                    <p>Adjuntar documento para este punto</p>
+                    <input type="file" id="file-req-{{ loop.index0 }}" class="hidden" multiple onchange="handleFiles(this.files, 'REQ_{{ loop.index0 }}')">
+                </div>
+                <div id="file-list-REQ_{{ loop.index0 }}" class="file-list-container"></div>
+            </li>
+            {% endfor %}
+        </ul>
     </div>
 </div>
 {% endif %}
 {% endmacro %}
 
-{# 3. SECCIÓN DE OBSERVACIONES FINALES #}
-{% macro render_observaciones_finales() %}
+{# Bloque de Contacto y Adjuntos Generales #}
+{% macro render_contacto_y_adjuntos() %}
 <div class="card">
-    <h2 class="section-title"><i data-lucide="message-square-more"></i> Observaciones Finales</h2>
-    <p class="form-help" style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
-        Utilice este espacio para aclaraciones generales sobre toda la información enviada en este formulario.
-    </p>
-    <textarea id="observaciones" class="form-control" rows="4" placeholder="Escriba sus observaciones aquí..."></textarea>
+    <h2 class="section-title"><i data-lucide="user-check"></i> Información de Contacto y Otros Adjuntos</h2>
+    <div class="card-body">
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">Nombre del Técnico:</label>
+                <input type="text" id="contacto_nombre" class="form-input" placeholder="Nombre completo">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Departamento:</label>
+                <input type="text" id="contacto_depto" class="form-input" placeholder="Ej: Urbanismo">
+            </div>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email de contacto:</label>
+            <input type="email" id="contacto_email" class="form-input" placeholder="correo@municipio.es">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Observaciones Generales:</label>
+            <textarea id="observaciones" class="form-textarea" rows="3"></textarea>
+        </div>
+        <div class="form-group" style="margin-top: 1.5rem;">
+            <label class="form-label">Documentación Adicional (Planos, Memorias...):</label>
+            <div class="upload-zone" onclick="document.getElementById('file-general').click()">
+                <i data-lucide="upload-cloud"></i>
+                <p>Haga clic para adjuntar archivos</p>
+                <input type="file" id="file-general" class="hidden" multiple onchange="handleFiles(this.files, 'GENERAL')">
+            </div>
+            <div id="file-list-GENERAL" class="file-list-container"></div>
+        </div>
+    </div>
 </div>
 {% endmacro %}
 
-{# 4. FOOTER DE ENVÍO (CONFORMIDAD Y BOTÓN) #}
-{% macro render_footer_envio() %}
-<div class="card" style="border-top: 4px solid var(--primary); background: #f8fafc;">
-    <div class="conformidad-container" style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 1.5rem;">
-        <input type="checkbox" id="checkConformidad" style="width: 20px; height: 20px; margin-top: 3px; cursor: pointer;">
-        <label for="checkConformidad" style="font-size: 0.95rem; cursor: pointer; color: var(--text-primary);">
-            Confirmo que los datos introducidos han sido revisados y son correctos según la situación actual del municipio.
+{# Bloque de Botón de Envío #}
+{% macro render_boton_envio() %}
+<div class="card" style="border: none; background: transparent; box-shadow: none;">
+    <div class="form-group" style="display: flex; align-items: flex-start; gap: 10px; background: #fff; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+        <input type="checkbox" id="checkConformidad" style="margin-top: 4px; cursor: pointer;">
+        <label for="checkConformidad" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer;">
+            Confirmo que los datos introducidos son correctos y cuento con la autorización para remitir esta información técnica.
         </label>
     </div>
-    
-    <div class="form-actions" style="text-align: right;">
-        <button type="button" id="btnEnviar" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem;" disabled>
-            <i data-lucide="send"></i> Enviar Información
-        </button>
-    </div>
+    <button type="button" id="btnEnviar" class="btn btn-primary" disabled style="margin-top: 1rem;">
+        <i data-lucide="send"></i> Enviar Información
+    </button>
 </div>
 {% endmacro %}

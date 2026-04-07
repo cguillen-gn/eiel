@@ -1,139 +1,158 @@
 ﻿{% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
-{% block title %}EIEL - Obras{% endblock %}
+{% block title %}EIEL - Seguimiento de Obras{% endblock %}
+{% block tipo_ficha %}obras{% endblock %}
+{% block body_class %}obras{% endblock %}
 {% block header_icon %}<i data-lucide="construction"></i>{% endblock %}
 {% block header_title %}SEGUIMIENTO DE OBRAS{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones("Rellene el estado de todas las obras del listado y adjunte la documentación técnica disponible (memorias, planos, etc.).") }}
 
-{# 1. Instrucciones #}
-{{ components.render_instrucciones([
-    '<strong>Estado:</strong> Actualice el estado de ejecución para cada obra del listado.',
-    '<strong>Documentación:</strong> Adjunte al menos memoria y planos para cada actuación. Si no dispone de ellos, justifíquelo en Observaciones.',
-    'Si existen obras nuevas no listadas, descríbalas en el apartado de <strong>Observaciones Finales</strong>.'
-]) }}
-
-{# 2. Requerimientos dinámicos #}
-{{ components.render_requerimientos(avisos_personalizados) }}
-
-{# 3. SECCIÓN ESPECÍFICA: LISTADO DE OBRAS #}
-<div class="card">
-    <h2 class="section-title"><i data-lucide="list-checks"></i> Listado de Seguimiento</h2>
-    <div class="table-wrapper">
-        <table class="data-table" id="tablaObras">
-            <thead>
-                <tr>
-                    <th style="width: 10%;">ID</th>
-                    <th style="width: 45%;">Denominación de la Obra</th>
-                    <th style="width: 20%;">Estado Actual</th>
-                    <th style="width: 25%;">Documentación</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for obra in obras %}
-                <tr class="obra-row" data-obra-id="{{ obra.id }}" data-obra-nombre="{{ obra.denominacion }}">
-                    <td style="font-family: monospace; font-weight: bold;">{{ obra.id }}</td>
-                    <td>
-                        <div style="font-weight: 600;">{{ obra.denominacion }}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ obra.descripcion or '' }}</div>
-                    </td>
-                    <td>
-                        <select class="form-select val-estado">
-                            <option value="">Seleccionar...</option>
-                            <option value="EJECUTADA" {% if obra.estado == 'EJECUTADA' %}selected{% endif %}>Ejecutada</option>
-                            <option value="EN EJECUCION" {% if obra.estado == 'EN EJECUCION' %}selected{% endif %}>En ejecución</option>
-                            <option value="EN PROYECTO" {% if obra.estado == 'EN PROYECTO' %}selected{% endif %}>En proyecto</option>
-                            <option value="PARALIZADA" {% if obra.estado == 'PARALIZADA' %}selected{% endif %}>Paralizada</option>
-                            <option value="ANULADA" {% if obra.estado == 'ANULADA' %}selected{% endif %}>Anulada</option>
-                        </select>
-                    </td>
-                    <td>
-                        <div class="adjunto-obra-container">
-                            <input type="file" id="file_obra_{{ obra.id }}" class="hidden" 
-                                   onchange="handleFileSelectObra(event, '{{ obra.id }}')">
-                            <label class="btn" for="file_obra_{{ obra.id }}" style="padding: 5px 10px; font-size: 0.8rem; background: #f1f5f9; border: 1px dashed var(--border); width: 100%; justify-content: center;">
-                                <i data-lucide="upload-cloud"></i> Subir Doc.
-                            </label>
-                            <div id="file_list_obra_{{ obra.id }}" class="file-list-mini" style="margin-top: 5px; font-size: 0.7rem; color: var(--success);"></div>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {# --- SECCIÓN: SEGUIMIENTO DE OBRAS EXISTENTES --- #}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="list-checks"></i> Obras en Seguimiento</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 10%;">ID</th>
+                        <th style="width: 50%;">Denominación de la Obra</th>
+                        <th style="width: 20%;">Estado actual</th>
+                        <th style="width: 20%;">Adjunto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obra in obras %}
+                    <tr class="obra-row" data-id="{{ obra.id }}">
+                        <td style="font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">{{ obra.id }}</td>
+                        <td>
+                            <div style="font-weight: 500;">{{ obra.denominacion }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ obra.descripcion or '' }}</div>
+                        </td>
+                        <td>
+                            <select class="form-select obra-estado">
+                                <option value="Pendiente" {% if obra.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                                <option value="En Ejecución" {% if obra.estado == 'En Ejecución' %}selected{% endif %}>En Ejecución</option>
+                                <option value="Finalizada" {% if obra.estado == 'Finalizada' %}selected{% endif %}>Finalizada</option>
+                                <option value="Paralizada" {% if obra.estado == 'Paralizada' %}selected{% endif %}>Paralizada</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="file" id="file-obra-{{ obra.id }}" class="hidden" onchange="handleFiles(this.files, 'OBRA_{{ obra.id }}')">
+                            <button type="button" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" 
+                                    onclick="document.getElementById('file-obra-{{ obra.id }}').click()">
+                                <i data-lucide="paperclip" style="width: 14px;"></i> Subir
+                            </button>
+                            <div id="file-list-OBRA_{{ obra.id }}" class="file-list-container" style="font-size: 0.7rem; margin-top: 5px;"></div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 
-{# 4. Observaciones y Footer #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
+    {# --- SECCIÓN: OTRAS OBRAS / NUEVAS ACTUACIONES --- #}
+    <div class="card">
+        <h2 class="section-title" style="color: var(--warning);"><i data-lucide="plus-square"></i> Otras Obras Realizadas o Previstas</h2>
+        <div class="card-body">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Si se han realizado obras no incluidas en el listado anterior, añádalas aquí indicando descripción y presupuesto.
+            </p>
+            <div id="nuevas-obras-container">
+                </div>
+            <button type="button" onclick="addNuevaObra()" class="btn btn-outline" style="width: 100%; border-style: dashed; margin-top: 1rem;">
+                <i data-lucide="plus"></i> Añadir otra actuación
+            </button>
+        </div>
+    </div>
 
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
 /**
- * LÓGICA ESPECÍFICA DE OBRAS
+ * Añadir fila dinámica para nuevas obras
  */
-let colaAdjuntosObras = {}; // { obraId: File }
-
-// Manejar archivos específicos de cada obra
-window.handleFileSelectObra = function(event, obraId) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (file.size > 15 * 1024 * 1024) { // 15MB para proyectos de obra
-        Swal.fire("Archivo pesado", "El límite para proyectos es 15MB", "warning");
-        event.target.value = "";
-        return;
-    }
-
-    colaAdjuntosObras[obraId] = file;
-    document.getElementById(`file_list_obra_${obraId}`).innerHTML = `
-        <i data-lucide="file-check"></i> ${file.name}
+function addNuevaObra() {
+    const container = document.getElementById('nuevas-obras-container');
+    const id = Date.now(); // ID temporal para los inputs
+    const div = document.createElement('div');
+    div.className = 'aviso-item nueva-obra-item';
+    div.style.borderLeft = '4px solid var(--warning)';
+    div.innerHTML = `
+        <div class="form-group">
+            <label class="form-label">Denominación / Descripción:</label>
+            <input type="text" class="form-input n-desc" placeholder="Ej: Renovación red agua Calle Mayor">
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label class="form-label">Presupuesto (€):</label>
+                <input type="number" class="form-input n-presu">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Año:</label>
+                <input type="number" class="form-input n-year" value="${new Date().getFullYear()}">
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="upload-zone" onclick="document.getElementById('file-nobra-${id}').click()" style="padding: 0.8rem;">
+                <p style="font-size: 0.8rem;"><i data-lucide="upload" style="width:14px"></i> Adjuntar Proyecto/Memoria</p>
+                <input type="file" id="file-nobra-${id}" class="hidden" multiple onchange="handleFiles(this.files, 'NUEVA_OBRA_${id}')">
+            </div>
+            <div id="file-list-NUEVA_OBRA_${id}" class="file-list-container"></div>
+        </div>
     `;
+    container.appendChild(div);
     lucide.createIcons();
-};
+}
 
 document.addEventListener('DOMContentLoaded', () => {
+    const btnEnviar = document.getElementById('btnEnviar');
+    const checkConf = document.getElementById('checkConformidad');
     
-    document.getElementById('btnEnviar').addEventListener('click', async () => {
-        
-        processSubmit(async () => {
-            const datosObras = [];
-            const nombresArchivosObras = [];
+    // Auto-relleno de contacto
+    ['nombre', 'depto', 'email'].forEach(f => {
+        const el = document.getElementById(`contacto_${f}`);
+        if(el) el.value = localStorage.getItem(`eiel_user_${f}`) || "";
+    });
 
-            // 1. Procesar cada fila de la tabla
-            const filas = document.querySelectorAll('.obra-row');
-            
-            for (const fila of filas) {
-                const obraId = fila.dataset.obraId;
-                const obraNombre = fila.dataset.obraNombre;
-                const estado = fila.querySelector('.val-estado').value;
-                let adjuntoNombre = "No aportado";
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
 
-                // 2. Si hay un archivo para esta obra, lo subimos antes de cerrar el payload
-                // Nota: uploadToDrive está disponible globalmente en form-handler.js
-                if (colaAdjuntosObras[obraId]) {
-                    UI.showProgress(`Subiendo doc. obra ${obraId}...`);
-                    const uploaded = await uploadToDrive(colaAdjuntosObras[obraId], `OBRA_${obraId}`, "ENV_OBRAS_" + Date.now());
-                    if (uploaded) adjuntoNombre = uploaded;
-                }
-
-                datosObras.push({
-                    id: obraId,
-                    denominacion: obraNombre,
-                    estado: estado,
-                    archivo: adjuntoNombre
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            // 1. Recoger estados de obras existentes
+            const obrasExistentes = [];
+            document.querySelectorAll('.obra-row').forEach(row => {
+                obrasExistentes.push({
+                    id: row.dataset.id,
+                    denominacion: row.querySelector('div').innerText,
+                    estado: row.querySelector('.obra-estado').value
                 });
-            }
+            });
+
+            // 2. Recoger datos de nuevas obras
+            const obrasNuevas = [];
+            document.querySelectorAll('.nueva-obra-item').forEach(item => {
+                obrasNuevas.push({
+                    descripcion: item.querySelector('.n-desc').value,
+                    presupuesto: item.querySelector('.n-presu').value,
+                    year: item.querySelector('.n-year').value
+                });
+            });
 
             return {
-                datos_obras_json: JSON.stringify(datosObras)
+                DATOS_OBRAS_EXISTENTES: JSON.stringify(obrasExistentes),
+                DATOS_OBRAS_NUEVAS: JSON.stringify(obrasNuevas)
             };
         });
-    });
+    };
 });
 </script>
 {% endblock %}

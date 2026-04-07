@@ -1,46 +1,84 @@
 ﻿{% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
 {% block title %}EIEL - Alumbrado Público{% endblock %}
+{% block tipo_ficha %}alumbrado{% endblock %}
+{% block body_class %}alumbrado{% endblock %}
 {% block header_icon %}<i data-lucide="lightbulb"></i>{% endblock %}
 {% block header_title %}ALUMBRADO PÚBLICO{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones() }}
 
-{# 1. Instrucciones (vía Macro) #}
-{{ components.render_instrucciones([
-    'Rellene los datos requeridos y justifique cualquier dato que no disponga o no pueda aportar en el apartado de <strong>Observaciones</strong>.'
-]) }}
+    {# --- SECCIÓN: PUNTOS DE LUZ --- #}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="lamp"></i>Puntos de Luz</h2>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Nº Total de Puntos de Luz:</label>
+                    <input type="number" class="form-input" name="total_puntos_luz">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">% de Tecnología LED:</label>
+                    <input type="number" min="0" max="100" class="form-input" name="porcentaje_led" placeholder="0-100">
+                </div>
+            </div>
+        </div>
+    </div>
 
-{# 2. Requerimientos dinámicos (vía Macro) #}
-{# Esta sección mostrará automáticamente los avisos de alumbrado y los campos para adjuntar archivos #}
-{{ components.render_requerimientos(avisos_personalizados) }}
+    {# --- SECCIÓN: CENTROS DE MANDO --- #}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="settings"></i>Centros de Mando</h2>
+        <div class="card-body">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Nº de Centros de Mando:</label>
+                    <input type="number" class="form-input" name="num_centros_mando">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">% con Telegestión:</label>
+                    <input type="number" min="0" max="100" class="form-input" name="porcentaje_telegestion">
+                </div>
+            </div>
+        </div>
+    </div>
 
-{# 3. Observaciones y Botón de Envío (vía Macros) #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
+    {# --- SECCIÓN: CONSUMO --- #}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="zap"></i>Consumo Energético</h2>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Consumo anual estimado (kWh/año):</label>
+                <input type="number" class="form-input" name="consumo_anual_kwh">
+            </div>
+        </div>
+    </div>
 
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
-/**
- * LÓGICA ESPECÍFICA DEL FORMULARIO DE ALUMBRADO
- */
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // Configuración del botón de enviar
     const btnEnviar = document.getElementById('btnEnviar');
-    if (btnEnviar) {
-        btnEnviar.addEventListener('click', () => {
-            // Llamamos a la función global 'processSubmit'
-            processSubmit(() => {
-                // Alumbrado no tiene campos adicionales fuera de los requerimientos en este momento.
-                // Si en el futuro añades campos (ej. tipo de lámparas), los recogerías aquí.
-                return {}; 
-            });
+    const checkConf = document.getElementById('checkConformidad');
+    
+    document.getElementById('contacto_nombre').value = localStorage.getItem("eiel_user_name") || "";
+    document.getElementById('contacto_depto').value = localStorage.getItem("eiel_user_dept") || "";
+    document.getElementById('contacto_email').value = localStorage.getItem("eiel_user_email") || "";
+
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
+
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            const formData = new FormData(document.getElementById('mainForm'));
+            return Object.fromEntries(formData.entries());
         });
-    }
+    };
 });
 </script>
 {% endblock %}

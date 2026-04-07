@@ -1,79 +1,48 @@
 ﻿{% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
 {% block title %}EIEL - Abastecimiento de Agua{% endblock %}
+{% block tipo_ficha %}agua{% endblock %}
+{% block body_class %}agua{% endblock %}
 {% block header_icon %}<i data-lucide="droplet"></i>{% endblock %}
 {% block header_title %}ABASTECIMIENTO DE AGUA{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones() }}
 
-{# 1. Instrucciones (vía Macro) #}
-{{ components.render_instrucciones([
-    'Rellene los datos requeridos y justifique cualquier dato que no disponga o no pueda aportar en el apartado de <strong>Observaciones</strong>.'
-]) }}
-
-{# 2. Requerimientos dinámicos (vía Macro) #}
-{{ components.render_requerimientos(avisos_personalizados) }}
-
-{# 3. SECCIÓN ESPECÍFICA: GESTIÓN DEL SERVICIO #}
-<div class="card">
-    <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
-
-    <div class="card-body">
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-            <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
-            <select class="form-select" name="tipo_gestion" id="tipo_gestion">
-                <option value="">Seleccionar...</option>
-                <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
-                <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
-                <option value="Otro">Otro</option>
-            </select>
-        </div>
-
-        <div id="campos_gestion_externa" class="hidden">
-            <div class="form-group">
-                <label class="form-label" for="empresa_nombre">Nombre de la Empresa / Entidad:</label>
-                <input type="text" class="form-control" id="empresa_nombre" placeholder="Ej: Aqualia, Hidraqua...">
-            </div>
+    {# SECCIONES ESPECÍFICAS DE AGUA (Captación, Depósitos...) #}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="waves"></i>Captación</h2>
+        <div class="card-body">
+            <input type="number" class="form-input" name="volumen_captado" placeholder="Volumen m3/año">
         </div>
     </div>
-</div>
+    {# ... resto de secciones de agua ... #}
 
-{# 4. Observaciones y Botón de Envío (vía Macros) #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
-
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
-/**
- * LÓGICA ESPECÍFICA DEL FORMULARIO DE AGUA
- */
 document.addEventListener('DOMContentLoaded', () => {
-    const selectGestion = document.getElementById('tipo_gestion');
-    const divExterna = document.getElementById('campos_gestion_externa');
+    const btnEnviar = document.getElementById('btnEnviar');
+    const checkConf = document.getElementById('checkConformidad');
+    
+    // Rellenar contacto
+    document.getElementById('contacto_nombre').value = localStorage.getItem("eiel_user_name") || "";
+    
+    checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
 
-    // Mostrar/ocultar campos según el tipo de gestión
-    selectGestion.addEventListener('change', () => {
-        if (selectGestion.value === 'Indirecta (Concesionaria)') {
-            divExterna.classList.remove('hidden');
-        } else {
-            divExterna.classList.add('hidden');
-        }
-    });
-
-    // CONFIGURAR EL BOTÓN DE ENVIAR
-    document.getElementById('btnEnviar').addEventListener('click', () => {
-        // Llamamos a la función global 'processSubmit' del form-handler.js
-        processSubmit(() => {
-            // Aquí solo definimos los datos ÚNICOS de este formulario
-            return {
-                tipo_gestion: selectGestion.value,
-                empresa_concesionaria: document.getElementById('empresa_nombre').value || 'N/A'
-            };
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            // Aquí solo definimos cómo extraer los datos de ESTE formulario
+            const formData = new FormData(document.getElementById('mainForm'));
+            return Object.fromEntries(formData.entries());
         });
-    });
+    };
 });
 </script>
 {% endblock %}

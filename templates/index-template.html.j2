@@ -4,164 +4,260 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EIEL {{ fase_actual }} - Acceso</title>
+    
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
-    <link rel="stylesheet" href="css/style.css"> 
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* Estilos específicos para el layout del Index que no están en el base */
+        .login-container {
+            max-width: 450px;
+            margin: 10vh auto;
+        }
+        .index-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .index-header h1 {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        .btn-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-decoration: none;
+            color: var(--text-primary);
+            font-weight: 600;
+            transition: all 0.2s;
+            border-left: 5px solid var(--item-color, var(--primary));
+        }
+        .btn-menu:hover {
+            transform: translateX(5px);
+            box-shadow: var(--shadow);
+            border-color: var(--item-color);
+        }
+        .btn-menu i {
+            color: var(--item-color);
+        }
+        .error-message {
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+            display: none;
+            text-align: center;
+            border: 1px solid #fecaca;
+        }
+    </style>
 </head>
-<body class="theme-default">
+<body>
 
-<div class="panel-container">
-    {# CABECERA DEL PANEL #}
-    <div class="panel-header" id="mainHeader">
-        <h1 style="font-size: 2rem; margin-bottom: 0.5rem;">EIEL {{ fase_actual }}</h1>
-        <p id="headerSubtitle">Portal de Recogida de Datos</p>
+    <div class="container login-container">
         
-        <div id="headerMuniInfo" class="hidden" style="margin-top: 1.5rem; background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 12px;">
-            <div id="headerMuniName" style="font-weight: 700; font-size: 1.1rem;"></div>
-            <div id="headerCode" style="font-size: 0.85rem; opacity: 0.9;"></div>
+        <div class="index-header">
+            <h1>EIEL {{ fase_actual }}</h1>
+            <p style="color: var(--text-secondary);">Portal de Encuesta de Infraestructuras</p>
+        </div>
+
+        {# --- BLOQUE 1: LOGIN --- #}
+        <div id="viewLogin" class="card">
+            <div class="section-title">
+                <i data-lucide="lock"></i> Acceso al Municipio
+            </div>
+            <div class="card-body">
+                <div id="loginError" class="error-message"></div>
+
+                <div class="form-group">
+                    <label class="form-label">1. Seleccione Municipio</label>
+                    <select id="muniSelect" class="form-select">
+                        <option value="">Cargando municipios...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">2. Código de Acceso</label>
+                    <input type="password" id="muniPass" class="form-input" placeholder="Introduzca la clave">
+                </div>
+
+                <button type="button" id="btnLogin" class="btn btn-primary" style="margin-top: 1rem;">
+                    <i data-lucide="log-in"></i> Entrar al Portal
+                </button>
+            </div>
+        </div>
+
+        {# --- BLOQUE 2: MENÚ DE FORMULARIOS (Oculto inicialmente) --- #}
+        <div id="viewMenu" class="hidden">
+            <div class="card card-info" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 id="displayMuniName" style="margin:0">Municipio</h4>
+                        <span id="displayMuniCode" class="text-xs">Código: 000</span>
+                    </div>
+                    <button onclick="location.reload()" class="btn btn-outline" style="padding: 0.4rem 0.7rem; font-size: 0.8rem;">
+                        Cambiar
+                    </button>
+                </div>
+            </div>
+
+            <h3 style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem; font-weight: 600;">
+                FORMULARIOS DISPONIBLES:
+            </h3>
+
+            <div class="menu-grid">
+                <a href="#" id="link-agua" class="btn-menu" style="--item-color: #0ea5e9;">
+                    <i data-lucide="droplet"></i> Abastecimiento de Agua
+                </a>
+                <a href="#" id="link-saneamiento" class="btn-menu" style="--item-color: #A15908;">
+                    <i data-lucide="test-tube"></i> Saneamiento y Depuración
+                </a>
+                <a href="#" id="link-alumbrado" class="btn-menu" style="--item-color: #eab308;">
+                    <i data-lucide="lightbulb"></i> Alumbrado Público
+                </a>
+                <a href="#" id="link-viario" class="btn-menu" style="--item-color: #8F006B;">
+                    <i data-lucide="milestone"></i> Viario y Pavimentación
+                </a>
+                <a href="#" id="link-residuos" class="btn-menu" style="--item-color: #16a34a;">
+                    <i data-lucide="recycle"></i> Gestión de Residuos
+                </a>
+                <a href="#" id="link-equipamientos" class="btn-menu" style="--item-color: #D81B60;">
+                    <i data-lucide="building-2"></i> Equipamientos Municipales
+                </a>
+                <a href="#" id="link-cementerios" class="btn-menu" style="--item-color: #475569;">
+                    <i data-lucide="rose"></i> Cementerios
+                </a>
+                <a href="#" id="link-obras" class="btn-menu" style="--item-color: #f97316;">
+                    <i data-lucide="construction"></i> Seguimiento de Obras
+                </a>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 2rem; opacity: 0.5; font-size: 0.75rem;">
+            &copy; {{ fase_actual }} Geonet Territorial
         </div>
     </div>
 
-    {# VISTA 1: LOGIN #}
-    <div id="viewLogin" style="padding: 2rem;">
-        <div class="form-group" style="margin-bottom: 1.5rem;">
-            <label class="form-label">1. Seleccione su Municipio</label>
-            <select id="muniSelect" class="form-select">
-                <option value="">Cargando municipios...</option>
-            </select>
-        </div>
+    <script>
+        // Datos inyectados desde Python
+        const MUNICIPIOS = {{ municipios_lista | safe }};
+        const FLAGS = {{ config_flags_json | safe }};
+        const LOGIN_API = "{{ url_login_api }}";
 
-        <div class="form-group" style="margin-bottom: 2rem;">
-            <label class="form-label">2. Código de Acceso</label>
-            <input type="password" id="muniCode" class="form-control" placeholder="Introduzca la clave facilitada">
-        </div>
-
-        <button id="btnLogin" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem;">
-            <i data-lucide="log-in"></i> Acceder al Portal
-        </button>
-        
-        <p id="loginError" class="hidden" style="color: var(--danger); text-align: center; margin-top: 1rem; font-weight: 600; font-size: 0.9rem;"></p>
-    </div>
-
-    {# VISTA 2: MENÚ DE FORMULARIOS #}
-    <div id="viewMenu" class="hidden" style="padding: 1rem;">
-        <div class="menu-grid">
-            <a href="#" id="link_agua" class="menu-card"><i data-lucide="droplet"></i><span>Agua</span></a>
-            <a href="#" id="link_saneamiento" class="menu-card"><i data-lucide="test-tube"></i><span>Saneamiento</span></a>
-            <a href="#" id="link_residuos" class="menu-card"><i data-lucide="recycle"></i><span>Residuos</span></a>
-            <a href="#" id="link_alumbrado" class="menu-card"><i data-lucide="lightbulb"></i><span>Alumbrado</span></a>
-            <a href="#" id="link_viario" class="menu-card"><i data-lucide="milestone"></i><span>Viario</span></a>
-            <a href="#" id="link_cementerios" class="menu-card"><i data-lucide="rose"></i><span>Cementerios</span></a>
-            <a href="#" id="link_equipamientos" class="menu-card"><i data-lucide="building-2"></i><span>Equipamientos</span></a>
-            <a href="#" id="link_obras" class="menu-card"><i data-lucide="construction"></i><span>Obras</span></a>
-        </div>
-        
-        <div style="padding: 1rem; border-top: 1px solid var(--border); text-align: center;">
-            <button onclick="location.reload()" class="btn-back" style="width: 100%; justify-content: center;">
-                <i data-lucide="log-out"></i> Cerrar Sesión
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-    // --- DATOS INYECTADOS POR PYTHON ---
-    const LISTA_MUNICIPIOS = {{ municipios_lista | safe }};
-    const CONFIG_FLAGS = {{ config_flags_json | safe }};
-    const URL_LOGIN_API = "{{ url_login_api }}";
-
-    // --- ELEMENTOS UI ---
-    const ui = {
-        select: document.getElementById('muniSelect'),
-        pass: document.getElementById('muniCode'),
-        btnLogin: document.getElementById('btnLogin'),
-        error: document.getElementById('loginError'),
-        viewLogin: document.getElementById('viewLogin'),
-        viewMenu: document.getElementById('viewMenu'),
-        headerInfo: document.getElementById('headerMuniInfo'),
-        headerName: document.getElementById('headerMuniName'),
-        headerCode: document.getElementById('headerCode'),
-        subtitle: document.getElementById('headerSubtitle')
-    };
-
-    // --- INICIALIZACIÓN ---
-    document.addEventListener('DOMContentLoaded', () => {
-        // Cargar municipios en el select
-        ui.select.innerHTML = '<option value="">Seleccionar...</option>' + 
-            LISTA_MUNICIPIOS.map(m => `<option value="${m.id}">${m.nombre}</option>`).join('');
-        
-        lucide.createIcons();
-    });
-
-    // --- LÓGICA DE LOGIN ---
-    ui.btnLogin.addEventListener('click', async () => {
-        const code = ui.select.value;
-        const pass = ui.pass.value;
-
-        if (!code || !pass) {
-            showError("Seleccione un municipio e introduzca la clave.");
-            return;
-        }
-
-        ui.btnLogin.disabled = true;
-        ui.btnLogin.innerHTML = "Verificando...";
-
-        try {
-            const response = await fetch(URL_LOGIN_API, {
-                method: 'POST',
-                body: JSON.stringify({ codigo: code, password: pass })
-            });
-            const result = await response.json();
-
-            if (result.valid) {
-                showMenu(code, result.nombre, result.isTest);
-            } else {
-                showError("Clave de acceso incorrecta.");
-                ui.btnLogin.disabled = false;
-                ui.btnLogin.innerHTML = '<i data-lucide="log-in"></i> Acceder';
-                lucide.createIcons();
-            }
-        } catch (e) {
-            showError("Error de conexión con el servidor de seguridad.");
-            ui.btnLogin.disabled = false;
-        }
-    });
-
-    function showMenu(code, name, isTest) {
-        // Guardar sesión básica
-        localStorage.setItem("eiel_muni_code", code);
-        localStorage.setItem("eiel_muni_name", name);
-        localStorage.setItem("eiel_is_test", isTest);
-
-        // Actualizar Cabecera
-        ui.subtitle.classList.add('hidden');
-        ui.headerInfo.classList.remove('hidden');
-        ui.headerName.textContent = name;
-        ui.headerCode.textContent = "Código INE: " + code;
-
-        // Configurar enlaces según flags de disponibilidad
-        const flags = CONFIG_FLAGS[code] || {};
-        const servicios = ['agua', 'saneamiento', 'residuos', 'alumbrado', 'viario', 'cementerios', 'equipamientos', 'obras'];
-
-        servicios.forEach(s => {
-            const el = document.getElementById(`link_${s}`);
-            el.href = `${s}_${code}.html`;
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
             
-            // Si el flag es falso, ocultamos el botón (excepto para los obligatorios)
-            if (flags[s] === false) {
-                el.style.display = 'none';
+            const select = document.getElementById('muniSelect');
+            const viewLogin = document.getElementById('viewLogin');
+            const viewMenu = document.getElementById('viewMenu');
+            const btnLogin = document.getElementById('btnLogin');
+            const errorDiv = document.getElementById('loginError');
+
+            // 1. Cargar lista de municipios
+            select.innerHTML = '<option value="">Seleccionar...</option>';
+            MUNICIPIOS.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.codigo;
+                opt.textContent = m.nombre;
+                select.appendChild(opt);
+            });
+
+            // 2. Lógica de Login
+            btnLogin.onclick = async () => {
+                const code = select.value;
+                const pass = document.getElementById('muniPass').value;
+
+                if (!code || !pass) {
+                    errorDiv.textContent = "Seleccione municipio e introduzca clave.";
+                    errorDiv.style.display = "block";
+                    return;
+                }
+
+                btnLogin.disabled = true;
+                btnLogin.innerHTML = '<i data-lucide="loader" class="animate-spin"></i> Validando...';
+                lucide.createIcons();
+
+                try {
+                    const res = await fetch(LOGIN_API, {
+                        method: 'POST',
+                        body: JSON.stringify({ codigo: code, password: pass })
+                    });
+                    const data = await res.json();
+
+                    if (data.valid) {
+                        // Guardar sesión
+                        localStorage.setItem("eiel_muni_code", code);
+                        localStorage.setItem("eiel_muni_name", data.nombre);
+                        localStorage.setItem("eiel_is_test", data.isTest || "false");
+                        
+                        showMenu(code, data.nombre);
+                    } else {
+                        errorDiv.textContent = "Clave incorrecta para este municipio.";
+                        errorDiv.style.display = "block";
+                        btnLogin.disabled = false;
+                        btnLogin.innerHTML = '<i data-lucide="log-in"></i> Entrar al Portal';
+                        lucide.createIcons();
+                    }
+                } catch (e) {
+                    errorDiv.textContent = "Error de conexión con el servidor.";
+                    errorDiv.style.display = "block";
+                    btnLogin.disabled = false;
+                }
+            };
+
+            function showMenu(code, name) {
+                document.getElementById('displayMuniName').textContent = name;
+                document.getElementById('displayMuniCode').textContent = `Código INE: ${code}`;
+                
+                // Configurar enlaces según flags
+                const mFlags = FLAGS[code] || {};
+                
+                const setLink = (id, fileBase, hasFlag = true) => {
+                    const el = document.getElementById(`link-${id}`);
+                    if (hasFlag) {
+                        el.href = `${fileBase}_${code}.html`;
+                        el.style.display = "flex";
+                    } else {
+                        el.style.display = "none";
+                    }
+                };
+
+                setLink('agua', 'agua');
+                setLink('saneamiento', 'saneamiento', mFlags.saneamiento);
+                setLink('alumbrado', 'alumbrado', mFlags.alumbrado);
+                setLink('viario', 'viario', mFlags.viario);
+                setLink('residuos', 'residuos');
+                setLink('equipamientos', 'equipamientos');
+                setLink('cementerios', 'cementerios', mFlags.cementerios);
+                setLink('obras', 'obras');
+
+                viewLogin.classList.add('hidden');
+                viewMenu.classList.remove('hidden');
+            }
+
+            // Persistencia: Si ya estaba logueado, mostrar menú directamente
+            const savedCode = localStorage.getItem("eiel_muni_code");
+            const savedName = localStorage.getItem("eiel_muni_name");
+            if (savedCode && savedName) {
+                showMenu(savedCode, savedName);
             }
         });
-
-        ui.viewLogin.classList.add('hidden');
-        ui.viewMenu.classList.remove('hidden');
-    }
-
-    function showError(msg) {
-        ui.error.textContent = msg;
-        ui.error.classList.remove('hidden');
-    }
-</script>
-
+    </script>
 </body>
 </html>

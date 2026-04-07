@@ -1,106 +1,88 @@
 {% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
 {% block title %}EIEL - Gestión de Residuos{% endblock %}
+{% block tipo_ficha %}residuos{% endblock %}
+{% block body_class %}residuos{% endblock %}
 {% block header_icon %}<i data-lucide="recycle"></i>{% endblock %}
 {% block header_title %}GESTIÓN DE RESIDUOS{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones() }}
 
-{# 1. Instrucciones #}
-{{ components.render_instrucciones([
-    'Rellene los datos de producción y gestión para cada tipo de residuo.',
-    'Si no dispone de algún dato exacto, aporte una estimación o justifíquelo en <strong>Observaciones</strong>.'
-]) }}
-
-{# 2. Requerimientos dinámicos #}
-{{ components.render_requerimientos(avisos_personalizados) }}
-
-{# 3. SECCIÓN ESPECÍFICA: TABLA DE RECOGIDA #}
-<div class="card">
-    <h2 class="section-title"><i data-lucide="trash"></i>Recogida de Residuos</h2>
-    <div class="table-wrapper">
-        <table class="data-table" id="tablaResiduos">
-            <thead>
-                <tr>
-                    <th style="width: 25%;">Tipo de Residuo</th>
-                    <th style="width: 20%;">Producción (T/Año)</th>
-                    <th style="width: 15%;">Nº Contenedores</th>
-                    <th style="width: 20%;">Periodicidad</th>
-                    <th style="width: 20%;">Destino</th>
-                </tr>
-            </thead>
-            <tbody>
-                {# Definimos las filas de la tabla #}
-                {% set filas = [
-                    {'id': 'envases', 'nombre': '🟡 Plásticos y Envases'},
-                    {'id': 'papel', 'nombre': '🔵 Papel y Cartón'},
-                    {'id': 'vidrio', 'nombre': '🟢 Vidrio'},
-                    {'id': 'voluminosos', 'nombre': '🪑 Voluminosos / Enseres'},
-                    {'id': 'resto', 'nombre': '🔘 Resto (No selectiva)'}
-                ] %}
-                
-                {% for fila in filas %}
-                <tr>
-                    <td style="font-weight: 600;">{{ fila.nombre }}</td>
-                    <td><input type="number" step="0.01" class="form-control" id="prod_{{ fila.id }}" placeholder="0.00"></td>
-                    <td><input type="number" class="form-control" id="cont_{{ fila.id }}" placeholder="0"></td>
-                    <td>
-                        <select class="form-select" id="period_{{ fila.id }}">
-                            <option value="">Seleccionar...</option>
-                            <option value="Diaria">Diaria</option>
-                            <option value="Semanal">Semanal</option>
-                            <option value="Quincenal">Quincenal</option>
-                            <option value="Mensual">Mensual</option>
-                            <option value="A demanda">A demanda</option>
-                        </select>
-                    </td>
-                    <td><input type="text" class="form-control" id="dest_{{ fila.id }}" placeholder="Planta / Vertedero"></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="trash"></i>Recogida de Residuos - Año {{ fase_anterior }}</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Tipo de Residuo</th>
+                        <th style="width: 20%;">Producción (T/año)</th>
+                        <th style="width: 15%;">Nº Contenedores</th>
+                        <th style="width: 20%;">Periodicidad</th>
+                        <th style="width: 25%;">Destino (Vertedero/Planta)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {# Usamos los slugs exactos que espera tu script de PDF en Google Apps Script #}
+                    {% set tipos = [
+                        ('Envases', 'envases'), ('Papel y Cartón', 'papel'), 
+                        ('Vidrio', 'vidrio'), ('Pilas', 'pilas'), 
+                        ('Voluminosos', 'voluminosos'), ('Resto', 'resto')
+                    ] %}
+                    {% for nombre, slug in tipos %}
+                    <tr>
+                        <td style="font-weight: 500;">{{ nombre }}</td>
+                        <td><input type="number" step="0.01" class="form-input" id="prod_{{ slug }}" name="prod_{{ slug }}" placeholder="0.00"></td>
+                        <td><input type="number" class="form-input" id="cont_{{ slug }}" name="cont_{{ slug }}" placeholder="0"></td>
+                        <td>
+                            <select class="form-select" id="period_{{ slug }}" name="period_{{ slug }}">
+                                <option value="Diaria">Diaria</option>
+                                <option value="Semanal">Semanal</option>
+                                <option value="Quincenal">Quincenal</option>
+                                <option value="A demanda">A demanda</option>
+                            </select>
+                        </td>
+                        <td><input type="text" class="form-input" id="dest_{{ slug }}" name="dest_{{ slug }}" placeholder="Ej: Planta X"></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <div style="margin-top: 1.5rem;">
-        <label class="form-label" for="personasLimpieza">Nº Personas adscritas a limpieza viaria:</label>
-        <input type="number" class="form-control" id="personasLimpieza" placeholder="Indique el número de operarios">
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="sparkles"></i>Limpieza Viaria</h2>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label">Nº de personas destinadas a limpieza viaria:</label>
+                <input type="number" class="form-input" name="personas_limpieza" id="personasLimpieza">
+            </div>
+        </div>
     </div>
-</div>
 
-{# 4. Observaciones y Footer #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
-
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
-/**
- * LÓGICA ESPECÍFICA DEL FORMULARIO DE RESIDUOS
- */
 document.addEventListener('DOMContentLoaded', () => {
+    const btnEnviar = document.getElementById('btnEnviar');
+    const checkConf = document.getElementById('checkConformidad');
     
-    document.getElementById('btnEnviar').addEventListener('click', () => {
-        processSubmit(() => {
-            // Recogemos los datos de la tabla de forma estructurada
-            const tipos = ['envases', 'papel', 'vidrio', 'voluminosos', 'resto'];
-            const datosResiduos = tipos.map(t => {
-                return {
-                    tipo: t,
-                    produccion: document.getElementById(`prod_${t}`).value || 0,
-                    contenedores: document.getElementById(`cont_${t}`).value || 0,
-                    periodicidad: document.getElementById(`period_${t}`).value || 'N/A',
-                    destino: document.getElementById(`dest_${t}`).value || 'N/A'
-                };
-            });
+    ['nombre', 'depto', 'email'].forEach(f => document.getElementById(`contacto_${f}`).value = localStorage.getItem(`eiel_user_${f}`) || "");
 
-            return {
-                datos_residuos_json: JSON.stringify(datosResiduos),
-                personas_limpieza: document.getElementById('personasLimpieza').value || 0
-            };
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
+
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            const formData = new FormData(document.getElementById('mainForm'));
+            return Object.fromEntries(formData.entries());
         });
-    });
+    };
 });
 </script>
 {% endblock %}

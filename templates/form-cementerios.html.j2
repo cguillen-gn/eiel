@@ -1,137 +1,110 @@
 ﻿{% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
 {% block title %}EIEL - Cementerios{% endblock %}
+{% block tipo_ficha %}cementerios{% endblock %}
+{% block body_class %}cementerios{% endblock %}
 {% block header_icon %}<i data-lucide="rose"></i>{% endblock %}
 {% block header_title %}CEMENTERIOS{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones() }}
 
-{# 1. Estado Vacío #}
-{% if cementerios|length == 0 %}
-<div class="card" style="text-align: center; padding: 3rem;">
-    <div style="font-size: 3rem; margin-bottom: 1rem;">🌹</div>
-    <h3 style="color: var(--text-secondary);">No hay cementerios registrados</h3>
-    <p style="color: var(--text-secondary);">Su municipio no tiene cementerios en la base de datos de la EIEL.</p>
-</div>
-{% else %}
-
-{# 2. Instrucciones #}
-{{ components.render_instrucciones([
-    'Actualice los datos de ocupación para cada cementerio del municipio.',
-    'Si existen nuevos cementerios o cambios de titularidad, indíquelo en <strong>Observaciones</strong>.'
-]) }}
-
-{# 3. Requerimientos dinámicos #}
-{{ components.render_requerimientos(avisos_personalizados) }}
-
-{# 4. Listado de Cementerios #}
-{% for cem in cementerios %}
-<div class="card cementerio-block" data-cem-id="{{ cem.id }}" data-cem-nombre="{{ cem.nombre }}">
-    <h2 class="section-title"><i data-lucide="map-pin"></i> {{ cem.nombre }}</h2>
-    
-    <div class="table-wrapper">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Tipo de Enterramiento</th>
-                    <th>Nº Total</th>
-                    <th>Nº Ocupados</th>
-                    <th>Disponibles</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% set tipos = [
-                    {'id': 'nichos', 'label': 'Nichos'},
-                    {'id': 'sepulturas', 'label': 'Sepulturas / Tumbas'},
-                    {'id': 'panteones', 'label': 'Panteones'},
-                    {'id': 'columbarios', 'label': 'Columbarios'}
-                ] %}
-                
-                {% for tipo in tipos %}
-                <tr class="fila-dato" data-tipo="{{ tipo.id }}">
-                    <td style="font-weight: 600;">{{ tipo.label }}</td>
-                    <td>
-                        <input type="number" class="form-control val-total" 
-                               value="{{ cem[tipo.id + '_total'] or 0 }}" 
-                               oninput="calcularDisponibles(this)">
-                    </td>
-                    <td>
-                        <input type="number" class="form-control val-ocupado" 
-                               value="{{ cem[tipo.id + '_ocupados'] or 0 }}" 
-                               oninput="calcularDisponibles(this)">
-                    </td>
-                    <td>
-                        <input type="number" class="form-control val-disponible" 
-                               value="{{ (cem[tipo.id + '_total'] or 0) - (cem[tipo.id + '_ocupados'] or 0) }}" 
-                               disabled style="background: #f1f5f9;">
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% if cementerios|length == 0 %}
+    <div class="card card-body" style="text-align: center; padding: 3rem;">
+        <i data-lucide="info" style="width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 1rem;"></i>
+        <p>No hay cementerios registrados para este municipio.</p>
     </div>
-</div>
-{% endfor %}
+    {% else %}
+        {% for cem in cementerios %}
+        <div class="card cementerio-item" data-id="{{ cem.id }}">
+            <h2 class="section-title"><i data-lucide="map-pin"></i> {{ cem.nombre }}</h2>
+            <div class="table-wrapper">
+                <table class="cementerio-table">
+                    <thead>
+                        <tr>
+                            <th class="header-ocupacion">Tipo</th>
+                            <th class="header-ocupacion">Capacidad Total</th>
+                            <th class="header-ocupacion">Ocupadas</th>
+                            <th class="header-ocupacion">Vacías</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tipo in [('sepulturas', 'Sepulturas'), ('nichos', 'Nichos'), ('columbarios', 'Columbarios'), ('panteones', 'Panteones')] %}
+                        <tr>
+                            <td class="col-label">{{ tipo[1] }}</td>
+                            <td><input type="number" class="form-input val-total" data-tipo="{{ tipo[0] }}" value="{{ cem[tipo[0] ~ '_total'] or 0 }}"></td>
+                            <td><input type="number" class="form-input val-ocu" data-tipo="{{ tipo[0] }}" value="{{ cem[tipo[0] ~ '_ocu'] or 0 }}"></td>
+                            <td><input type="number" class="form-input val-vacia" data-tipo="{{ tipo[0] }}" value="{{ cem[tipo[0] ~ '_vacia'] or 0 }}" readonly style="background: #f8fafc;"></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-body">
+                <div class="form-group">
+                    <label class="form-label">Observaciones específicas del cementerio:</label>
+                    <textarea class="form-textarea obs-cem" rows="2"></textarea>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% endif %}
 
-{# 5. Observaciones y Footer #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
-
-{% endif %}
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
-/**
- * LÓGICA ESPECÍFICA DE CEMENTERIOS
- */
-
-// Función para calcular disponibilidad en tiempo real
-function calcularDisponibles(input) {
-    const fila = input.closest('tr');
-    const total = parseInt(fila.querySelector('.val-total').value) || 0;
-    const ocupado = parseInt(fila.querySelector('.val-ocupado').value) || 0;
-    const disponibleField = fila.querySelector('.val-disponible');
-    
-    disponibleField.value = Math.max(0, total - ocupado);
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-    
     const btnEnviar = document.getElementById('btnEnviar');
-    if (!btnEnviar) return;
+    const checkConf = document.getElementById('checkConformidad');
 
-    btnEnviar.addEventListener('click', () => {
-        processSubmit(() => {
-            // Recolectar datos de todos los bloques de cementerios
-            const datosCementerios = [];
-            
-            document.querySelectorAll('.cementerio-block').forEach(bloque => {
-                const cemId = bloque.dataset.cemId;
-                const cemNombre = bloque.dataset.cemNombre;
-                const detalle = {};
+    // Auto-relleno de contacto
+    ['nombre', 'depto', 'email'].forEach(f => document.getElementById(`contacto_${f}`).value = localStorage.getItem(`eiel_user_${f}`) || "");
 
-                bloque.querySelectorAll('.fila-dato').forEach(fila => {
-                    const tipo = fila.dataset.tipo;
-                    detalle[tipo] = {
-                        total: fila.querySelector('.val-total').value || 0,
-                        ocupados: fila.querySelector('.val-ocupado').value || 0
+    // Lógica de cálculo automático de plazas vacías
+    document.querySelectorAll('.val-total, .val-ocu').forEach(input => {
+        input.addEventListener('input', (e) => {
+            const row = e.target.closest('tr');
+            const total = parseInt(row.querySelector('.val-total').value) || 0;
+            const ocu = parseInt(row.querySelector('.val-ocu').value) || 0;
+            row.querySelector('.val-vacia').value = Math.max(0, total - ocu);
+        });
+    });
+
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
+
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            // Recopilamos los datos de cada cementerio de forma estructurada
+            const cementeriosData = [];
+            document.querySelectorAll('.cementerio-item').forEach(card => {
+                const item = {
+                    id: card.dataset.id,
+                    nombre: card.querySelector('h2').innerText.trim(),
+                    datos: {},
+                    observaciones: card.querySelector('.obs-cem').value
+                };
+                card.querySelectorAll('tbody tr').forEach(row => {
+                    const tipo = row.querySelector('.val-total').dataset.tipo;
+                    item.datos[tipo] = {
+                        total: row.querySelector('.val-total').value,
+                        ocu: row.querySelector('.val-ocu').value,
+                        vacia: row.querySelector('.val-vacia').value
                     };
                 });
-
-                datosCementerios.push({
-                    id: cemId,
-                    nombre: cemNombre,
-                    datos: detalle
-                });
+                cementeriosData.push(item);
             });
 
             return {
-                cementerios_data_json: JSON.stringify(datosCementerios)
+                DATOS_CEMENTERIOS: JSON.stringify(cementeriosData)
             };
         });
-    });
+    };
 });
 </script>
 {% endblock %}

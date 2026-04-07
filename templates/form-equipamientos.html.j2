@@ -1,121 +1,106 @@
 ﻿{% extends "base.html.j2" %}
-{% import "macros.html.j2" as components %}
+{% import "macros.html.j2" as ui %}
 
 {% block title %}EIEL - Equipamientos{% endblock %}
+{% block tipo_ficha %}equipamientos{% endblock %}
+{% block body_class %}equipamientos{% endblock %}
 {% block header_icon %}<i data-lucide="building-2"></i>{% endblock %}
-{% block header_title %}EQUIPAMIENTOS{% endblock %}
+{% block header_title %}EQUIPAMIENTOS MUNICIPALES{% endblock %}
+{% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
 
 {% block content %}
+    {{ ui.render_instrucciones() }}
 
-{# 1. Instrucciones #}
-{{ components.render_instrucciones([
-    'Despliegue cada categoría para revisar los equipamientos registrados.',
-    '<strong>Estado:</strong> Indique el estado de conservación actual.',
-    '<strong>Observaciones:</strong> Indique cambios de nombre, uso o si el edificio ya no presta servicio.'
-]) }}
+    {# Definimos el orden de categorías igual que en tu original #}
+    {% set orden_categorias = ['CASA CONSISTORIAL', 'CENTRO CULTURAL', 'CENTRO ENSEÑANZA', 'CENTRO SANITARIO','CENTRO ASISTENCIAL', 'MERCADO/LONJA','PROTECCIÓN CIVIL', 'TANATORIO', 'INSTALACIÓN DEPORTIVA', 'PARQUE'] %}
 
-{# 2. Requerimientos dinámicos #}
-{{ components.render_requerimientos(avisos_personalizados) }}
-
-{# 3. SECCIÓN ESPECÍFICA: ACORDEÓN DE EQUIPAMIENTOS #}
-{% set orden_categorias = [
-    'CASA CONSISTORIAL', 'CENTRO CULTURAL', 'CENTRO ENSEÑANZA', 
-    'CENTRO SANITARIO', 'CENTRO ASISTENCIAL', 'MERCADO/LONJA',
-    'PROTECCIÓN CIVIL', 'TANATORIO', 'INSTALACIÓN DEPORTIVA', 'PARQUE'
-] %}
-
-<div class="equipamientos-container">
     {% for cat in orden_categorias %}
-    {% set items = equipamientos | selectattr('tipo', 'equalto', cat) | list %}
-    {% if items|length > 0 %}
-    <div class="card category-block" style="padding: 0; overflow: hidden; margin-bottom: 1rem;">
-        <button type="button" class="category-header" onclick="toggleCategory('cat_{{ loop.index }}')" 
-                style="width: 100%; padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; background: none; border: none; cursor: pointer; text-align: left;">
-            <h3 style="margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.75rem;">
-                <i data-lucide="chevron-right" class="icon-arrow" id="arrow_cat_{{ loop.index }}"></i>
-                {{ cat }} 
-                <span style="font-size: 0.8rem; background: var(--border); padding: 2px 8px; border-radius: 10px; color: var(--text-secondary);">{{ items|length }}</span>
-            </h3>
-        </button>
-
-        <div id="cat_{{ loop.index }}" class="category-content hidden" style="padding: 1rem; border-top: 1px solid var(--border); background: #fafafa;">
-            {% for item in items %}
-            <div class="equipamiento-item card" data-id="{{ item.id }}" data-nombre="{{ item.nombre }}" data-tipo="{{ cat }}" style="margin-bottom: 1rem; border-left: 3px solid var(--primary);">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
-                    <h4 style="margin: 0; color: var(--text-primary);">{{ item.nombre }}</h4>
-                    {% if item.lat and item.lon %}
-                    <a href="https://www.google.com/maps?q={{ item.lat }},{{ item.lon }}" target="_blank" class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: #eee;">
-                        <i data-lucide="map"></i> Mapa
-                    </a>
-                    {% endif %}
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div class="form-group">
-                        <label class="form-label" style="font-size: 0.8rem;">Estado de conservación:</label>
-                        <select class="form-select val-estado">
-                            <option value="B" {% if item.estado == 'B' %}selected{% endif %}>Bueno</option>
-                            <option value="R" {% if item.estado == 'R' %}selected{% endif %}>Regular</option>
-                            <option value="M" {% if item.estado == 'M' %}selected{% endif %}>Malo</option>
-                            <option value="E" {% if item.estado == 'E' %}selected{% endif %}>Ruina / Ejecución</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" style="font-size: 0.8rem;">Observaciones del elemento:</label>
-                        <textarea class="form-control val-obs" rows="1" placeholder="Cambios, usos..."></textarea>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+    {# Filtramos la lista plana que envía tu script original #}
+    {% set items = equipamientos | selectattr("tipo_agrupado", "equalto", cat) | list %}
+    {% if items | length > 0 %}
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="package"></i> {{ cat }}</h2>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40%;">Nombre / Ubicación</th>
+                        <th style="width: 25%;">Estado</th>
+                        <th style="width: 35%;">Observaciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for eq in items %}
+                    <tr class="eq-row" data-id="{{ eq.id }}" data-cat="{{ cat }}">
+                        <td>
+                            <div style="font-weight: 600;">{{ eq.nombre }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ eq.nucleo }}</div>
+                        </td>
+                        <td>
+                            <select class="form-select eq-estado">
+                                {% for est in ['Buen estado', 'Regular', 'Mal estado', 'En ruina'] %}
+                                <option value="{{ est }}" {% if eq.estado == est %}selected{% endif %}>{{ est }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" class="form-input eq-obs" value="{{ eq.observaciones or '' }}">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
     {% endif %}
     {% endfor %}
-</div>
 
-{# 4. Observaciones y Footer #}
-{{ components.render_observaciones_finales() }}
-{{ components.render_footer_envio() }}
-
+    {{ ui.render_requerimientos(avisos_personalizados) }}
+    {{ ui.render_contacto_y_adjuntos() }}
+    {{ ui.render_boton_envio() }}
 {% endblock %}
 
 {% block scripts %}
 <script>
-/**
- * LÓGICA DE EQUIPAMIENTOS
- */
-
-// Función para abrir/cerrar categorías
-function toggleCategory(id) {
-    const content = document.getElementById(id);
-    const arrow = document.getElementById('arrow_' + id);
-    const isHidden = content.classList.contains('hidden');
-    
-    content.classList.toggle('hidden');
-    arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+// (Lógica de añadir nuevo equipamiento y envío idéntica a la anterior)
+function addNuevoEquipamiento() {
+    const container = document.getElementById('nuevos-container');
+    const div = document.createElement('div');
+    div.className = 'aviso-item nuevo-eq-item';
+    div.innerHTML = `
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">Nombre:</label><input type="text" class="form-input n-nombre"></div>
+            <div class="form-group"><label class="form-label">Categoría:</label>
+                <select class="form-select n-cat">
+                    <option value="CULTURAL">Cultural</option><option value="DEPORTIVO">Deportivo</option><option value="OTRO">Otro</option>
+                </select>
+            </div>
+        </div>
+        <input type="text" class="form-input n-obs" placeholder="Obs..." style="margin-top:0.5rem">
+    `;
+    container.appendChild(div);
+    lucide.createIcons();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    
-    document.getElementById('btnEnviar').addEventListener('click', () => {
-        processSubmit(() => {
-            const datosEquipamientos = [];
-            
-            document.querySelectorAll('.equipamiento-item').forEach(el => {
-                datosEquipamientos.push({
-                    id: el.dataset.id,
-                    nombre: el.dataset.nombre,
-                    tipo: el.dataset.tipo,
-                    estado: el.querySelector('.val-estado').value,
-                    observaciones: el.querySelector('.val-obs').value || ""
-                });
-            });
+    const btnEnviar = document.getElementById('btnEnviar');
+    const checkConf = document.getElementById('checkConformidad');
+    ['nombre', 'depto', 'email'].forEach(f => document.getElementById(`contacto_${f}`).value = localStorage.getItem(`eiel_user_${f}`) || "");
+    if(checkConf) checkConf.onchange = () => btnEnviar.disabled = !checkConf.checked;
 
-            return {
-                datos_equipamientos_json: JSON.stringify(datosEquipamientos)
-            };
+    btnEnviar.onclick = () => {
+        enviarFormularioGlobal(() => {
+            const existentes = [];
+            document.querySelectorAll('.eq-row').forEach(row => {
+                existentes.push({ id: row.dataset.id, cat: row.dataset.cat, estado: row.querySelector('.eq-estado').value, obs: row.querySelector('.eq-obs').value });
+            });
+            const nuevos = [];
+            document.querySelectorAll('.nuevo-eq-item').forEach(item => {
+                nuevos.push({ nombre: item.querySelector('.n-nombre').value, cat: item.querySelector('.n-cat').value, obs: item.querySelector('.n-obs').value });
+            });
+            return { DATOS_EXISTENTES: JSON.stringify(existentes), DATOS_NUEVOS: JSON.stringify(nuevos) };
         });
-    });
+    };
 });
 </script>
 {% endblock %}
