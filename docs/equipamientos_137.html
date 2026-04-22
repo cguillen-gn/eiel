@@ -12,6 +12,7 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
+        // 1. CONFIGURACIÓN GLOBAL
         window.EIEL_CONFIG = {
             muniCode: "137",
             muniName: "La Vall de Laguar",
@@ -19,9 +20,11 @@
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
             urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzLZ7x2cAW28eyaCDk0ZVr7tIHYShSQp4Jet8_1Pda8hoySHvOGwOa-mMwZ8d0cJmJe/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
-            isTest: localStorage.getItem("eiel_is_test") === "true"
+            isTest: localStorage.getItem("eiel_is_test") === "true",
+            hasAvisos: false
         };
 
+        // 2. MOTOR GLOBAL REFACTORIZADO
         const UIProgress = {
             show(steps = 1) {
                 if (document.getElementById('uploadOverlay')) return;
@@ -33,7 +36,7 @@
                             <div class="progress-bar-container">
                                 <div id="progressBar" class="progress-bar" style="width: 0%"></div>
                             </div>
-                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando...</p>
+                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando transferencia segura</p>
                         </div>
                     </div>`;
                 document.body.insertAdjacentHTML('beforeend', html);
@@ -54,13 +57,13 @@
                 setTimeout(() => {
                     const overlay = document.getElementById('uploadOverlay');
                     if (overlay) overlay.remove();
-                    Swal.fire({ icon: 'success', title: '¡Enviado!', text: 'La información se ha registrado correctamente.', confirmButtonColor: '#0080ad' });
+                    Swal.fire({ icon: 'success', title: '¡Enviado!', text: 'La información se ha registrado correctamente.', confirmButtonColor: 'var(--primary)' });
                 }, 500);
             }
         };
 
         function mostrarMensaje(texto, tipo = "info") {
-            Swal.fire({ icon: tipo, title: tipo === "error" ? "Error" : "Aviso", text: texto, confirmButtonColor: "#0080ad" });
+            Swal.fire({ icon: tipo, title: tipo === "error" ? "Error" : "Aviso", text: texto, confirmButtonColor: "var(--primary)" });
         }
 
         const EIEL_Engine = {
@@ -73,7 +76,6 @@
             },
             
             setupListeners() {
-                // Escucha archivos generales
                 const fileInput = document.getElementById('fileInput');
                 if (fileInput) {
                     fileInput.addEventListener('change', (e) => {
@@ -82,7 +84,6 @@
                     });
                 }
                 
-                // Escucha archivos de requerimientos (delegación de eventos)
                 document.addEventListener('change', (e) => {
                     if (e.target.classList.contains('req-file-input')) {
                         const rid = e.target.getAttribute('data-req-id');
@@ -99,7 +100,7 @@
                 container.innerHTML = array.map((f, i) => `
                     <div class="file-item">
                         <span class="file-name"><i data-lucide="file-text"></i> ${f.name}</span>
-                        <button type="button" class="btn-remove-file" onclick="EIEL_Engine.removeFile('${id}', ${i}, ${reqId})">
+                        <button type="button" class="btn-remove-file" onclick="EIEL_Engine.removeFile('${id}', ${i}, ${reqId ? `'${reqId}'` : 'null'})">
                             <i data-lucide="x"></i>
                         </button>
                     </div>`).join('');
@@ -122,7 +123,6 @@
                     reader.onerror = rej; 
                 });
 
-                // Subir generales
                 for (const file of this.archivos) {
                     UIProgress.update(`Subiendo: ${file.name}`);
                     const b64 = await toBase64(file);
@@ -133,7 +133,6 @@
                     nombresSubidos.push(file.name);
                 }
 
-                // Subir requerimientos
                 for (const [rid, files] of Object.entries(this.colaAdjuntosReq)) {
                     for (const file of files) {
                         UIProgress.update(`Subiendo justificante: ${file.name}`);
@@ -149,48 +148,28 @@
             }
         };
 
-        // Iniciar el motor cuando el DOM esté listo
         document.addEventListener('DOMContentLoaded', () => EIEL_Engine.init());
     </script>
-   
-    
 </head>
 <body>
-
-    <header class="site-header">
-        <div class="header-content">
-            <div class="logo-area">
-                <h1>EIEL</h1>
-                <span class="badge-fase">
-                    Fase 2026
-                </span>
+    <div class="top-bar">
+        <div class="top-bar-content">
+            <div class="muni-info">
+                <span class="muni-badge">137</span>
+                <span class="muni-name">La Vall de Laguar</span>
             </div>
-        
-            <div class="user-area">
-                <span id="headerMuniName" class="user-email">...</span>
-                <button onclick="logout()" class="btn-logout">Salir</button>
-            </div>
+            <div class="fase-badge">Fase 2026</div>
         </div>
-    </header>
+    </div>
 
-    <nav class="breadcrumb-nav">
-        <div class="container">
-            <a href="index.html" class="back-link">
-                ⭠ Volver al listado de formularios
-            </a>
-        </div>
-    </nav>
-
-    <main class="main-container">
-        <div class="form-header">
-            <div class="icon-header">
-                <i data-lucide="building-2"></i>
+    <div class="container">
+        <header class="header-main">
+            <div class="header-icon"><i data-lucide="building-2"></i></div>
+            <div class="header-text">
+                <h1>EQUIPAMIENTOS</h1>
+                <p>Encuesta de Infraestructura y Equipamientos Locales</p>
             </div>
-            <div class="title-header">
-                <h2>EQUIPAMIENTOS</h2>
-                <p class="subtitle">La Vall de Laguar (Código: 137)</p>
-            </div>
-        </div>
+        </header>
 
         
 
@@ -1734,100 +1713,6 @@
 <input type="file" id="hiddenInputNuevos" multiple style="display: none;">
 
 
-    </main>
-
-    <footer class="site-footer" style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">
-        <p>Diputación de Alicante - Encuesta de Infraestructura y Equipamientos Locales</p>
-    </footer>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // A. VALIDACIÓN DE SESIÓN DEL MUNICIPIO
-            const muniCode = localStorage.getItem("eiel_muni_code");
-            const muniName = localStorage.getItem("eiel_muni_name");
-
-            if (!muniCode) {
-                console.warn("Acceso no autorizado. Redirigiendo al login...");
-                window.location.href = "index.html";
-                return;
-            }
-
-            // Actualizamos el nombre del municipio en la cabecera
-            const headerName = document.getElementById("headerMuniName");
-            if(headerName) headerName.textContent = muniName || "Municipio";
-
-            // B. AUTOCOMPLETADO Y PERSISTENCIA PROACTIVA
-            const fieldsMap = {
-                "contactoNombre": "eiel_user_name",
-                "contactoEmail": "eiel_user_email",
-                "contactoDepartamento": "eiel_user_dept"
-            };
-
-            // 1. Rellenar campos si ya existen datos guardados
-            Object.keys(fieldsMap).forEach(id => {
-                const savedValue = localStorage.getItem(fieldsMap[id]);
-                const inputEl = document.getElementById(id);
-                
-                if (savedValue && inputEl) {
-                    inputEl.value = savedValue;
-                    // Caso especial: Sincronizar campo de confirmación de email
-                    if (id === "contactoEmail") {
-                        const confirmEl = document.getElementById("contactoEmailConfirm");
-                        if (confirmEl) confirmEl.value = savedValue;
-                    }
-                }
-            });
-
-            // 2. Guardar datos en tiempo real mientras el técnico escribe (Escucha Activa)
-            Object.keys(fieldsMap).forEach(id => {
-                const inputEl = document.getElementById(id);
-                if (inputEl) {
-                    inputEl.addEventListener('input', (e) => {
-                        localStorage.setItem(fieldsMap[id], e.target.value.trim());
-                    });
-                }
-            });
-            
-            // C. Detectar cambios en cualquier campo de entrada de forma global
-            document.addEventListener('input', (e) => {
-                if (e.target.closest('input, select, textarea')) {
-                    formSucio = true;
-                }
-            });
-        });
-    </script>
-    
-    <div id="overlayProgress" class="overlay hidden">
-        <div class="progress-card">
-            <h3 id="progressTitle" style="margin-bottom: 10px; font-weight: 700; color: #1e293b;">Enviando datos...</h3>
-            
-            <div id="progressElements">
-                <div class="progress-bar-container">
-                    <div id="progressBar" class="progress-bar" style="width: 0%; height: 100%; background-color: #10b981; transition: width 0.3s ease;"></div>
-                </div>
-                <div class="progress-info">
-                    <span id="progressText">Iniciando...</span>
-                    <span id="progressValue">0%</span>
-                </div>
-                <p id="pacienciaNota" style="margin-top:20px; font-size:0.85em; color:#64748b; font-style:italic; line-height:1.4; text-align: center; border-top: 1px solid #f1f5f9; padding-top: 15px;">
-                    ⌛ <b>Nota:</b> Este proceso puede tardar <b>varios minutos</b> debido al volumen de información y la generación del certificado oficial. Por favor, <b>no cierre ni refresque la pestaña.</b>
-                </p>
-            </div>
-
-            <div id="successState" class="hidden" style="margin-top: 20px;">
-                <div style="color: #10b981; font-size: 3rem; margin-bottom: 15px;">
-                    <i data-lucide="check-circle-2" style="width: 60px; height: 60px; margin: 0 auto;"></i>
-                </div>
-                <p style="color: #475569; font-weight: 500; line-height: 1.6; margin-bottom: 25px;">
-                    ¡El envío se ha realizado correctamente!<br>
-                    <span style="color: #1e293b; font-weight: 700;">Se ha enviado un justificante en formato PDF al correo electrónico facilitado.</span>
-                </p>
-                <a href="index.html" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; justify-content: center; width: 100%;">
-                    <i data-lucide="home" style="width: 18px;"></i>
-                    Volver al Listado de Formularios
-                </a>
-            </div>
-        </div>
     </div>
 
     
@@ -2417,15 +2302,12 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>
 
 
-    
     <script>
     (function() {
-        // No registrar accesos si se abre el archivo localmente
         if (window.location.protocol === 'file:') return;
         const isTest = localStorage.getItem("eiel_is_test") === "true";
         const payload = {
-            municipio: isTest ?
-                "(PRUEBAS) " + "La Vall de Laguar" : "La Vall de Laguar",
+            municipio: isTest ? "(PRUEBAS) " + "La Vall de Laguar" : "La Vall de Laguar",
             codigo: "137",
             fase: "2026",
             tipo: window.location.pathname.split("/").pop().split("_")[0].toUpperCase(),
@@ -2434,14 +2316,12 @@ document.addEventListener("DOMContentLoaded", () => {
             departamento: localStorage.getItem("eiel_user_dept") || "N/A",
             email: localStorage.getItem("eiel_user_email") || "N/A" 
         };
-
-        // Envío al Apps Script de Logs si la URL está configurada en Python
         if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
             fetch(window.EIEL_CONFIG.urlLogger, {
-                method: 'POST',
-                mode: 'no-cors',
+                method: "POST", mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
-            });
+            }).catch(e => console.log("Log error silencioso"));
         }
     })();
     </script>
