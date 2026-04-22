@@ -48,40 +48,37 @@
             <div id="fileList" class="file-list-container"></div>
         </div>
     </div>
-
-    <div class="footer-actions">
-        <label class="checkbox-container">
-            <input type="checkbox" id="checkConformidad">
-            <span class="checkmark"></span>
-            Confirmo que los datos introducidos son correctos
-        </label>
-        <button type="submit" id="btnEnviar" class="btn btn-primary" disabled>
-            <i data-lucide="send"></i> Enviar Información
-        </button>
-        <a href="index.html" class="btn btn-secondary">
-            <i data-lucide="arrow-left"></i> Volver al Menú
-        </a>
-    </div>
 </form>
+
+{# PIE DE PÁGINA FUERA DEL FORMULARIO (Como el original) #}
+<div class="footer-actions">
+    <label class="checkbox-container">
+        <input type="checkbox" id="checkConformidad">
+        <span class="checkmark"></span>
+        Confirmo que los datos introducidos son correctos
+    </label>
+    <button type="submit" id="btnEnviar" form="mainForm" class="btn btn-primary" disabled>
+        <i data-lucide="send"></i> Enviar Información
+    </button>
+    <a href="index.html" class="btn btn-secondary">
+        <i data-lucide=\"arrow-left\"></i> Volver al Menú
+    </a>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     const checkConf = document.getElementById('checkConformidad');
     const btnEnv = document.getElementById('btnEnviar');
-    checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
+    if(checkConf) checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
 
     document.getElementById('mainForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
         UIProgress.show(total + 1);
+
         try {
             const adjuntos = await EIEL_Engine.uploadFiles("agua");
-            const respuestasReq = Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
-                id: el.getAttribute('data-req-id'),
-                pregunta: el.getAttribute('data-req-nombre'),
-                respuesta: el.value
-            }));
             const payload = {
                 TIPO_FORMULARIO: "agua",
                 NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
@@ -95,8 +92,10 @@
                 tipo_gestion: document.getElementById('tipo_gestion').value,
                 entidad_gestion: document.getElementById('entidad_gestion').value,
                 archivos_adjuntos: adjuntos,
-                respuestas_requerimientos_json: JSON.stringify(respuestasReq)
+                respuestas_requerimientos_json: JSON.stringify(EIEL_Engine.getReqData())
             };
+
+            UIProgress.update("Generando acta PDF...");
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
             setTimeout(() => location.reload(), 1500);

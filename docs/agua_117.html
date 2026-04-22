@@ -8,7 +8,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EIEL - Abastecimiento de Agua</title>
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+    
+    
     <link rel="stylesheet" href="css/style.css">
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -35,7 +38,7 @@
                             <div class="progress-bar-container">
                                 <div id="progressBar" class="progress-bar" style="width: 0%"></div>
                             </div>
-                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando...</p>
+                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando transferencia segura</p>
                         </div>
                     </div>`;
                 document.body.insertAdjacentHTML('beforeend', html);
@@ -119,13 +122,20 @@
                 }
                 for (const [rid, fs] of Object.entries(this.colaAdjuntosReq)) {
                     for (const f of fs) {
-                        UIProgress.update(`Subiendo: ${f.name}`);
+                        UIProgress.update(`Subiendo justificante: ${f.name}`);
                         const b64 = await toB64(f);
                         await fetch(window.EIEL_CONFIG.urlAdjuntos, { method: "POST", mode: "no-cors", body: JSON.stringify({ municipio: window.EIEL_CONFIG.muniCode, tipo, seccion: "REQUERIMIENTOS", nombre: `[REQ_${rid}] ${f.name}`, base64: b64.split(',')[1], id_envio: idEnvio })});
                         nombres.push(`[REQ_${rid}] ${f.name}`);
                     }
                 }
                 return nombres;
+            },
+            getReqData() {
+                return Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
+                    id: el.getAttribute('data-req-id'),
+                    pregunta: el.getAttribute('data-req-nombre'),
+                    respuesta: el.value
+                }));
             }
         };
     </script>
@@ -140,6 +150,7 @@
             <div class="fase-badge">Fase 2026</div>
         </div>
     </div>
+
     <div class="container">
         <header class="header-main">
             <div class="header-icon"><i data-lucide="droplet"></i></div>
@@ -148,7 +159,10 @@
                 <p>Encuesta de Infraestructura y Equipamientos Locales</p>
             </div>
         </header>
+
         
+        <div class="main-content">
+            
 <form id="mainForm">
     
 <div class="card card-info">
@@ -240,40 +254,39 @@
             <div id="fileList" class="file-list-container"></div>
         </div>
     </div>
-
-    <div class="footer-actions">
-        <label class="checkbox-container">
-            <input type="checkbox" id="checkConformidad">
-            <span class="checkmark"></span>
-            Confirmo que los datos introducidos son correctos
-        </label>
-        <button type="submit" id="btnEnviar" class="btn btn-primary" disabled>
-            <i data-lucide="send"></i> Enviar Información
-        </button>
-        <a href="index.html" class="btn btn-secondary">
-            <i data-lucide="arrow-left"></i> Volver al Menú
-        </a>
-    </div>
 </form>
 
+
+<div class="footer-actions">
+    <label class="checkbox-container">
+        <input type="checkbox" id="checkConformidad">
+        <span class="checkmark"></span>
+        Confirmo que los datos introducidos son correctos
+    </label>
+    <button type="submit" id="btnEnviar" form="mainForm" class="btn btn-primary" disabled>
+        <i data-lucide="send"></i> Enviar Información
+    </button>
+    <a href="index.html" class="btn btn-secondary">
+        <i data-lucide=\"arrow-left\"></i> Volver al Menú
+    </a>
+</div>
+
+        </div>
     </div>
+
     
 <script>
     const checkConf = document.getElementById('checkConformidad');
     const btnEnv = document.getElementById('btnEnviar');
-    checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
+    if(checkConf) checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
 
     document.getElementById('mainForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
         UIProgress.show(total + 1);
+
         try {
             const adjuntos = await EIEL_Engine.uploadFiles("agua");
-            const respuestasReq = Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
-                id: el.getAttribute('data-req-id'),
-                pregunta: el.getAttribute('data-req-nombre'),
-                respuesta: el.value
-            }));
             const payload = {
                 TIPO_FORMULARIO: "agua",
                 NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
@@ -287,8 +300,10 @@
                 tipo_gestion: document.getElementById('tipo_gestion').value,
                 entidad_gestion: document.getElementById('entidad_gestion').value,
                 archivos_adjuntos: adjuntos,
-                respuestas_requerimientos_json: JSON.stringify(respuestasReq)
+                respuestas_requerimientos_json: JSON.stringify(EIEL_Engine.getReqData())
             };
+
+            UIProgress.update("Generando acta PDF...");
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
             setTimeout(() => location.reload(), 1500);
@@ -297,6 +312,7 @@
         }
     });
 </script>
+
 
     <script>
         (function() {
