@@ -1,17 +1,27 @@
-﻿{# form-agua.html.j2 #}
-{% extends "base.html.j2" %}
+﻿{% extends "base.html.j2" %}
 
 {% block bloque_fase %}Fase {{ fase_actual }}{% endblock %}
+
 {% block title %}EIEL - Abastecimiento de Agua{% endblock %}
 {% block header_icon %}<i data-lucide="droplet"></i>{% endblock %}
 {% block header_title %}ABASTECIMIENTO DE AGUA{% endblock %}
 
 {% block content %}
-{{ macros.render_instrucciones() }}
-{{ macros.render_requerimientos(avisos_personalizados) }}
 
+{# --- SECCIÓN: INSTRUCCIONES --- #}
+<div class="card card-info">
+    <h4><i data-lucide="info"></i> Instrucciones</h4>
+    <ul>
+        <li>
+            Rellene los datos requeridos y justifique cualquier dato que no disponga o no pueda aportar en el apartado de <strong>Observaciones</strong>.
+        </li>
+    </ul>
+</div>
+
+{# --- SECCIÓN: GESTIÓN DEL SERVICIO --- #}
 <div class="card">
     <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
+
     <div class="card-body">
         <div class="form-group">
             <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
@@ -19,70 +29,260 @@
                 <option value="">Seleccionar...</option>
                 <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
                 <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
-                <option value="Delegada (Diputación/Consorcio)">Delegada (Diputación/Consorcio)</option>
+                <option value="Otro">Otro</option>
             </select>
         </div>
-        <div class="form-group">
-            <label class="form-label" for="entidad_gestion">Nombre de la Entidad/Empresa Gestora:</label>
-            <input type="text" class="form-control" name="entidad_gestion" id="entidad_gestion" placeholder="Ej: Aqualia, Hidraqua, Propio Ayuntamiento...">
+        <div id="campos_gestion_externa" class="hidden">
+            <div class="form-group">
+                <label class="form-label" for="nombre_empresa">Nombre de la Empresa / Ente:</label>
+                <input type="text" class="form-input" name="nombre_empresa" id="nombre_empresa"
+                       placeholder="Ej: Hidraqua, AMAEM, Global Omnium, Aqualia...">
+            </div>
+
+            <div class="form-section-divider"></div>
+
+            <div class="form-group">
+                <label class="form-label label-highlight">
+                    Datos de Contacto Técnico (Empresa):
+                </label>
+                
+                <div class="grid-2-col">
+                    <input type="text" id="tecnicoNombre" class="form-input" name="contacto_nombre" placeholder="Nombre persona responsable">
+                    <input type="text" id="tecnicoTel" class="form-input" name="contacto_telefono" placeholder="Teléfono directo/Móvil">
+                    <input type="email" id="tecnicoEmail" class="form-input" name="contacto_email" placeholder="Correo electrónico">
+                </div>
+            </div>
+        </div>
+
+        <div id="campos_gestion_otro" class="hidden">
+            <div class="form-group">
+                <label class="form-label" for="nombre_gestor">Gestor:</label>
+                <input type="text" class="form-input" name="nombre_gestor" id="nombre_gestor"
+                       placeholder="Especifique el gestor del servicio...">
+            </div>
         </div>
     </div>
 </div>
 
-<div class="card" style="margin-top: 2rem;">
-    <h2 class="section-title"><i data-lucide="message-square"></i> Observaciones Finales</h2>
-    <div class="form-group">
-        <textarea class="form-control" name="observaciones" id="observaciones" rows="4" placeholder="Indique cualquier aclaración adicional..."></textarea>
-    </div>
-</div>
-
+{# --- SECCIÓN: CONSUMO ANUAL AGUA POTABLE DEL SERVICIO --- #}
 <div class="card">
-    <h2 class="section-title"><i data-lucide="paperclip"></i> Documentación Adjunta</h2>
-    <p class="form-help">Adjunte cualquier documento técnico, planos o facturas que justifiquen cambios.</p>
-    <div class="file-upload-wrapper">
-        <label class="file-upload-label">
-            <i data-lucide="upload"></i> Seleccionar archivos
-            <input type="file" id="fileInput" multiple hidden>
+    <h2 class="section-title"><i data-lucide="chart-column"></i>Consumo anual agua potable</h2>
+    <div class="form-group">
+        <label for="consumoInput" class="form-label">
+            Consumo de agua potable en el año {{ fase_anterior }} (m³)
         </label>
-        <div id="fileList" class="file-list-container"></div>
+        <input type="number" id="consumoInput" class="form-input" placeholder="Ej: 15000" min="0">
     </div>
 </div>
 
-<div class="footer-actions">
-    <label class="checkbox-container">
-        <input type="checkbox" id="checkConformidad">
-        <span class="checkmark"></span>
-        Confirmo que los datos introducidos son correctos
-    </label>
-    <button type="button" id="btnEnviar" class="btn btn-primary" disabled>
-        <i data-lucide="send"></i> Enviar Información
-    </button>
-    <a href="index.html" class="btn btn-secondary">
-        <i data-lucide="arrow-left"></i> Volver al Menú
-    </a>
+{# --- SECCIÓN: LIMPIEZA DEPÓSITOS --- #}
+<div class="card">
+    <h2 class="section-title"><i data-lucide="bubbles"></i>Depósitos Municipales</h2>
+    
+    {% if depositos_json and depositos_json != "[]" %}
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">Cód</th>
+                    <th style="width: 60%;">Nombre del depósito</th>
+                    <th style="width: 25%;" class="td-ubicacion">Última limpieza (año)</th>
+                </tr>
+            </thead>
+            <tbody id="tablaDepositos">
+                {% set lista_depositos = depositos_json | fromjson %}
+                
+                {% for d in lista_depositos %}
+                <tr>
+                    <td class="td-ubicacion text-xs" style="font-weight: 500; color: var(--text-secondary);">
+                        {{ d.codigo }}
+                    </td>
+                    <td style="font-weight: 500;">
+                        {{ d.nombre }}
+                    </td>
+                    <td class="td-ubicacion">
+                        <input 
+                            type="number" 
+                            class="form-input input-limpieza" 
+                            data-codigo="{{ d.codigo }}"
+                            data-nombre="{{ d.nombre }}"
+                            placeholder="Ej: {{ fase_anterior }}"
+                            value="" 
+                            min="1900" 
+                            max="{{ fase_actual }}"
+                        >
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <p class="sin-uso-intro">
+            ℹ️ No constan depósitos registrados para este municipio.
+        </p>
+    {% endif %}
 </div>
+
+{# --- SECCIÓN: REQUERIMIENTOS --- #}
+{% if avisos_personalizados and avisos_personalizados|length > 0 %}
+<div class="card card-requerimientos">
+    <div class="requerimientos-content">
+        <h2 class="section-title">
+            <i data-lucide="circle-plus"></i> Otra información solicitada
+        </h2>
+        
+        <p class="form-help form-help-spacer">
+            Se ha detectado falta de información o incidencias en la EIEL que requieren solución. Responda a cada punto y adjunte documentación si es necesario.
+        </p>
+
+        <ul class="requerimientos-list" style="list-style: none; padding: 0;">
+            {% for aviso in avisos_personalizados %}
+            {% set req_id = loop.index0 %}
+            <li class="aviso-item" style="display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 15px; border-bottom: 1px dashed #e2e8f0;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div class="status-dot {{ 'dot-alta' if aviso.prioridad == 'Alta' else 'dot-media' }}"></div>
+                        <span style="font-weight: 600; color: var(--text-primary); font-size: 0.95rem;">{{ aviso.mensaje }}</span>
+                    </div>
+                    
+                    {% if aviso.url %}
+                        {% set final_url = aviso.url if 'http' in aviso.url else 'https://' ~ aviso.url %}
+                        <a href="{{ final_url }}" target="_blank" class="btn btn-secondary btn-sm" style="display: flex; align-items: center; gap: 5px; text-decoration: none; background: white; border: 1px solid #cbd5e1;">
+                            <i data-lucide="map" style="width: 14px; height: 14px;"></i> Mapa
+                        </a>
+                    {% endif %}
+                </div>
+                
+                <div style="margin-left: 28px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <textarea class="form-input txt-resp-req" data-msg="{{ aviso.mensaje }}" data-id="{{ req_id }}" rows="2" 
+                              placeholder="Responda o aclare este punto aquí..." style="margin-bottom: 8px; background: white;"></textarea>
+                    
+                    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" 
+                                onclick="gestionarAdjuntosReq('{{ req_id }}')" 
+                                title="Adjuntar documentación">
+                            <i data-lucide="paperclip"></i> Adjuntar
+                        </button>
+                        <div style="font-size: 0.65rem; color: #94a3b8; margin-top: 2px; white-space: nowrap; font-weight: 500;">
+                            Máx 35 MB / archivo
+                        </div>
+                        <div id="lista_adjuntos_req_{{ req_id }}" class="file-list-container" style="margin: 0; display: flex; flex-direction: column; gap: 4px; width: 100%;"></div>
+                    </div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        <input type="file" id="hiddenInputReq" multiple style="display: none;">
+    </div>
+</div>
+{% endif %}
+
+{# --- SECCIÓN: OBSERVACIONES --- #}
+<div class="card">
+    <h2 class="section-title"><i data-lucide="file-text"></i>Observaciones</h2>
+    <div class="form-group">
+        <label for="observaciones" class="form-label">Comentarios adicionales:</label>
+        <textarea id="observaciones" class="form-input" rows="4" placeholder="Indique aquí cualquier incidencia, aclaración o dato relevante..."></textarea>
+    </div>
+</div>
+
+{# --- SECCIÓN: ADJUNTOS --- #}
+<div class="card">
+    <h2 class="section-title"><i data-lucide="folder"></i>Documentación Adjunta (Opcional)</h2>    
+    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">
+            <i data-lucide="upload-cloud" style="width: 40px; height: 40px; margin-bottom: 10px; opacity: 0.7;"></i>
+        </div>
+        <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary);">
+            Arrastra y suelta archivos aquí
+        </div>
+        <div style="font-size: 0.9rem; color: var(--text-secondary); margin: 5px 0;">
+            o <span style="text-decoration: underline; color: var(--primary); cursor: pointer;">haz clic para buscarlos</span>
+        </div>
+        <p class="upload-help" style="margin-top: 8px;">(Planos, fotos, informes... Máx 35 MB / archivo)</p>
+        <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" class="file-list-container"></div>
+</div>
+
+{# --- SECCIÓN: DATOS DE CONTACTO --- #}
+<div class="card">
+        <h2 class="section-title"><i data-lucide="user"></i>Datos de Contacto</h2>
+    
+    <div class="grid-2-col">
+        <div class="form-group">
+            <label class="form-label">Nombre y apellidos *</label>
+            <input type="text" id="contactoNombre" class="form-input" placeholder="Ej: Juan Pérez" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Departamento</label>
+            <input type="text" id="contactoDepartamento" class="form-input" placeholder="Ej: Urbanismo" required>
+        </div>
+       <div class="form-group">
+            <label class="form-label">Email (Para recibir justificante) *</label>
+            <input type="email" id="contactoEmail" class="form-input" placeholder="Ej: ejemplo@ayuntamiento.es" required>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Confirme su Email *</label>
+            <input type="email" id="contactoEmailConfirm" class="form-input" placeholder="Repita el email" required onpaste="return false;">
+            </div>
+    </div>
+</div>
+
+{# --- SECCIÓN: DECLARACIÓN RESPONSABLE --- #}
+<div class="card">
+    <div class="conformidad-box">
+        <label class="check-label">
+            <input type="checkbox" id="checkConformidad" class="check-input">
+            <span class="check-text">
+                <strong>Declaración de veracidad:</strong> Como responsable, 
+                confirmo que los datos introducidos son correctos y actualizados.
+            </span>
+        </label>
+    </div>
+
+{# --- SECCIÓN: ENVÍO --- #}
+    <div id="mensaje" class="message hidden"></div>
+
+    <button id="btnEnviar" class="btn btn-primary" disabled>
+        Enviar Datos
+    </button>
+</div>
+    
 {% endblock %}
 
 {% block scripts %}
 <script>
     const checkConf = document.getElementById('checkConformidad');
     const btnEnv = document.getElementById('btnEnviar');
-    if(checkConf) checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
+    
+    // Activar botón solo si marcan el check
+    if (checkConf && btnEnv) {
+        checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
+    }
 
+    // Lógica de envío simplificada (apoyada en el Engine)
     btnEnv.addEventListener('click', async () => {
-        const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
-        UIProgress.show(total + 1);
+        // Bloquear botón para evitar doble envío
+        btnEnv.disabled = true;
+        
+        const totalArchivos = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
+        UIProgress.show(totalArchivos + 1); // +1 por la generación del PDF
 
         try {
-            const adjuntos = await EIEL_Engine.uploadFiles("agua");
-            
-            // Recolectar respuestas de requerimientos
+            // 1. Subir archivos usando el motor central
+            const nombresAdjuntos = await EIEL_Engine.uploadFiles("agua");
+
+            // 2. Recopilar requerimientos
             const respuestasReq = Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
                 id: el.getAttribute('data-req-id'),
                 pregunta: el.getAttribute('data-req-nombre'),
                 respuesta: el.value
             }));
 
+            // 3. Crear el paquete de datos final
             const payload = {
                 TIPO_FORMULARIO: "agua",
                 NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
@@ -91,23 +291,34 @@
                 MUNICIPIO_INE: window.EIEL_CONFIG.muniCode,
                 MUNICIPIO_NOMBRE: window.EIEL_CONFIG.muniName,
                 FASE: window.EIEL_CONFIG.fase,
-                FECHA_ENVIO: new Date().toLocaleString(),
+                FECHA_ENVIO: new Date().toISOString(),
+                
+                // DATOS ESPECÍFICOS DE ESTE FORMULARIO
                 OBSERVACIONES: document.getElementById('observaciones').value,
                 tipo_gestion: document.getElementById('tipo_gestion').value,
                 entidad_gestion: document.getElementById('entidad_gestion').value,
-                archivos_adjuntos: adjuntos,
+                
+                archivos_adjuntos: nombresAdjuntos,
                 respuestas_requerimientos_json: JSON.stringify(respuestasReq)
             };
 
+            // 4. Enviar a generar PDF
+            UIProgress.update("Generando acta PDF...");
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
-                method: "POST", mode: "no-cors", body: JSON.stringify(payload) 
+                method: "POST", mode: "no-cors", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload) 
             });
 
             UIProgress.complete();
-            setTimeout(() => location.reload(), 1500);
+            
+            // Recargar página para limpiar estado
+            setTimeout(() => location.reload(), 2000);
 
-        } catch (err) {
-            Swal.fire({ icon: 'error', title: 'Error', text: err.message });
+        } catch (error) {
+            console.error(error);
+            mostrarMensaje(`❌ Error técnico: ${error.message}`, "error");
+            btnEnv.disabled = false; // Desbloquear en caso de error
         }
     });
 </script>
