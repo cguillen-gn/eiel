@@ -12,7 +12,6 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <script>
-        // 1. CONFIGURACIÓN GLOBAL
         window.EIEL_CONFIG = {
             muniCode: "080",
             muniName: "Jacarilla",
@@ -20,67 +19,138 @@
             urlLogger: "https://script.google.com/macros/s/AKfycbwvsLf32-eJrK17EBGyLWXto5Hnh4JOxRj7k7J3HHtXZlYW9D_n5GlsuQNBphcwvCFyvw/exec",
             urlGenerarPdf: "https://script.google.com/macros/s/AKfycbzLZ7x2cAW28eyaCDk0ZVr7tIHYShSQp4Jet8_1Pda8hoySHvOGwOa-mMwZ8d0cJmJe/exec",
             urlAdjuntos: "https://script.google.com/macros/s/AKfycby19wBddAxtXotBt34a6JTt-K3n8Ett9yOiCDLTFiMdPuMslnk1Ktk7sRSoXbWJBNDg/exec",
-            isTest: localStorage.getItem("eiel_is_test") === "true",
-            hasAvisos: true
+            isTest: localStorage.getItem("eiel_is_test") === "true"
         };
 
-        // 2. FUNCIONES GLOBALES (Accesibles desde el HTML)
-        function logout() {
-            // Limpia toda la sesión y datos del técnico por seguridad
-            localStorage.clear(); 
-            window.location.href = "index.html";
-        }
-        
-        // Aviso de que no abandonar el formulario si hay datos metidos
-        let formSucio = false;
-
-        window.addEventListener('beforeunload', (e) => {
-            if (formSucio) {
-                e.preventDefault();
-                e.returnValue = ''; 
+        const UIProgress = {
+            show(steps = 1) {
+                if (document.getElementById('uploadOverlay')) return;
+                const html = `
+                    <div id="uploadOverlay" class="overlay">
+                        <div class="progress-card">
+                            <div class="spinner"></div>
+                            <h3 id="progressTitle">Procesando envío...</h3>
+                            <div class="progress-bar-container">
+                                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando...</p>
+                        </div>
+                    </div>`;
+                document.body.insertAdjacentHTML('beforeend', html);
+                this.totalSteps = steps;
+                this.currentStep = 0;
+            },
+            update(text) {
+                this.currentStep++;
+                const percent = Math.min((this.currentStep / this.totalSteps) * 100, 95);
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = percent + '%';
+                const status = document.getElementById('progressStatus');
+                if (status) status.innerText = text;
+            },
+            complete() {
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = '100%';
+                setTimeout(() => {
+                    const overlay = document.getElementById('uploadOverlay');
+                    if (overlay) overlay.remove();
+                    Swal.fire({ icon: 'success', title: '¡Enviado!', text: 'La información se ha registrado correctamente.', confirmButtonColor: '#0080ad' });
+                }, 500);
             }
-        });
-        
-        // 3. FUNCIÓN DE BLOQUEO DE FORMULARIO
-        function toggleFormFreeze(isFrozen) {
-            const selectors = 'input, select, textarea, button:not(.btn-logout), .btn-remove, .btn-add';
-            const elements = document.querySelectorAll(selectors);
+        };
+
+        function mostrarMensaje(texto, tipo = "info") {
+            Swal.fire({ icon: tipo, title: tipo === "error" ? "Error" : "Aviso", text: texto, confirmButtonColor: "#0080ad" });
+        }
+
+        const EIEL_Engine = {
+            archivos: [],
+            colaAdjuntosReq: {},
             
-            elements.forEach(el => {
-                el.disabled = isFrozen;
-                // Efecto visual de "congelado"
-                el.style.opacity = isFrozen ? "0.6" : "1";
-                if (isFrozen) {
-                    el.style.pointerEvents = "none"; 
-                } else {
-                    el.style.pointerEvents = "auto";
+            init() {
+                this.setupListeners();
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            },
+            
+            setupListeners() {
+                // Escucha archivos generales
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput) {
+                    fileInput.addEventListener('change', (e) => {
+                        Array.from(e.target.files).forEach(f => this.archivos.push(f));
+                        this.renderList('fileList', this.archivos);
+                    });
                 }
-            });
+                
+                // Escucha archivos de requerimientos (delegación de eventos)
+                document.addEventListener('change', (e) => {
+                    if (e.target.classList.contains('req-file-input')) {
+                        const rid = e.target.getAttribute('data-req-id');
+                        if (!this.colaAdjuntosReq[rid]) this.colaAdjuntosReq[rid] = [];
+                        Array.from(e.target.files).forEach(f => this.colaAdjuntosReq[rid].push(f));
+                        this.renderList(`list-req-${rid}`, this.colaAdjuntosReq[rid], rid);
+                    }
+                });
+            },
+            
+            renderList(id, array, reqId = null) {
+                const container = document.getElementById(id);
+                if (!container) return;
+                container.innerHTML = array.map((f, i) => `
+                    <div class="file-item">
+                        <span class="file-name"><i data-lucide="file-text"></i> ${f.name}</span>
+                        <button type="button" class="btn-remove-file" onclick="EIEL_Engine.removeFile('${id}', ${i}, ${reqId})">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>`).join('');
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            },
+            
+            removeFile(id, idx, reqId) {
+                if (reqId) this.colaAdjuntosReq[reqId].splice(idx, 1);
+                else this.archivos.splice(idx, 1);
+                this.renderList(id, reqId ? this.colaAdjuntosReq[reqId] : this.archivos, reqId);
+            },
+            
+            async uploadFiles(tipoForm) {
+                const nombresSubidos = [];
+                const idEnvio = "ID_" + Date.now();
+                const toBase64 = file => new Promise((res, rej) => { 
+                    const reader = new FileReader(); 
+                    reader.readAsDataURL(file); 
+                    reader.onload = () => res(reader.result.split(',')[1]); 
+                    reader.onerror = rej; 
+                });
 
-            // Ajuste específico para el botón enviar para mantener el cursor de espera
-            const btnEnviar = document.getElementById('btnEnviar');
-            if (btnEnviar && isFrozen) {
-                btnEnviar.style.cursor = "wait";
-            } else if (btnEnviar) {
-                btnEnviar.style.cursor = "pointer";
+                // Subir generales
+                for (const file of this.archivos) {
+                    UIProgress.update(`Subiendo: ${file.name}`);
+                    const b64 = await toBase64(file);
+                    await fetch(window.EIEL_CONFIG.urlAdjuntos, { 
+                        method: "POST", mode: "no-cors", 
+                        body: JSON.stringify({ municipio: window.EIEL_CONFIG.muniCode, tipo: tipoForm, nombre: file.name, base64: b64, id_envio: idEnvio })
+                    });
+                    nombresSubidos.push(file.name);
+                }
+
+                // Subir requerimientos
+                for (const [rid, files] of Object.entries(this.colaAdjuntosReq)) {
+                    for (const file of files) {
+                        UIProgress.update(`Subiendo justificante: ${file.name}`);
+                        const b64 = await toBase64(file);
+                        await fetch(window.EIEL_CONFIG.urlAdjuntos, { 
+                            method: "POST", mode: "no-cors", 
+                            body: JSON.stringify({ municipio: window.EIEL_CONFIG.muniCode, tipo: tipoForm, seccion: "REQUERIMIENTOS", nombre: `[REQ_${rid}] ${file.name}`, base64: b64, id_envio: idEnvio })
+                        });
+                        nombresSubidos.push(`[REQ_${rid}] ${file.name}`);
+                    }
+                }
+                return nombresSubidos;
             }
-        }
-        
-        // 4. MODAL DE IMAGEN
-        window.abrirVisorImagen = (src) => {
-            let modal = document.getElementById('visorImagenGlobal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'visorImagenGlobal';
-                modal.className = 'modal-img';
-                modal.innerHTML = `<img src="" id="imgVisor">`;
-                modal.onclick = () => modal.style.display = 'none';
-                document.body.appendChild(modal);
-            }
-            modal.querySelector('img').src = src;
-            modal.style.display = 'flex';
         };
-        
+
+        // Iniciar el motor cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', () => EIEL_Engine.init());
     </script>
    
     
