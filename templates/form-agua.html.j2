@@ -7,90 +7,100 @@
 {% block header_title %}ABASTECIMIENTO DE AGUA{% endblock %}
 
 {% block content %}
+<form id="mainForm">
+    {{ macros.render_instrucciones() }}
+    {{ macros.render_requerimientos(avisos_personalizados) }}
 
-{# USAMOS LAS MACROS PARA INSTRUCCIONES Y REQUERIMIENTOS #}
-{{ macros.render_instrucciones() }}
-{{ macros.render_requerimientos(avisos_personalizados) }}
-
-<div class="card">
-    <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
-    <div class="card-body">
-        <div class="form-group">
-            <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
-            <select class="form-select" name="tipo_gestion" id="tipo_gestion">
-                <option value="">Seleccionar...</option>
-                <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
-                <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
-                <option value="Delegada (Diputación/Consorcio)">Delegada (Diputación/Consorcio)</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="form-label" for="entidad_gestion">Nombre de la Entidad/Empresa Gestora:</label>
-            <input type="text" class="form-control" name="entidad_gestion" id="entidad_gestion" placeholder="Ej: Aqualia, Hidraqua, Propio Ayuntamiento...">
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
+        <div class="card-body">
+            <div class="form-group">
+                <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
+                <select class="form-select" name="tipo_gestion" id="tipo_gestion">
+                    <option value="">Seleccionar...</option>
+                    <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
+                    <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
+                    <option value="Delegada (Diputación/Consorcio)">Delegada (Diputación/Consorcio)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="entidad_gestion">Nombre de la Entidad/Empresa Gestora:</label>
+                <input type="text" class="form-control" name="entidad_gestion" id="entidad_gestion" placeholder="Ej: Aqualia, Hidraqua, Propio Ayuntamiento...">
+            </div>
         </div>
     </div>
-</div>
 
-<div class="card">
-    <h2 class="section-title"><i data-lucide="paperclip"></i> Documentación Adjunta</h2>
-    <p class="form-help">Adjunte cualquier documento técnico, planos o facturas que justifiquen cambios.</p>
-    <div class="file-upload-wrapper">
-        <label class="file-upload-label">
-            <i data-lucide="upload"></i> Seleccionar archivos
-            <input type="file" id="fileInput" multiple hidden>
+    <div class="card" style="margin-top: 2rem;">
+        <h2 class="section-title"><i data-lucide="message-square"></i> Observaciones Finales</h2>
+        <div class="form-group">
+            <textarea class="form-control" name="observaciones" id="observaciones" rows="4" placeholder="Indique cualquier aclaración adicional..."></textarea>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 class="section-title"><i data-lucide="paperclip"></i> Documentación Adjunta</h2>
+        <p class="form-help">Adjunte cualquier documento técnico, planos o facturas que justifiquen cambios.</p>
+        <div class="file-upload-wrapper">
+            <label class="file-upload-label">
+                <i data-lucide="upload"></i> Seleccionar archivos
+                <input type="file" id="fileInput" multiple hidden>
+            </label>
+            <div id="fileList" class="file-list-container"></div>
+        </div>
+    </div>
+
+    <div class="footer-actions">
+        <label class="checkbox-container">
+            <input type="checkbox" id="checkConformidad">
+            <span class="checkmark"></span>
+            Confirmo que los datos introducidos son correctos
         </label>
-        <div id="fileList" class="file-list-container"></div>
+        <button type="submit" id="btnEnviar" class="btn btn-primary" disabled>
+            <i data-lucide="send"></i> Enviar Información
+        </button>
+        <a href="index.html" class="btn btn-secondary">
+            <i data-lucide="arrow-left"></i> Volver al Menú
+        </a>
     </div>
-</div>
+</form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.getElementById('mainForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // 1. Preparar UI
-    const totalFiles = EIEL_FormManager.archivosGenerales.length + Object.values(EIEL_FormManager.colaAdjuntosReq).flat().length;
-    UIProgress.show(totalFiles + 1); // Pasos: archivos + 1 por el PDF
+    const checkConformidad = document.getElementById('checkConformidad');
+    const btnEnviar = document.getElementById('btnEnviar');
+    checkConformidad.addEventListener('change', (e) => btnEnviar.disabled = !e.target.checked);
 
-    try {
-        // 2. Subir archivos usando el motor global
-        const nombresAdjuntos = await EIEL_FormManager.uploadFiles("agua");
+    document.getElementById('mainForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
+        UIProgress.show(total + 1);
 
-        // 3. Recolectar datos específicos de este formulario
-        const payload = {
-            TIPO_FORMULARIO: "agua",
-            NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "No identificado",
-            DEPARTAMENTO_CONTACTO: localStorage.getItem("eiel_user_dept") || "N/A",
-            EMAIL_CONTACTO: localStorage.getItem("eiel_user_email") || "N/A",
-            MUNICIPIO_INE: window.EIEL_CONFIG.muniCode,
-            MUNICIPIO_NOMBRE: window.EIEL_CONFIG.muniName,
-            FASE: window.EIEL_CONFIG.fase,
-            FECHA_ENVIO: new Date().toLocaleString(),
-            OBSERVACIONES: document.getElementById('observaciones').value,
-            
-            // Datos del cuerpo del formulario
-            tipo_gestion: document.getElementById('tipo_gestion').value,
-            entidad_gestion: document.getElementById('entidad_gestion').value,
-            
-            // Requerimientos y adjuntos
-            archivos_adjuntos: nombresAdjuntos,
-            respuestas_requerimientos_json: JSON.stringify(EIEL_FormManager.getRequerimientosData())
-        };
+        try {
+            const adjuntos = await EIEL_Engine.uploadAll("agua");
+            const payload = {
+                TIPO_FORMULARIO: "agua",
+                NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
+                DEPARTAMENTO_CONTACTO: localStorage.getItem("eiel_user_dept") || "N/A",
+                EMAIL_CONTACTO: localStorage.getItem("eiel_user_email") || "N/A",
+                MUNICIPIO_INE: window.EIEL_CONFIG.muniCode,
+                MUNICIPIO_NOMBRE: window.EIEL_CONFIG.muniName,
+                FASE: window.EIEL_CONFIG.fase,
+                FECHA_ENVIO: new Date().toLocaleString(),
+                OBSERVACIONES: document.getElementById('observaciones').value,
+                tipo_gestion: document.getElementById('tipo_gestion').value,
+                entidad_gestion: document.getElementById('entidad_gestion').value,
+                archivos_adjuntos: adjuntos,
+                respuestas_requerimientos_json: JSON.stringify(EIEL_Engine.getReqData())
+            };
 
-        // 4. Enviar al PDF
-        UIProgress.update("Generando acta PDF y enviando copia...");
-        await fetch(window.EIEL_CONFIG.urlGenerarPdf, {
-            method: "POST", mode: "no-cors",
-            body: JSON.stringify(payload)
-        });
-
-        UIProgress.complete();
-        setTimeout(() => location.reload(), 1500);
-
-    } catch (err) {
-        Swal.fire("Error", err.message, "error");
-    }
-});
+            UIProgress.update("Generando acta PDF...");
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            UIProgress.complete();
+            setTimeout(() => location.reload(), 1500);
+        } catch (err) {
+            Swal.fire("Error", err.message, "error");
+        }
+    });
 </script>
 {% endblock %}
