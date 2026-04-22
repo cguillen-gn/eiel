@@ -23,38 +23,75 @@
             isTest: localStorage.getItem("eiel_is_test") === "true"
         };
 
-        // MOTOR CENTRAL DE LÓGICA (Para evitar duplicidad en formularios)
+        const UIProgress = {
+            show(steps = 1) {
+                if (document.getElementById('uploadOverlay')) return;
+                const html = `
+                    <div id="uploadOverlay" class="overlay">
+                        <div class="progress-card">
+                            <div class="spinner"></div>
+                            <h3 id="progressTitle">Procesando envío...</h3>
+                            <div class="progress-bar-container">
+                                <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                            <p id="progressStatus" style="margin-top:10px; color:#64748b;">Iniciando...</p>
+                        </div>
+                    </div>`;
+                document.body.insertAdjacentHTML('beforeend', html);
+                this.totalSteps = steps;
+                this.currentStep = 0;
+            },
+            update(text) {
+                this.currentStep++;
+                const percent = Math.min((this.currentStep / this.totalSteps) * 100, 95);
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = percent + '%';
+                const status = document.getElementById('progressStatus');
+                if (status) status.innerText = text;
+            },
+            complete() {
+                const bar = document.getElementById('progressBar');
+                if (bar) bar.style.width = '100%';
+                setTimeout(() => {
+                    const overlay = document.getElementById('uploadOverlay');
+                    if (overlay) overlay.remove();
+                    Swal.fire({ icon: 'success', title: '¡Enviado!', text: 'La información se ha registrado correctamente.', confirmButtonColor: '#0080ad' });
+                }, 500);
+            }
+        };
+
+        function mostrarMensaje(texto, tipo = "info") {
+            Swal.fire({ icon: tipo, title: tipo === "error" ? "Error" : "Aviso", text: texto, confirmButtonColor: "#0080ad" });
+        }
+
         const EIEL_Engine = {
             archivos: [],
             colaAdjuntosReq: {},
-
             init() {
-                this.setupListeners();
+                this.setupFileListeners();
                 lucide.createIcons();
             },
-
-            setupListeners() {
-                const inputGral = document.getElementById('fileInput');
-                if (inputGral) {
-                    inputGral.addEventListener('change', (e) => {
+            setupFileListeners() {
+                const mainInput = document.getElementById('fileInput');
+                if (mainInput) {
+                    mainInput.addEventListener('change', (e) => {
                         Array.from(e.target.files).forEach(f => this.archivos.push(f));
                         this.renderList('fileList', this.archivos);
                     });
                 }
                 document.addEventListener('change', (e) => {
                     if (e.target.classList.contains('req-file-input')) {
-                        const id = e.target.getAttribute('data-req-id');
-                        if (!this.colaAdjuntosReq[id]) this.colaAdjuntosReq[id] = [];
-                        Array.from(e.target.files).forEach(f => this.colaAdjuntosReq[id].push(f));
-                        this.renderList(`list-req-${id}`, this.colaAdjuntosReq[id], id);
+                        const rid = e.target.getAttribute('data-req-id');
+                        if (!this.colaAdjuntosReq[rid]) this.colaAdjuntosReq[rid] = [];
+                        Array.from(e.target.files).forEach(f => this.colaAdjuntosReq[rid].push(f));
+                        this.renderList(`list-req-${rid}`, this.colaAdjuntosReq[rid], rid);
                     }
                 });
             },
-
             renderList(id, array, reqId = null) {
-                const cont = document.getElementById(id);
-                if (!cont) return;
-                cont.innerHTML = array.map((f, i) => `
+                const container = document.getElementById(id);
+                if (!container) return;
+                container.innerHTML = array.map((f, i) => `
                     <div class="file-item">
                         <span class="file-name"><i data-lucide="file-text"></i> ${f.name}</span>
                         <button type="button" class="btn-remove-file" onclick="EIEL_Engine.removeFile('${id}', ${i}, ${reqId})">
@@ -63,37 +100,31 @@
                     </div>`).join('');
                 lucide.createIcons();
             },
-
             removeFile(id, idx, reqId) {
                 if (reqId) this.colaAdjuntosReq[reqId].splice(idx, 1);
                 else this.archivos.splice(idx, 1);
                 this.renderList(id, reqId ? this.colaAdjuntosReq[reqId] : this.archivos, reqId);
             },
-
-            async uploadAll(tipo) {
-                const subidos = [];
+            async uploadFiles(tipo) {
+                const nombres = [];
                 const idEnvio = "ID_" + Date.now();
-                const toB64 = f => new Promise((r, j) => { const rd = new FileReader(); rd.readAsDataURL(f); rd.onload = () => r(rd.result); rd.onerror = j; });
+                const toB64 = f => new Promise((res, rej) => { const r = new FileReader(); r.readAsDataURL(f); r.onload = () => res(r.result); r.onerror = rej; });
 
                 for (const f of this.archivos) {
                     UIProgress.update(`Subiendo: ${f.name}`);
                     const b64 = await toB64(f);
                     await fetch(window.EIEL_CONFIG.urlAdjuntos, { method: "POST", mode: "no-cors", body: JSON.stringify({ municipio: window.EIEL_CONFIG.muniCode, tipo, nombre: f.name, base64: b64.split(',')[1], id_envio: idEnvio })});
-                    subidos.push(f.name);
+                    nombres.push(f.name);
                 }
                 for (const [rid, fs] of Object.entries(this.colaAdjuntosReq)) {
                     for (const f of fs) {
                         UIProgress.update(`Subiendo: ${f.name}`);
                         const b64 = await toB64(f);
                         await fetch(window.EIEL_CONFIG.urlAdjuntos, { method: "POST", mode: "no-cors", body: JSON.stringify({ municipio: window.EIEL_CONFIG.muniCode, tipo, seccion: "REQUERIMIENTOS", nombre: `[REQ_${rid}] ${f.name}`, base64: b64.split(',')[1], id_envio: idEnvio })});
-                        subidos.push(`[REQ_${rid}] ${f.name}`);
+                        nombres.push(`[REQ_${rid}] ${f.name}`);
                     }
                 }
-                return subidos;
-            },
-
-            getReqData() {
-                return Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({ id: el.getAttribute('data-req-id'), pregunta: el.getAttribute('data-req-nombre'), respuesta: el.value }));
+                return nombres;
             }
         };
     </script>
@@ -108,7 +139,6 @@
             <div class="fase-badge">Fase 2026</div>
         </div>
     </div>
-
     <div class="container">
         <header class="header-main">
             <div class="header-icon"><i data-lucide="construction"></i></div>
@@ -117,7 +147,6 @@
                 <p>Encuesta de Infraestructura y Equipamientos Locales</p>
             </div>
         </header>
-
         
 
 
@@ -1165,7 +1194,6 @@
 
 
     </div>
-
     
 <script>
 document.addEventListener("DOMContentLoaded", () => {
@@ -1726,9 +1754,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 </script>
 
-
     <script>
-        // Logger idéntico al tuyo
         (function() {
             if (window.location.protocol === 'file:') return;
             const payload = {

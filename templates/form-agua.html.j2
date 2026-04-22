@@ -67,17 +67,21 @@
 
 {% block scripts %}
 <script>
-    const checkConformidad = document.getElementById('checkConformidad');
-    const btnEnviar = document.getElementById('btnEnviar');
-    checkConformidad.addEventListener('change', (e) => btnEnviar.disabled = !e.target.checked);
+    const checkConf = document.getElementById('checkConformidad');
+    const btnEnv = document.getElementById('btnEnviar');
+    checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
 
     document.getElementById('mainForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
         UIProgress.show(total + 1);
-
         try {
-            const adjuntos = await EIEL_Engine.uploadAll("agua");
+            const adjuntos = await EIEL_Engine.uploadFiles("agua");
+            const respuestasReq = Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
+                id: el.getAttribute('data-req-id'),
+                pregunta: el.getAttribute('data-req-nombre'),
+                respuesta: el.value
+            }));
             const payload = {
                 TIPO_FORMULARIO: "agua",
                 NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
@@ -91,15 +95,13 @@
                 tipo_gestion: document.getElementById('tipo_gestion').value,
                 entidad_gestion: document.getElementById('entidad_gestion').value,
                 archivos_adjuntos: adjuntos,
-                respuestas_requerimientos_json: JSON.stringify(EIEL_Engine.getReqData())
+                respuestas_requerimientos_json: JSON.stringify(respuestasReq)
             };
-
-            UIProgress.update("Generando acta PDF...");
             await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
             UIProgress.complete();
             setTimeout(() => location.reload(), 1500);
         } catch (err) {
-            Swal.fire("Error", err.message, "error");
+            mostrarMensaje(err.message, "error");
         }
     });
 </script>
