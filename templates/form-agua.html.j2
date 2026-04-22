@@ -7,61 +7,58 @@
 {% block header_title %}ABASTECIMIENTO DE AGUA{% endblock %}
 
 {% block content %}
-<form id="mainForm">
-    {{ macros.render_instrucciones() }}
-    {{ macros.render_requerimientos(avisos_personalizados) }}
+{{ macros.render_instrucciones() }}
+{{ macros.render_requerimientos(avisos_personalizados) }}
 
-    <div class="card">
-        <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
-        <div class="card-body">
-            <div class="form-group">
-                <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
-                <select class="form-select" name="tipo_gestion" id="tipo_gestion">
-                    <option value="">Seleccionar...</option>
-                    <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
-                    <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
-                    <option value="Delegada (Diputación/Consorcio)">Delegada (Diputación/Consorcio)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label" for="entidad_gestion">Nombre de la Entidad/Empresa Gestora:</label>
-                <input type="text" class="form-control" name="entidad_gestion" id="entidad_gestion" placeholder="Ej: Aqualia, Hidraqua, Propio Ayuntamiento...">
-            </div>
-        </div>
-    </div>
-
-    <div class="card" style="margin-top: 2rem;">
-        <h2 class="section-title"><i data-lucide="message-square"></i> Observaciones Finales</h2>
+<div class="card">
+    <h2 class="section-title"><i data-lucide="briefcase-business"></i>Gestión del Servicio</h2>
+    <div class="card-body">
         <div class="form-group">
-            <textarea class="form-control" name="observaciones" id="observaciones" rows="4" placeholder="Indique cualquier aclaración adicional..."></textarea>
+            <label class="form-label" for="tipo_gestion">Tipo de Gestión:</label>
+            <select class="form-select" name="tipo_gestion" id="tipo_gestion">
+                <option value="">Seleccionar...</option>
+                <option value="Directa (Municipal)">Municipal (Ayuntamiento)</option>
+                <option value="Indirecta (Concesionaria)">Empresa Concesionaria</option>
+                <option value="Delegada (Diputación/Consorcio)">Delegada (Diputación/Consorcio)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="entidad_gestion">Nombre de la Entidad/Empresa Gestora:</label>
+            <input type="text" class="form-control" name="entidad_gestion" id="entidad_gestion" placeholder="Ej: Aqualia, Hidraqua, Propio Ayuntamiento...">
         </div>
     </div>
+</div>
 
-    <div class="card">
-        <h2 class="section-title"><i data-lucide="paperclip"></i> Documentación Adjunta</h2>
-        <p class="form-help">Adjunte cualquier documento técnico, planos o facturas que justifiquen cambios.</p>
-        <div class="file-upload-wrapper">
-            <label class="file-upload-label">
-                <i data-lucide="upload"></i> Seleccionar archivos
-                <input type="file" id="fileInput" multiple hidden>
-            </label>
-            <div id="fileList" class="file-list-container"></div>
-        </div>
+<div class="card" style="margin-top: 2rem;">
+    <h2 class="section-title"><i data-lucide="message-square"></i> Observaciones Finales</h2>
+    <div class="form-group">
+        <textarea class="form-control" name="observaciones" id="observaciones" rows="4" placeholder="Indique cualquier aclaración adicional..."></textarea>
     </div>
-</form>
+</div>
 
-{# PIE DE PÁGINA FUERA DEL FORMULARIO (Como el original) #}
+<div class="card">
+    <h2 class="section-title"><i data-lucide="paperclip"></i> Documentación Adjunta</h2>
+    <p class="form-help">Adjunte cualquier documento técnico, planos o facturas que justifiquen cambios.</p>
+    <div class="file-upload-wrapper">
+        <label class="file-upload-label">
+            <i data-lucide="upload"></i> Seleccionar archivos
+            <input type="file" id="fileInput" multiple hidden>
+        </label>
+        <div id="fileList" class="file-list-container"></div>
+    </div>
+</div>
+
 <div class="footer-actions">
     <label class="checkbox-container">
         <input type="checkbox" id="checkConformidad">
         <span class="checkmark"></span>
         Confirmo que los datos introducidos son correctos
     </label>
-    <button type="submit" id="btnEnviar" form="mainForm" class="btn btn-primary" disabled>
+    <button type="button" id="btnEnviar" class="btn btn-primary" disabled>
         <i data-lucide="send"></i> Enviar Información
     </button>
     <a href="index.html" class="btn btn-secondary">
-        <i data-lucide=\"arrow-left\"></i> Volver al Menú
+        <i data-lucide="arrow-left"></i> Volver al Menú
     </a>
 </div>
 {% endblock %}
@@ -72,13 +69,20 @@
     const btnEnv = document.getElementById('btnEnviar');
     if(checkConf) checkConf.addEventListener('change', (e) => btnEnv.disabled = !e.target.checked);
 
-    document.getElementById('mainForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
+    btnEnv.addEventListener('click', async () => {
         const total = EIEL_Engine.archivos.length + Object.values(EIEL_Engine.colaAdjuntosReq).flat().length;
         UIProgress.show(total + 1);
 
         try {
             const adjuntos = await EIEL_Engine.uploadFiles("agua");
+            
+            // Recolectar respuestas de requerimientos
+            const respuestasReq = Array.from(document.querySelectorAll('.req-respuesta')).map(el => ({
+                id: el.getAttribute('data-req-id'),
+                pregunta: el.getAttribute('data-req-nombre'),
+                respuesta: el.value
+            }));
+
             const payload = {
                 TIPO_FORMULARIO: "agua",
                 NOMBRE_CONTACTO: localStorage.getItem("eiel_user_name") || "N/A",
@@ -92,15 +96,18 @@
                 tipo_gestion: document.getElementById('tipo_gestion').value,
                 entidad_gestion: document.getElementById('entidad_gestion').value,
                 archivos_adjuntos: adjuntos,
-                respuestas_requerimientos_json: JSON.stringify(EIEL_Engine.getReqData())
+                respuestas_requerimientos_json: JSON.stringify(respuestasReq)
             };
 
-            UIProgress.update("Generando acta PDF...");
-            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            await fetch(window.EIEL_CONFIG.urlGenerarPdf, { 
+                method: "POST", mode: "no-cors", body: JSON.stringify(payload) 
+            });
+
             UIProgress.complete();
             setTimeout(() => location.reload(), 1500);
+
         } catch (err) {
-            mostrarMensaje(err.message, "error");
+            Swal.fire({ icon: 'error', title: 'Error', text: err.message });
         }
     });
 </script>
