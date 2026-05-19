@@ -162,34 +162,42 @@ def obtener_depositos(conn, mun):
 def obtener_obras(conn, mun):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         sql = """
-            SELECT clave, mun, orden, nombre, plan_obra, estado, proyecto,
-            CASE WHEN estado = 'FI' THEN 2 ELSE 0 END as cond
-            FROM geonet_obras
-            WHERE fase = (SELECT max(fase) FROM geonet_fase)
-            AND mun = %s
-            AND (
-                (equipamientos IS NULL OR equipamientos = 'SI') OR
-                (alumbrado IS NULL OR alumbrado = 'SI') OR
-                (infra_viaria IS NULL OR infra_viaria = 'SI') OR
-                (abastecimiento IS NULL OR abastecimiento = 'SI') OR
-                (saneamiento IS NULL OR saneamiento = 'SI')
-            ) 
-            -- Se descartan las anuladas
-            AND (estado IS NULL OR estado <> 'AN') 
-            -- Se descartan las finalizadas con proyecto
-            AND NOT (estado IS NOT DISTINCT FROM 'FI' AND proyecto IS NOT DISTINCT FROM 'RE')
-            AND (
-                mun IN ('001','002','008','016','022','024','026','030','033','045','048','051','062','073','075','085','086','088','101','106','107','110','112','120','130','135','136','137') -- Municipios en los que no se desea filtrar obras por algun motivo.
-                OR (
-                    -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
-                    (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
-                    -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
-                    AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
-                    -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
-                    AND (subvencion IS NULL OR subvencion <> 'DICH')
-                    )
+                SELECT clave, mun, orden, nombre, plan_obra, estado, proyecto,
+                CASE WHEN estado = 'FI' THEN 2 ELSE 0 END as cond
+                FROM geonet_obras
+                WHERE fase = (SELECT max(fase) FROM geonet_fase)
+                AND mun = %s
+                AND (
+                    (equipamientos IS NULL OR equipamientos = 'SI') OR
+                    (alumbrado IS NULL OR alumbrado = 'SI') OR
+                    (infra_viaria IS NULL OR infra_viaria = 'SI') OR
+                    (abastecimiento IS NULL OR abastecimiento = 'SI') OR
+                    (saneamiento IS NULL OR saneamiento = 'SI')
+                ) 
+                -- Se descartan las anuladas
+                AND (estado IS NULL OR estado <> 'AN') 
+                -- Se descartan las finalizadas con proyecto
+                AND NOT (estado IS NOT DISTINCT FROM 'FI' AND proyecto IS NOT DISTINCT FROM 'RE')
+                -- Se descartan las obras de EATIMS (ELM), que se piden por otro canal (email o similar)
+                AND NOT (
+                    (mun = '063' AND nombre ILIKE ANY(ARRAY['%%JESÚS POBRE%%','%%JESUS POBRE%%','%%LA XARA%%','%%LA JARA%%']))
+                    OR
+                    (mun = '006' AND nombre ILIKE ANY(ARRAY['%%LLOSA DE CAMACHO%%','%%LLOSA DE CAMATXO%%']))
                 )
-            ORDER BY orden;
+                AND (
+                    -- Municipios en los que no se desea filtrar obras, y se prefiere que aparezcan todas
+                    mun IN ('001','002','008','016','022','024','026','030','033','045','048','051','062','073','075','085','086','088','101','106','107','110','112','120','130','135','136','137') 
+                    -- Filtros de obras que no se desea que aparezcan
+                    OR (
+                        -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
+                        (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
+                        -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
+                        AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
+                        -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
+                        AND (subvencion IS NULL OR subvencion <> 'DICH')
+                        )
+                    )
+                ORDER BY orden;
         """
         cur.execute(sql, (mun,))
         rows = cur.fetchall()
