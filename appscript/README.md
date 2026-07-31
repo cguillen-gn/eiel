@@ -51,6 +51,13 @@ Mismo valor en los 3 proyectos:
 - Front sin `no-cors`; interpreta `status` o `success`
 - Gancho contacto `FORZAR_ERROR`
 
+
+## E — Logger de accesos (`logger.gs`)
+
+- Front sin `no-cors`; lee `{ status }`
+- Si falla: solo `console.warn` (no bloquea el formulario)
+- Ver `logger.PARCHE.md` para desplegar
+
 ## Nota DriveApp / setSharing
 
 En muchos Workspace, `ANYONE_WITH_LINK` está bloqueado. El flujo EIEL no

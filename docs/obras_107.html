@@ -1082,13 +1082,36 @@ document.addEventListener("DOMContentLoaded", () => {
             email: localStorage.getItem("eiel_user_email") || "N/A" 
         };
 
-        // Envío al Apps Script de Logs si la URL está configurada en Python
+        // Envío al Apps Script de Logs (respuesta legible; no bloquea la UI)
         if (window.EIEL_CONFIG && window.EIEL_CONFIG.urlLogger) {
             fetch(window.EIEL_CONFIG.urlLogger, {
                 method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(payload)
-            });
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify(payload),
+                redirect: 'follow'
+            })
+                .then(function (response) {
+                    return response.text().then(function (raw) {
+                        var result = null;
+                        try {
+                            result = JSON.parse(raw);
+                        } catch (parseErr) {
+                            console.warn(
+                                '[EIEL] Logger: respuesta no JSON. Actualice appscript/logger.gs'
+                            );
+                            return;
+                        }
+                        if (!result || result.status !== 'success') {
+                            console.warn(
+                                '[EIEL] Logger: no se registró el acceso:',
+                                (result && result.message) || ('HTTP ' + response.status)
+                            );
+                        }
+                    });
+                })
+                .catch(function (err) {
+                    console.warn('[EIEL] Logger: fallo de red', err);
+                });
         }
     })();
     </script>
