@@ -617,13 +617,64 @@
         return completados;
     }
 
+    /**
+     * Interpreta la respuesta del script Generar PDF.
+     * Acepta contrato nuevo { status: "success"|"error" } y el histórico { success: bool }.
+     * null = JSON sin indicador conocido (legado opaco) → no bloquea.
+     */
+    function interpretPdfResult(result) {
+        if (!result || typeof result !== "object") return null;
+        if (typeof result.status === "string") {
+            return result.status === "success";
+        }
+        if (typeof result.success === "boolean") {
+            return result.success === true;
+        }
+        return null;
+    }
+
+    /**
+     * Envía el payload al script de generar PDF.
+     * Misma estrategia que adjuntos: text/plain (sin preflight) y JSON legible.
+     */
     async function sendPdfPayload(payload) {
-        await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
+        const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
             method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+            redirect: "follow"
         });
+
+        const raw = await response.text();
+        let result = null;
+        try {
+            result = JSON.parse(raw);
+        } catch (parseErr) {
+            console.warn(
+                "[EIEL] Respuesta PDF no JSON (¿Apps Script antiguo?). " +
+                    "Actualice appscript/generar-pdf.gs y redespliegue."
+            );
+            return true;
+        }
+
+        const ok = interpretPdfResult(result);
+        if (ok === null) {
+            console.warn(
+                "[EIEL] Respuesta PDF sin status/success; se asume OK (legado)."
+            );
+            return true;
+        }
+
+        if (!response.ok || !ok) {
+            UIProgress.hide();
+            const detalle =
+                (result && result.message) ||
+                "HTTP " + response.status ||
+                "Error desconocido";
+            throw new Error("No se pudo generar el justificante PDF: " + detalle);
+        }
+
+        return true;
     }
 
     /**
