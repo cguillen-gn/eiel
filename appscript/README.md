@@ -1,8 +1,7 @@
-# Apps Script — Adjuntos fiables (A + B)
+# Apps Script — Adjuntos fiables + PDF legible
 
-## Qué cambia
+## A + B — Adjuntos (`appscript/adjuntos.gs`)
 
-### A — `appscript/adjuntos.gs`
 - Validación de municipio, `id_envio`, nombre y Base64
 - Límite 35 MB
 - Gancho de prueba: nombre que empiece por `FORZAR_ERROR`
@@ -12,29 +11,44 @@
   el archivo **sigue** como éxito (antes tumba toda la subida con
   `Acceso denegado: DriveApp`)
 
-### B — Front (`js/eiel-forms.js`)
-- Deja de usar `no-cors` en adjuntos
-- Usa `Content-Type: text/plain` (como el login) para poder leer la respuesta
+### Front adjuntos (`js/eiel-forms.js`)
+
+- Sin `no-cors` en adjuntos
+- `Content-Type: text/plain` (como el login) para leer la respuesta
 - Exige `status === "success"`
 - 2 reintentos por fichero
 - Si falla: cierra overlay, muestra error, **no** llama a generar PDF
 
-## Cómo desplegar
+### Despliegue adjuntos
 
 1. Abrir el proyecto Apps Script de **URL_ADJUNTOS**
 2. Sustituir el código por el de `appscript/adjuntos.gs`
-3. (Opcional) Ejecutar `testDrivePermisos` en el editor: debe crear un txt de
-   prueba; si `setSharing` falla, lo verás en el log pero no es bloqueante
+3. (Opcional) Ejecutar `testDrivePermisos` en el editor
 4. **Implementar** → nueva versión → Web app `/exec`
    - Ejecutar como: **Yo**
    - Acceso: **Cualquiera**
-5. Publicar el front (`docs/js/eiel-forms.js`) si aún no está en Pages
 
-## Prueba forzada
+## C — PDF / justificante (respuesta legible)
 
-1. Login en modo pruebas
-2. Adjuntar `FORZAR_ERROR_prueba.pdf` → debe fallar con mensaje
-3. Adjuntar un PDF normal → debe completar OK
+### Front
+
+- `sendPdfPayload` ya **no** usa `no-cors`
+- Usa `Content-Type: text/plain` y lee JSON
+- Si el script antiguo no devuelve `{ status }`, no bloquea (compatibilidad)
+- Si devuelve `status !== "success"`, cierra overlay y muestra error
+
+### Apps Script
+
+Ver instrucciones de parche en [`generar-pdf.PARCHE.md`](./generar-pdf.PARCHE.md).
+
+Resumen: envolver `doPost` en try/catch y **siempre** devolver
+
+```javascript
+ContentService.createTextOutput(JSON.stringify(result))
+  .setMimeType(ContentService.MimeType.JSON);
+```
+
+Luego **Implementar → Nueva versión**.
 
 ## Nota sobre "Acceso denegado: DriveApp"
 

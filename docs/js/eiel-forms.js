@@ -617,13 +617,48 @@
         return completados;
     }
 
+    /**
+     * Envía el payload al script de generar PDF.
+     * Misma estrategia que adjuntos: text/plain (sin preflight) y JSON legible.
+     * Compatibilidad: si el despliegue antiguo no devuelve { status }, no bloquea
+     * (comportamiento previo tipo no-cors). Tras actualizar Apps Script, exige success.
+     */
     async function sendPdfPayload(payload) {
-        await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
+        const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
             method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+            redirect: "follow"
         });
+
+        const raw = await response.text();
+        let result = null;
+        try {
+            result = JSON.parse(raw);
+        } catch (parseErr) {
+            // Despliegue antiguo sin JSON: no podemos verificar; no fingimos fallo.
+            console.warn(
+                "[EIEL] Respuesta PDF no JSON (¿Apps Script antiguo?). " +
+                    "Actualice generar-pdf.gs para respuestas legibles."
+            );
+            return true;
+        }
+
+        if (!result || typeof result.status === "undefined") {
+            console.warn("[EIEL] Respuesta PDF sin campo status; se asume OK (legado).");
+            return true;
+        }
+
+        if (!response.ok || result.status !== "success") {
+            UIProgress.hide();
+            const detalle =
+                (result && result.message) ||
+                "HTTP " + response.status ||
+                "Error desconocido";
+            throw new Error("No se pudo generar el justificante PDF: " + detalle);
+        }
+
+        return true;
     }
 
     /**
