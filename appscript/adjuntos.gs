@@ -3,7 +3,6 @@
 // Pegar en URL_ADJUNTOS + fichero auth-token.gs en el MISMO proyecto.
 // Tras pegar: Implementar → Nueva versión.
 //
-// Prueba forzada: nombre de archivo que empiece por FORZAR_ERROR
 // --------------------------------------------------------------------
 
 const CARPETA_RAIZ_ID = "1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV";
@@ -85,10 +84,6 @@ function handleAdjuntosPost_(e) {
     if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
-    if (fileName.indexOf("FORZAR_ERROR") === 0) {
-      throw new Error("Error de prueba forzado (FORZAR_ERROR).");
-    }
-
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
     if (approxBytes > LIMITE_BYTES) {
       throw new Error(
@@ -167,7 +162,7 @@ function handleAdjuntosPost_(e) {
     );
   } catch (error) {
     result.status = "error";
-    result.message = error.toString();
+    result.message = friendlyUserMessageAdjuntos_(error);
     Logger.log("ERROR SUBIDA: " + error.toString());
     try {
       Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
@@ -185,6 +180,45 @@ function isJson(str) {
     return false;
   }
   return true;
+}
+
+function cleanErrorTextAdjuntos_(err) {
+  var s = "";
+  if (err && err.message) s = String(err.message);
+  else if (err != null) s = String(err);
+  s = s.trim();
+  while (/^Error:\s*/i.test(s)) {
+    s = s.replace(/^Error:\s*/i, "").trim();
+  }
+  return s || "Error desconocido";
+}
+
+function friendlyUserMessageAdjuntos_(err) {
+  var raw = cleanErrorTextAdjuntos_(err);
+  var lower = raw.toLowerCase();
+
+  if (
+    lower.indexOf("sesión") !== -1 ||
+    lower.indexOf("falta ") === 0 ||
+    lower.indexOf("supera el límite") !== -1 ||
+    lower.indexOf("no hay datos") !== -1 ||
+    lower.indexOf("auth-token") !== -1
+  ) {
+    return raw;
+  }
+  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
+    return "No se pudo guardar el archivo en Drive. Inténtelo de nuevo; si continúa, contacte con soporte.";
+  }
+  if (
+    lower.indexOf("quota") !== -1 ||
+    (lower.indexOf("limit") !== -1 && lower.indexOf("archivo") === -1)
+  ) {
+    return "El servicio de Drive está temporalmente saturado. Espere unos minutos e inténtelo de nuevo.";
+  }
+  if (/^(No se |Falta |El |La )/.test(raw) || /[áéíóúñ¿¡]/i.test(raw)) {
+    return raw;
+  }
+  return "No se pudo subir el archivo. Inténtelo de nuevo; si el problema continúa, contacte con soporte.";
 }
 
 function getOrCreateFolder(parent, name) {

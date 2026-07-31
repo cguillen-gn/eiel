@@ -223,10 +223,11 @@
             }
 
             if (!response.ok || !result || result.status !== "success") {
-                const detalle =
+                const detalle = cleanErrorText(
                     (result && result.message) ||
-                    "HTTP " + response.status ||
-                    "Error desconocido";
+                        "HTTP " + response.status ||
+                        "Error desconocido"
+                );
                 throw new Error(
                     'No se pudo subir "' + file.name + '": ' + detalle
                 );
@@ -692,11 +693,12 @@
 
         if (!response.ok || !ok) {
             UIProgress.hide();
-            const detalle =
+            const detalle = cleanErrorText(
                 (result && result.message) ||
-                "HTTP " + response.status ||
-                "Error desconocido";
-            throw new Error("No se pudo generar el justificante PDF: " + detalle);
+                    "HTTP " + response.status ||
+                    "Error desconocido"
+            );
+            throw new Error(detalle);
         }
 
         return true;

@@ -61,11 +61,6 @@ function doPost(e) {
       municipioCodigoEarly
     );
 
-    // Gancho de prueba: forzar fallo controlado
-    if ((data.nombre_contacto || "") === "FORZAR_ERROR") {
-      throw new Error("Error de prueba forzado (FORZAR_ERROR).");
-    }
-
     const TIPO_FORMULARIO = (data.tipo_formulario || data.tipo_ficha || "agua").toLowerCase();
 
     const isTestMode = data.is_test === true || data.is_test === "true";
@@ -269,13 +264,12 @@ function doPost(e) {
       console.error("ERROR CRÍTICO: " + error.toString());
       result.status = "error";
       result.success = false;
-      // Preferir .message (sin el prefijo "Error:" que añade toString())
-      result.message = cleanErrorText_(error);
+      result.message = friendlyUserMessage_(error);
 
       // Forzamos el aviso incluso si 'registro' no se ha definido correctamente
       try {
         const filaAfectada = (registro && registro.fila) ? registro.fila : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(NOMBRE_PESTANA_LOGS).getLastRow();
-        actualizarUrlLog(filaAfectada, "ERROR: " + result.message);
+        actualizarUrlLog(filaAfectada, "ERROR: " + cleanErrorText_(error));
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
@@ -405,6 +399,67 @@ function safeParse(val) {
   if (!val) return [];
   if (typeof val === 'object') return val;
   try { return JSON.parse(val); } catch(e) { return []; }
+}
+
+/** Quita prefijos repetidos "Error:" de Exceptions / toString(). */
+function cleanErrorText_(err) {
+  var s = "";
+  if (err && err.message) s = String(err.message);
+  else if (err != null) s = String(err);
+  s = s.trim();
+  while (/^Error:\s*/i.test(s)) {
+    s = s.replace(/^Error:\s*/i, "").trim();
+  }
+  return s || "Error desconocido";
+}
+
+/**
+ * Mensaje claro para el técnico. El detalle crudo queda en Logger / hoja de logs.
+ */
+function friendlyUserMessage_(err) {
+  var raw = cleanErrorText_(err);
+  var lower = raw.toLowerCase();
+
+  if (
+    lower.indexOf("sesión") !== -1 ||
+    lower.indexOf("falta ") === 0 ||
+    lower.indexOf("servidor temporalmente") !== -1 ||
+    lower.indexOf("no se recibieron") !== -1
+  ) {
+    return raw;
+  }
+  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
+    if (lower.indexOf("drive") !== -1) {
+      return "No se pudo acceder a Google Drive. Inténtelo de nuevo; si continúa, contacte con soporte.";
+    }
+    return "Acceso denegado al servicio. Inténtelo de nuevo o contacte con soporte.";
+  }
+  if (
+    lower.indexOf("gmail") !== -1 ||
+    lower.indexOf("mail service") !== -1 ||
+    lower.indexOf("enviar el correo") !== -1
+  ) {
+    return "No se pudo enviar el correo del justificante. Compruebe el email o inténtelo más tarde.";
+  }
+  if (lower.indexOf("spreadsheet") !== -1 || lower.indexOf("hoja de cálculo") !== -1) {
+    return "No se pudo registrar el envío en la hoja de control. Inténtelo de nuevo o contacte con soporte.";
+  }
+  if (
+    lower.indexOf("quota") !== -1 ||
+    lower.indexOf("rate limit") !== -1 ||
+    lower.indexOf("limite de") !== -1 ||
+    lower.indexOf("límite de") !== -1
+  ) {
+    return "El servicio está temporalmente saturado. Espere unos minutos e inténtelo de nuevo.";
+  }
+  if (lower.indexOf("timeout") !== -1 || lower.indexOf("timed out") !== -1 || lower.indexOf("excedido el tiempo") !== -1) {
+    return "La operación tardó demasiado. Inténtelo de nuevo más tarde.";
+  }
+  // Mensajes nuestros ya en español usable
+  if (/^(No se |Falta |El |La |Servidor )/.test(raw) || /[áéíóúñ¿¡]/i.test(raw)) {
+    return raw;
+  }
+  return "No se pudo completar el justificante PDF. Inténtelo de nuevo; si el problema continúa, contacte con soporte.";
 }
 
 // ====================================================================
