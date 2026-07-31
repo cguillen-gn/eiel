@@ -252,6 +252,8 @@ def copiar_assets():
         shutil.copytree(ASSETS_CSS_DIR, os.path.join(OUTPUT_DIR, 'css'), dirs_exist_ok=True)
     if os.path.exists(ASSETS_DIR):
         shutil.copytree(ASSETS_DIR, os.path.join(OUTPUT_DIR, 'assets'), dirs_exist_ok=True)
+    if os.path.exists(ASSETS_JS_DIR):
+        shutil.copytree(ASSETS_JS_DIR, os.path.join(OUTPUT_DIR, 'js'), dirs_exist_ok=True)
 
 # --- OBTENCION DE EQUIPAMIENTOS ---
 def obtener_equipamientos(conn, mun):
