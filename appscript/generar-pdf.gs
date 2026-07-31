@@ -35,7 +35,8 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       success: false, 
-      message: "Servidor temporalmente ocupado. Por favor, espere unos segundos y reintente."
+      message:
+        "El servidor está ocupado en este momento. Espere unos segundos e inténtelo de nuevo. Si necesita ayuda, escriba a eiel@geonet.es."
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -60,11 +61,6 @@ function doPost(e) {
       data.session_token || data.token || "",
       municipioCodigoEarly
     );
-
-    // Gancho de prueba: forzar fallo controlado
-    if ((data.nombre_contacto || "") === "FORZAR_ERROR") {
-      throw new Error("Error de prueba forzado (FORZAR_ERROR).");
-    }
 
     const TIPO_FORMULARIO = (data.tipo_formulario || data.tipo_ficha || "agua").toLowerCase();
 
@@ -269,12 +265,12 @@ function doPost(e) {
       console.error("ERROR CRÍTICO: " + error.toString());
       result.status = "error";
       result.success = false;
-      result.message = "Error: " + error.toString();
-      
+      result.message = friendlyUserMessage_(error);
+
       // Forzamos el aviso incluso si 'registro' no se ha definido correctamente
       try {
         const filaAfectada = (registro && registro.fila) ? registro.fila : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(NOMBRE_PESTANA_LOGS).getLastRow();
-        actualizarUrlLog(filaAfectada, "ERROR: " + error.toString());
+        actualizarUrlLog(filaAfectada, "ERROR: " + cleanErrorText_(error));
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
@@ -404,6 +400,94 @@ function safeParse(val) {
   if (!val) return [];
   if (typeof val === 'object') return val;
   try { return JSON.parse(val); } catch(e) { return []; }
+}
+
+/** Quita prefijos repetidos "Error:" de Exceptions / toString(). */
+function cleanErrorText_(err) {
+  var s = "";
+  if (err && err.message) s = String(err.message);
+  else if (err != null) s = String(err);
+  s = s.trim();
+  while (/^Error:\s*/i.test(s)) {
+    s = s.replace(/^Error:\s*/i, "").trim();
+  }
+  return s || "Error desconocido";
+}
+
+var EIEL_CONTACTO_AYUDA = "eiel@geonet.es";
+
+/** Añade contacto de ayuda si el mensaje aún no lo incluye. */
+function withAyuda_(msg) {
+  var s = String(msg || "").trim();
+  if (!s) s = "Ha ocurrido un problema al completar el envío.";
+  if (s.toLowerCase().indexOf(EIEL_CONTACTO_AYUDA.toLowerCase()) !== -1) return s;
+  return s + " Si necesita ayuda, escriba a " + EIEL_CONTACTO_AYUDA + ".";
+}
+
+/**
+ * Mensaje para el técnico: qué ha pasado + qué hacer + contacto.
+ * Sin detalles internos (Drive, hojas, etc.). El detalle crudo va a Logger.
+ */
+function friendlyUserMessage_(err) {
+  var raw = cleanErrorText_(err);
+  var lower = raw.toLowerCase();
+
+  if (lower.indexOf("sesión") !== -1) {
+    return withAyuda_(
+      "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("servidor temporalmente") !== -1) {
+    return withAyuda_(
+      "El servidor está ocupado en este momento. Espere unos segundos e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("falta ") === 0 || lower.indexOf("no se recibieron") !== -1) {
+    return withAyuda_(
+      "Faltan datos necesarios para el envío. Revise el formulario e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
+    return withAyuda_(
+      "No se ha podido completar el envío por un problema de permisos del sistema. Inténtelo de nuevo más tarde."
+    );
+  }
+  if (
+    lower.indexOf("gmail") !== -1 ||
+    lower.indexOf("mail service") !== -1 ||
+    lower.indexOf("sendemail") !== -1
+  ) {
+    return withAyuda_(
+      "No se ha podido enviar el justificante por correo. Compruebe que el email de contacto es correcto e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("spreadsheet") !== -1 || lower.indexOf("hoja de cálculo") !== -1) {
+    return withAyuda_(
+      "No se ha podido registrar el envío. Inténtelo de nuevo en unos minutos."
+    );
+  }
+  if (
+    lower.indexOf("quota") !== -1 ||
+    lower.indexOf("rate limit") !== -1 ||
+    lower.indexOf("limite de") !== -1 ||
+    lower.indexOf("límite de") !== -1
+  ) {
+    return withAyuda_(
+      "El sistema está saturado temporalmente. Espere unos minutos e inténtelo de nuevo."
+    );
+  }
+  if (
+    lower.indexOf("timeout") !== -1 ||
+    lower.indexOf("timed out") !== -1 ||
+    lower.indexOf("excedido el tiempo") !== -1
+  ) {
+    return withAyuda_(
+      "La operación ha tardado demasiado. Inténtelo de nuevo; si el envío incluye muchos adjuntos, repártalo en dos envíos (dos tandas) e indique en observaciones que es continuación del anterior."
+    );
+  }
+  return withAyuda_(
+    "No se ha podido completar el justificante. Inténtelo de nuevo en unos minutos."
+  );
 }
 
 // ====================================================================

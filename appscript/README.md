@@ -1,4 +1,4 @@
-# Apps Script — Adjuntos, PDF y token de sesión
+# Apps Script — Adjuntos, PDF, token y logger
 
 ## D — Token de sesión en el envío
 
@@ -8,55 +8,50 @@ disparar el PDF. Ahora el login emite un token HMAC; adjuntos y PDF lo exigen.
 | Pieza | Archivo |
 |-------|---------|
 | Helpers HMAC (compartidos) | `auth-token.gs` |
-| Parche login | `login.PARCHE.md` |
-| Adjuntos | `adjuntos.gs` (llama `assertValidSessionToken_`) |
-| PDF | `generar-pdf.gs` (idem) |
+| Login | `login.gs` / `login.PARCHE.md` |
+| Adjuntos | `adjuntos.gs` |
+| PDF | `generar-pdf.gs` |
 | Front | `js/eiel-forms.js` + plantillas index/base |
 
 ### Despliegue (orden)
 
-1. **Login:** añadir fichero `auth-token` (`auth-token.gs`) + emitir `token`
-   en la respuesta (ver `login.PARCHE.md`) → **Nueva versión**
-2. **Front:** merge + regenerar (`index` guarda `eiel_session_token`;
-   formularios lo envían como `session_token`)
-3. **Adjuntos y PDF:** añadir el mismo `auth-token.gs` + pegar scripts
-   actualizados → **Nueva versión** cada uno
-4. **Cerrar sesión** en el navegador y volver a entrar (sesiones antiguas
-   sin token se invalidan)
+1. **Login:** `auth-token.gs` + `login.gs` → **Nueva versión**
+2. **Front:** merge + regenerar
+3. **Adjuntos y PDF:** mismo `auth-token.gs` + scripts → **Nueva versión**
+4. Cerrar sesión y volver a entrar
 
 ### Secreto
 
-Mismo valor en los 3 proyectos:
-- Script Properties → `EIEL_TOKEN_SECRET` (recomendado), o
-- el fallback dentro de `auth-token.gs`
+Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
+`auth-token.gs` en Login, Adjuntos y PDF.
 
 ### Pruebas
 
-1. Login normal → menú OK  
+1. Login → menú OK  
 2. Envío con adjunto → OK  
-3. Sin token (borrar `eiel_session_token` en DevTools) → error / redirect login  
-4. Contacto `FORZAR_ERROR` → sigue fallando el PDF a propósito  
+3. Sin token (borrar `eiel_session_token`) → redirect / error de sesión  
 
 ---
 
 ## A + B — Adjuntos (`adjuntos.gs`)
 
-- Validación, límite 35 MB, `FORZAR_ERROR*`, JSON legible
+- Validación, límite 35 MB, JSON legible
 - `setSharing` no bloqueante
+- Mensajes de error en español para el técnico
 - Front sin `no-cors`; exige `status === "success"`
 
 ## C — PDF (`generar-pdf.gs`)
 
 - JSON `{ status, success, message }`
+- Mensajes de error amigables (Drive, Gmail, cuota, sesión…)
 - Front sin `no-cors`; interpreta `status` o `success`
-- Gancho contacto `FORZAR_ERROR`
-
 
 ## E — Logger de accesos (`logger.gs`)
 
 - Front sin `no-cors`; lee `{ status }`
 - Si falla: solo `console.warn` (no bloquea el formulario)
-- Ver `logger.PARCHE.md` para desplegar
+- Código municipio con ceros (`'006`)
+- Ver `logger.PARCHE.md`
 
 ## Nota DriveApp / setSharing
 

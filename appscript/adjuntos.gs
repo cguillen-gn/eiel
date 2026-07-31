@@ -3,7 +3,6 @@
 // Pegar en URL_ADJUNTOS + fichero auth-token.gs en el MISMO proyecto.
 // Tras pegar: Implementar → Nueva versión.
 //
-// Prueba forzada: nombre de archivo que empiece por FORZAR_ERROR
 // --------------------------------------------------------------------
 
 const CARPETA_RAIZ_ID = "1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV";
@@ -85,10 +84,6 @@ function handleAdjuntosPost_(e) {
     if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
-    if (fileName.indexOf("FORZAR_ERROR") === 0) {
-      throw new Error("Error de prueba forzado (FORZAR_ERROR).");
-    }
-
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
     if (approxBytes > LIMITE_BYTES) {
       throw new Error(
@@ -167,7 +162,7 @@ function handleAdjuntosPost_(e) {
     );
   } catch (error) {
     result.status = "error";
-    result.message = error.toString();
+    result.message = friendlyUserMessageAdjuntos_(error);
     Logger.log("ERROR SUBIDA: " + error.toString());
     try {
       Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
@@ -185,6 +180,71 @@ function isJson(str) {
     return false;
   }
   return true;
+}
+
+var EIEL_CONTACTO_AYUDA = "eiel@geonet.es";
+
+function withAyudaAdjuntos_(msg) {
+  var s = String(msg || "").trim();
+  if (!s) s = "Ha ocurrido un problema al subir el archivo.";
+  if (s.toLowerCase().indexOf(EIEL_CONTACTO_AYUDA.toLowerCase()) !== -1) return s;
+  return s + " Si necesita ayuda, escriba a " + EIEL_CONTACTO_AYUDA + ".";
+}
+
+function cleanErrorTextAdjuntos_(err) {
+  var s = "";
+  if (err && err.message) s = String(err.message);
+  else if (err != null) s = String(err);
+  s = s.trim();
+  while (/^Error:\s*/i.test(s)) {
+    s = s.replace(/^Error:\s*/i, "").trim();
+  }
+  return s || "Error desconocido";
+}
+
+/**
+ * Mensaje para el técnico: qué ha pasado + qué hacer + contacto.
+ * Sin detalles internos del sistema de almacenamiento.
+ */
+function friendlyUserMessageAdjuntos_(err) {
+  var raw = cleanErrorTextAdjuntos_(err);
+  var lower = raw.toLowerCase();
+
+  if (lower.indexOf("sesión") !== -1) {
+    return withAyudaAdjuntos_(
+      "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("supera el límite") !== -1 || lower.indexOf("35 mb") !== -1) {
+    return withAyudaAdjuntos_(
+      "El archivo supera el tamaño máximo permitido (35 MB). Reduzca el tamaño o divídalo e inténtelo de nuevo."
+    );
+  }
+  if (
+    lower.indexOf("falta ") === 0 ||
+    lower.indexOf("no hay datos") !== -1 ||
+    lower.indexOf("auth-token") !== -1
+  ) {
+    return withAyudaAdjuntos_(
+      "Faltan datos necesarios para la subida. Recargue la página, vuelva a iniciar sesión e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
+    return withAyudaAdjuntos_(
+      "No se ha podido guardar el archivo por un problema del sistema. Inténtelo de nuevo más tarde."
+    );
+  }
+  if (
+    lower.indexOf("quota") !== -1 ||
+    (lower.indexOf("limit") !== -1 && lower.indexOf("archivo") === -1)
+  ) {
+    return withAyudaAdjuntos_(
+      "El sistema está saturado temporalmente. Espere unos minutos e inténtelo de nuevo."
+    );
+  }
+  return withAyudaAdjuntos_(
+    "No se ha podido subir el archivo. Inténtelo de nuevo en unos minutos."
+  );
 }
 
 function getOrCreateFolder(parent, name) {

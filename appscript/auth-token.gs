@@ -46,12 +46,16 @@ function issueSessionToken_(muniCode, isTest) {
  * @return {Object} payload decodificado
  */
 function assertValidSessionToken_(token, expectedMuniCode) {
+  // Mensaje único: problema + solución (+ el caller puede añadir contacto)
+  var msgSesion =
+    "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo.";
+
   if (!token || typeof token !== "string" || token.indexOf(".") < 0) {
-    throw new Error("Sesión no válida. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
   var parts = token.split(".");
   if (parts.length !== 2) {
-    throw new Error("Sesión no válida. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
   var payload = parts[0];
   var sigB64 = parts[1];
@@ -59,7 +63,7 @@ function assertValidSessionToken_(token, expectedMuniCode) {
     Utilities.computeHmacSha256Signature(payload, getEielTokenSecret_())
   );
   if (sigB64 !== expectedSig) {
-    throw new Error("Sesión no válida o manipulada. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
 
   var data;
@@ -69,19 +73,21 @@ function assertValidSessionToken_(token, expectedMuniCode) {
     );
     data = JSON.parse(json);
   } catch (e) {
-    throw new Error("Sesión corrupta. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
 
   if (!data || data.v !== 1 || !data.e) {
-    throw new Error("Sesión no válida. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
   if (Date.now() > Number(data.e)) {
-    throw new Error("Sesión caducada. Vuelva a iniciar sesión.");
+    throw new Error(msgSesion);
   }
 
   var expected = String(expectedMuniCode || "").slice(-3);
   if (expected && data.m !== expected) {
-    throw new Error("El token no corresponde a este municipio. Vuelva a iniciar sesión.");
+    throw new Error(
+      "La sesión no corresponde a este municipio. Cierre sesión, seleccione el municipio correcto e inicie sesión de nuevo."
+    );
   }
   return data;
 }
