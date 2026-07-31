@@ -77,14 +77,30 @@ function doPost(e) {
     }
 
     const file = carpetaDestino.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    // El enlace público no es necesario para el flujo EIEL (el PDF usa Drive
+    // como propietario). En muchos Workspace, ANYONE_WITH_LINK lanza
+    // "Acceso denegado: DriveApp" y tumba toda la subida aunque el archivo
+    // ya se haya creado.
+    let sharingOk = false;
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      sharingOk = true;
+    } catch (shareErr) {
+      Logger.log(
+        "[ADJUNTOS] setSharing omitido (política Workspace?): " + shareErr.toString()
+      );
+    }
 
     result.status = "success";
     result.fileId = file.getId();
     result.url = file.getUrl();
-    result.message = "Archivo subido correctamente.";
+    result.message = sharingOk
+      ? "Archivo subido correctamente."
+      : "Archivo subido correctamente (sin enlace público; política de Drive).";
     result.filename = fileName;
     result.bytes = realBytes;
+    result.sharing = sharingOk;
 
     Logger.log(
       "[ADJUNTOS OK] mun=" + munCode +
@@ -134,5 +150,32 @@ function getOrCreateFolder(parent, name) {
 
 function testPermisos() {
   GmailApp.getAliases();
-  console.log("Permisos concedidos");
+  console.log("Permisos Gmail concedidos");
+}
+
+/**
+ * Prueba real de Drive: lectura de carpeta + creación + intento de compartir.
+ * Ejecutar desde el editor (no desde la web).
+ */
+function testDrivePermisos() {
+  const carpeta = DriveApp.getFolderById(CARPETA_RAIZ_ID);
+  Logger.log("Carpeta OK: " + carpeta.getName());
+
+  const blob = Utilities.newBlob("prueba eiel", "text/plain", "test_drive_eiel.txt");
+  const file = carpeta.createFile(blob);
+  Logger.log("createFile OK: " + file.getId());
+
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    Logger.log("setSharing OK (enlace público permitido)");
+  } catch (e) {
+    Logger.log("setSharing DENEGADO (esperado en muchos Workspace): " + e.toString());
+  }
+
+  // Limpieza del fichero de prueba
+  try {
+    file.setTrashed(true);
+  } catch (ignore) {}
+
+  Logger.log("testDrivePermisos terminado");
 }
