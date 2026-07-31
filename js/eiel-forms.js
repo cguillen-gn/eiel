@@ -27,6 +27,15 @@
         return localStorage.getItem("eiel_is_test") === "true";
     }
 
+    /** Quita prefijos repetidos "Error:" de mensajes de Apps Script / Exceptions. */
+    function cleanErrorText(msg) {
+        let s = String(msg == null ? "" : msg).trim();
+        while (/^Error:\s*/i.test(s)) {
+            s = s.replace(/^Error:\s*/i, "").trim();
+        }
+        return s || "Error desconocido";
+    }
+
     /**
      * Fusiona configuración del formulario preservando / refrescando isTest.
      */

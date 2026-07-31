@@ -269,12 +269,13 @@ function doPost(e) {
       console.error("ERROR CRÍTICO: " + error.toString());
       result.status = "error";
       result.success = false;
-      result.message = "Error: " + error.toString();
-      
+      // Preferir .message (sin el prefijo "Error:" que añade toString())
+      result.message = cleanErrorText_(error);
+
       // Forzamos el aviso incluso si 'registro' no se ha definido correctamente
       try {
         const filaAfectada = (registro && registro.fila) ? registro.fila : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(NOMBRE_PESTANA_LOGS).getLastRow();
-        actualizarUrlLog(filaAfectada, "ERROR: " + error.toString());
+        actualizarUrlLog(filaAfectada, "ERROR: " + result.message);
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
