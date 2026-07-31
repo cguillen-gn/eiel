@@ -1,33 +1,62 @@
 // --------------------------------------------------------------------
-// SCRIPT DE ADJUNTOS (DRIVE) — versión con validación y respuesta legible
-// Pegar en el proyecto Apps Script de URL_ADJUNTOS y redesplegar /exec
+// SCRIPT DE ADJUNTOS (DRIVE) — validación, token de sesión, JSON legible
+// Pegar en URL_ADJUNTOS + fichero auth-token.gs en el MISMO proyecto.
+// Tras pegar: Implementar → Nueva versión.
 //
-// Requiere también el fichero auth-token.gs en el MISMO proyecto
-// (o las funciones issue/assert al final de este archivo).
-// --------------------------------------------------------------------
-//
-// Prueba de fallo forzado: subir un archivo cuyo nombre empiece por
-// "FORZAR_ERROR" (ej: FORZAR_ERROR_prueba.pdf). Debe devolver status=error.
+// Prueba forzada: nombre de archivo que empiece por FORZAR_ERROR
 // --------------------------------------------------------------------
 
 const CARPETA_RAIZ_ID = "1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV";
-const LIMITE_BYTES = 35 * 1024 * 1024; // Alineado con el front (~Base64 / límite Drive)
+const LIMITE_BYTES = 35 * 1024 * 1024;
+
+function jsonOut_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
+    ContentService.MimeType.JSON
+  );
+}
 
 function doPost(e) {
-  const result = { status: "error", message: "", logs: [] };
+  // Envoltorio exterior: si algo revienta sin catch, igual intentamos JSON
+  // (si no, Google devuelve HTML sin CORS → "Failed to fetch" en el navegador).
+  try {
+    return handleAdjuntosPost_(e);
+  } catch (fatal) {
+    Logger.log("FATAL ADJUNTOS: " + fatal.toString());
+    try {
+      Logger.log("FATAL stack: " + (fatal.stack || ""));
+    } catch (ignore) {}
+    return jsonOut_({
+      status: "error",
+      message: "Error interno adjuntos: " + fatal.toString()
+    });
+  }
+}
+
+function handleAdjuntosPost_(e) {
+  const result = { status: "error", message: "" };
 
   try {
     if (!e) throw new Error("No hay datos de entrada.");
 
-    // 1. LECTURA DE DATOS (JSON o formulario)
+    if (typeof assertValidSessionToken_ !== "function") {
+      throw new Error(
+        "Falta auth-token.gs en el proyecto Adjuntos (assertValidSessionToken_ no definida)."
+      );
+    }
+
     var data = {};
-    if (e.postData && e.postData.contents && isJson(e.postData.contents)) {
-      data = JSON.parse(e.postData.contents);
+    var rawLen = 0;
+    if (e.postData && e.postData.contents) {
+      rawLen = String(e.postData.contents).length;
+      if (isJson(e.postData.contents)) {
+        data = JSON.parse(e.postData.contents);
+      } else {
+        data = e.parameter || {};
+      }
     } else {
       data = e.parameter || {};
     }
 
-    // 2. EXTRACCIÓN Y LIMPIEZA
     const munCodeFull = (data.municipio || data.mun || "").toString().trim();
     const munCode = munCodeFull ? munCodeFull.slice(-3) : "";
     const tipo = (data.tipo || data.tipo_ficha || "general").toLowerCase();
@@ -37,42 +66,60 @@ function doPost(e) {
     const mimeType = data.mimeType || "application/octet-stream";
     const fileName = (data.filename || data.nombre_archivo || "").toString().trim();
     const usuario = (data.usuario || "anonimo").toString();
+    const sessionToken = data.session_token || data.token || "";
 
-    // 3. VALIDACIÓN TEMPRANA
+    Logger.log(
+      "[ADJUNTOS] start mun=" +
+        munCode +
+        " file=" +
+        fileName +
+        " rawLen=" +
+        rawLen +
+        " tokenLen=" +
+        String(sessionToken).length
+    );
+
     if (!munCode) throw new Error("Falta el código de municipio.");
-    assertValidSessionToken_(data.session_token || data.token || "", munCode);
+    assertValidSessionToken_(sessionToken, munCode);
     if (!idEnvio) throw new Error("Falta id_envio.");
     if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
-    // Gancho de prueba (solo si el nombre empieza por FORZAR_ERROR)
     if (fileName.indexOf("FORZAR_ERROR") === 0) {
       throw new Error("Error de prueba forzado (FORZAR_ERROR).");
     }
 
-    // Estimación de tamaño desde Base64 (aprox. 3/4 de la longitud)
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
     if (approxBytes > LIMITE_BYTES) {
       throw new Error(
-        'El archivo "' + fileName + '" supera el límite de 35 MB (' +
-          Math.round(approxBytes / (1024 * 1024)) + " MB)."
+        'El archivo "' +
+          fileName +
+          '" supera el límite de 35 MB (' +
+          Math.round(approxBytes / (1024 * 1024)) +
+          " MB)."
       );
     }
 
-    // 4. CARPETAS
     const carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
     const carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
     const carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
 
     let carpetaDestino;
-    if (idEnvio.indexOf("-E-") !== -1 || idEnvio.indexOf("_E_") !== -1 || idEnvio.indexOf("EXP_E") === 0) {
+    if (
+      idEnvio.indexOf("-E-") !== -1 ||
+      idEnvio.indexOf("_E_") !== -1 ||
+      idEnvio.indexOf("EXP_E") === 0
+    ) {
       carpetaDestino = carpetaExpediente;
     } else {
       carpetaDestino = getOrCreateFolder(carpetaExpediente, seccion);
     }
 
-    // 5. CREAR ARCHIVO
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(base64Data),
+      mimeType,
+      fileName
+    );
     const realBytes = blob.getBytes().length;
     if (realBytes > LIMITE_BYTES) {
       throw new Error(
@@ -82,10 +129,6 @@ function doPost(e) {
 
     const file = carpetaDestino.createFile(blob);
 
-    // El enlace público no es necesario para el flujo EIEL (el PDF usa Drive
-    // como propietario). En muchos Workspace, ANYONE_WITH_LINK lanza
-    // "Acceso denegado: DriveApp" y tumba toda la subida aunque el archivo
-    // ya se haya creado.
     let sharingOk = false;
     try {
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -107,28 +150,32 @@ function doPost(e) {
     result.sharing = sharingOk;
 
     Logger.log(
-      "[ADJUNTOS OK] mun=" + munCode +
-        " id_envio=" + idEnvio +
-        " seccion=" + seccion +
-        " tipo=" + tipo +
-        " file=" + fileName +
-        " bytes=" + realBytes +
-        " user=" + usuario
+      "[ADJUNTOS OK] mun=" +
+        munCode +
+        " id_envio=" +
+        idEnvio +
+        " seccion=" +
+        seccion +
+        " tipo=" +
+        tipo +
+        " file=" +
+        fileName +
+        " bytes=" +
+        realBytes +
+        " user=" +
+        usuario
     );
   } catch (error) {
     result.status = "error";
     result.message = error.toString();
     Logger.log("ERROR SUBIDA: " + error.toString());
     try {
-      if (e && e.postData && e.postData.contents) {
-        Logger.log("ERROR SUBIDA payload keys / hint: " + String(e.postData.contents).substring(0, 200));
-      }
+      Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
     } catch (ignore) {}
+    // No loguear e.postData.contents: el Base64 puede ser enorme y tumbar la ejecución.
   }
 
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(
-    ContentService.MimeType.JSON
-  );
+  return jsonOut_(result);
 }
 
 function isJson(str) {
@@ -158,8 +205,24 @@ function testPermisos() {
 }
 
 /**
+ * Ejecutar desde el editor de Adjuntos (no desde la web).
+ * Comprueba que auth-token.gs está cargado y que emitir/validar token funciona.
+ */
+function testAuthAdjuntos() {
+  Logger.log("typeof assertValidSessionToken_ = " + typeof assertValidSessionToken_);
+  Logger.log("typeof issueSessionToken_ = " + typeof issueSessionToken_);
+  if (typeof issueSessionToken_ !== "function") {
+    throw new Error("Falta auth-token.gs (issueSessionToken_ no definida)");
+  }
+  var t = issueSessionToken_("001", true);
+  Logger.log("token sample len=" + t.length);
+  var data = assertValidSessionToken_(t, "001");
+  Logger.log("assert OK: " + JSON.stringify(data));
+  Logger.log("testAuthAdjuntos terminado");
+}
+
+/**
  * Prueba real de Drive: lectura de carpeta + creación + intento de compartir.
- * Ejecutar desde el editor (no desde la web).
  */
 function testDrivePermisos() {
   const carpeta = DriveApp.getFolderById(CARPETA_RAIZ_ID);
@@ -176,7 +239,6 @@ function testDrivePermisos() {
     Logger.log("setSharing DENEGADO (esperado en muchos Workspace): " + e.toString());
   }
 
-  // Limpieza del fichero de prueba
   try {
     file.setTrashed(true);
   } catch (ignore) {}
