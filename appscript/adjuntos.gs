@@ -182,6 +182,15 @@ function isJson(str) {
   return true;
 }
 
+var EIEL_CONTACTO_AYUDA = "eiel@geonet.es";
+
+function withAyudaAdjuntos_(msg) {
+  var s = String(msg || "").trim();
+  if (!s) s = "Ha ocurrido un problema al subir el archivo.";
+  if (s.toLowerCase().indexOf(EIEL_CONTACTO_AYUDA.toLowerCase()) !== -1) return s;
+  return s + " Si necesita ayuda, escriba a " + EIEL_CONTACTO_AYUDA + ".";
+}
+
 function cleanErrorTextAdjuntos_(err) {
   var s = "";
   if (err && err.message) s = String(err.message);
@@ -193,32 +202,49 @@ function cleanErrorTextAdjuntos_(err) {
   return s || "Error desconocido";
 }
 
+/**
+ * Mensaje para el técnico: qué ha pasado + qué hacer + contacto.
+ * Sin detalles internos del sistema de almacenamiento.
+ */
 function friendlyUserMessageAdjuntos_(err) {
   var raw = cleanErrorTextAdjuntos_(err);
   var lower = raw.toLowerCase();
 
+  if (lower.indexOf("sesión") !== -1) {
+    return withAyudaAdjuntos_(
+      "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
+    );
+  }
+  if (lower.indexOf("supera el límite") !== -1 || lower.indexOf("35 mb") !== -1) {
+    return withAyudaAdjuntos_(
+      "El archivo supera el tamaño máximo permitido (35 MB). Reduzca el tamaño o divídalo e inténtelo de nuevo."
+    );
+  }
   if (
-    lower.indexOf("sesión") !== -1 ||
     lower.indexOf("falta ") === 0 ||
-    lower.indexOf("supera el límite") !== -1 ||
     lower.indexOf("no hay datos") !== -1 ||
     lower.indexOf("auth-token") !== -1
   ) {
-    return raw;
+    return withAyudaAdjuntos_(
+      "Faltan datos necesarios para la subida. Recargue la página, vuelva a iniciar sesión e inténtelo de nuevo."
+    );
   }
   if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
-    return "No se pudo guardar el archivo en Drive. Inténtelo de nuevo; si continúa, contacte con soporte.";
+    return withAyudaAdjuntos_(
+      "No se ha podido guardar el archivo por un problema del sistema. Inténtelo de nuevo más tarde."
+    );
   }
   if (
     lower.indexOf("quota") !== -1 ||
     (lower.indexOf("limit") !== -1 && lower.indexOf("archivo") === -1)
   ) {
-    return "El servicio de Drive está temporalmente saturado. Espere unos minutos e inténtelo de nuevo.";
+    return withAyudaAdjuntos_(
+      "El sistema está saturado temporalmente. Espere unos minutos e inténtelo de nuevo."
+    );
   }
-  if (/^(No se |Falta |El |La )/.test(raw) || /[áéíóúñ¿¡]/i.test(raw)) {
-    return raw;
-  }
-  return "No se pudo subir el archivo. Inténtelo de nuevo; si el problema continúa, contacte con soporte.";
+  return withAyudaAdjuntos_(
+    "No se ha podido subir el archivo. Inténtelo de nuevo en unos minutos."
+  );
 }
 
 function getOrCreateFolder(parent, name) {
