@@ -1,6 +1,9 @@
 // --------------------------------------------------------------------
 // SCRIPT DE ADJUNTOS (DRIVE) — versión con validación y respuesta legible
 // Pegar en el proyecto Apps Script de URL_ADJUNTOS y redesplegar /exec
+//
+// Requiere también el fichero auth-token.gs en el MISMO proyecto
+// (o las funciones issue/assert al final de este archivo).
 // --------------------------------------------------------------------
 //
 // Prueba de fallo forzado: subir un archivo cuyo nombre empiece por
@@ -37,6 +40,7 @@ function doPost(e) {
 
     // 3. VALIDACIÓN TEMPRANA
     if (!munCode) throw new Error("Falta el código de municipio.");
+    assertValidSessionToken_(data.session_token || data.token || "", munCode);
     if (!idEnvio) throw new Error("Falta id_envio.");
     if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");

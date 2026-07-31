@@ -129,9 +129,16 @@
     function checkSession() {
         const code = localStorage.getItem("eiel_muni_code");
         const name = localStorage.getItem("eiel_muni_name");
-        const isTest = localStorage.getItem("eiel_is_test") === "true"; 
-        
-        if(code && name) {
+        const isTest = localStorage.getItem("eiel_is_test") === "true";
+        const token = localStorage.getItem("eiel_session_token");
+
+        // Tras el despliegue del token, sesiones antiguas deben re-autenticarse
+        if (code && name && !token) {
+            localStorage.clear();
+            return;
+        }
+
+        if (code && name && token) {
             loginSuccess(code, name, isTest);
         }
     }
@@ -177,7 +184,13 @@
             if (data.valid === true) {
                 const muniLocal = MUNICIPIOS.find(m => m.code === selectedCode);
                 const nombreParaGuardar = data.isTest ? data.nombre : (muniLocal ? muniLocal.name_bonito : data.nombre);
-                
+
+                if (!data.token) {
+                    showError("El servidor de acceso no devolvió token de sesión. Actualice el script de Login.");
+                    return;
+                }
+                localStorage.setItem("eiel_session_token", data.token);
+
                 loginSuccess(selectedCode, nombreParaGuardar, data.isTest || false);
             } else {
                 showError("Código de acceso incorrecto.");
