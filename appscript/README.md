@@ -9,8 +9,8 @@ disparar el PDF. Ahora el login emite un token HMAC; adjuntos y PDF lo exigen.
 |-------|---------|
 | Helpers HMAC (compartidos) | `auth-token.gs` |
 | Login | `login.gs` / `login.PARCHE.md` |
-| Adjuntos | `adjuntos.gs` |
-| PDF | `generar-pdf.gs` |
+| Adjuntos | `adjuntos.gs` + `log-errores.gs` |
+| PDF | `generar-pdf.gs` + `log-errores.gs` |
 | Front | `js/eiel-forms.js` + plantillas index/base |
 
 ### Despliegue (orden)
@@ -52,6 +52,24 @@ Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
 - Si falla: solo `console.warn` (no bloquea el formulario)
 - Código municipio con ceros (`'006`)
 - Ver `logger.PARCHE.md`
+
+## F — Hoja `logs_errores` (`log-errores.gs`)
+
+Las pestañas `logs_errores` y `verificaciones` no se usaban en código.
+Ahora Adjuntos y PDF escriben fallos en **`logs_errores`** (misma hoja
+de cálculo que `logs_envios` / `logs_acceso`).
+
+Columnas: Fecha, Origen (`adjuntos`/`pdf`), Municipio, Código, Tipo,
+id_envio, id_registro, Usuario, Archivo, Mensaje usuario, Detalle técnico.
+
+### Despliegue
+1. En **Adjuntos** y **PDF**: crear/actualizar fichero `log-errores` con
+   `appscript/log-errores.gs`
+2. Actualizar `Código.gs` de cada uno (`adjuntos.gs` / `generar-pdf.gs`)
+3. **Nueva versión** en ambos
+4. Probar: borrar token e intentar enviar → fila nueva en `logs_errores`
+
+`verificaciones` sigue sin uso en código (se puede archivar/borrar).
 
 ## Nota DriveApp / setSharing
 
