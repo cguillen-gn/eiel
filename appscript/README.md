@@ -53,6 +53,24 @@ Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
 - Código municipio con ceros (`'006`)
 - Ver `logger.PARCHE.md`
 
+## F — Hoja `logs_errores` (`log-errores.gs`)
+
+Las pestañas `logs_errores` y `verificaciones` no se usaban en código.
+Ahora Adjuntos y PDF escriben fallos en **`logs_errores`** (misma hoja
+de cálculo que `logs_envios` / `logs_acceso`).
+
+Columnas: Fecha, Origen (`adjuntos`/`pdf`), Municipio, Código, Tipo,
+id_envio, id_registro, Usuario, Archivo, Mensaje usuario, Detalle técnico.
+
+### Despliegue
+1. En **Adjuntos** y **PDF**: crear/actualizar fichero `log-errores` con
+   `appscript/log-errores.gs`
+2. Actualizar `Código.gs` de cada uno (`adjuntos.gs` / `generar-pdf.gs`)
+3. **Nueva versión** en ambos
+4. Probar: borrar token e intentar enviar → fila nueva en `logs_errores`
+
+`verificaciones` sigue sin uso en código (se puede archivar/borrar).
+
 ## Nota DriveApp / setSharing
 
 En muchos Workspace, `ANYONE_WITH_LINK` está bloqueado. El flujo EIEL no
