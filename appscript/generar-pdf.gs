@@ -4,11 +4,14 @@
 // Pegar en el proyecto Apps Script de URL_GENERAR_PDF y redesplegar
 // una NUEVA VERSIÓN (Implementar → Nueva versión → /exec).
 //
-// Requiere auth-token.gs en el MISMO proyecto (mismas funciones HMAC).
+// Requiere en el MISMO proyecto:
+//   - auth-token.gs (HMAC)
+//   - log-errores.gs (hoja logs_errores)
 //
 // Contrato de respuesta JSON (front sendPdfPayload):
 //   { status: "success"|"error", success: boolean, message: string, ... }
 // ====================================================================
+
 
 
 // --- CONFIGURACIÓN GENERAL ---
@@ -42,6 +45,14 @@ function doPost(e) {
 
   const result = { status: "error", success: false, message: "Error desconocido." };
   let registro = null;
+  var ctx = {
+    municipio: "",
+    codigo: "",
+    tipo: "",
+    id_envio: "",
+    id_registro: "",
+    usuario: ""
+  };
 
   try {
     if (!e) throw new Error("No se recibieron datos.");
@@ -65,6 +76,12 @@ function doPost(e) {
     const TIPO_FORMULARIO = (data.tipo_formulario || data.tipo_ficha || "agua").toLowerCase();
 
     const isTestMode = data.is_test === true || data.is_test === "true";
+
+    ctx.codigo = String(municipioCodigoEarly).slice(-3);
+    ctx.tipo = TIPO_FORMULARIO;
+    ctx.id_envio = (data.id_envio || "").toString();
+    ctx.municipio = (data.municipio_nombre || data.muni_display || "").toString();
+    ctx.usuario = (data.email_contacto || "").toString();
     
     const input = {
       is_test: isTestMode,
@@ -195,6 +212,8 @@ function doPost(e) {
     }
 
     templateData.ID_REGISTRO = registro.id;
+    ctx.id_registro = registro.id;
+    ctx.municipio = templateData.MUNI_NOMBRE || ctx.municipio;
 
     // 6. GENERACIÓN Y ORGANIZACIÓN DEL ARCHIVO PDF POR MUNICIPIO
     const htmlContent = generarHTML(templateData, subjectForm);
@@ -274,6 +293,20 @@ function doPost(e) {
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
+
+      if (typeof logErrorToSheet_ === "function") {
+        logErrorToSheet_({
+          origen: "pdf",
+          municipio: ctx.municipio,
+          codigo: ctx.codigo,
+          tipo: ctx.tipo,
+          id_envio: ctx.id_envio,
+          id_registro: ctx.id_registro || (registro && registro.id) || "",
+          usuario: ctx.usuario,
+          mensaje_usuario: result.message,
+          detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
+        });
+      }
     // -----------------------------------------------------------
 
   } finally {

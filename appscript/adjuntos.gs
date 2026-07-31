@@ -1,6 +1,6 @@
 // --------------------------------------------------------------------
 // SCRIPT DE ADJUNTOS (DRIVE) — validación, token de sesión, JSON legible
-// Pegar en URL_ADJUNTOS + fichero auth-token.gs en el MISMO proyecto.
+// Pegar en URL_ADJUNTOS + auth-token.gs + log-errores.gs en el MISMO proyecto.
 // Tras pegar: Implementar → Nueva versión.
 //
 // --------------------------------------------------------------------
@@ -24,15 +24,31 @@ function doPost(e) {
     try {
       Logger.log("FATAL stack: " + (fatal.stack || ""));
     } catch (ignore) {}
+    var fatalMsg = friendlyUserMessageAdjuntos_(fatal);
+    if (typeof logErrorToSheet_ === "function") {
+      logErrorToSheet_({
+        origen: "adjuntos",
+        mensaje_usuario: fatalMsg,
+        detalle: fatal.toString() + (fatal.stack ? "\n" + fatal.stack : "")
+      });
+    }
     return jsonOut_({
       status: "error",
-      message: "Error interno adjuntos: " + fatal.toString()
+      message: fatalMsg
     });
   }
 }
 
 function handleAdjuntosPost_(e) {
   const result = { status: "error", message: "" };
+  // Contexto para logs_errores (visible en el catch)
+  var ctx = {
+    codigo: "",
+    tipo: "",
+    id_envio: "",
+    usuario: "",
+    archivo: ""
+  };
 
   try {
     if (!e) throw new Error("No hay datos de entrada.");
@@ -66,6 +82,12 @@ function handleAdjuntosPost_(e) {
     const fileName = (data.filename || data.nombre_archivo || "").toString().trim();
     const usuario = (data.usuario || "anonimo").toString();
     const sessionToken = data.session_token || data.token || "";
+
+    ctx.codigo = munCode;
+    ctx.tipo = tipo;
+    ctx.id_envio = idEnvio;
+    ctx.usuario = usuario;
+    ctx.archivo = fileName;
 
     Logger.log(
       "[ADJUNTOS] start mun=" +
@@ -167,7 +189,18 @@ function handleAdjuntosPost_(e) {
     try {
       Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
     } catch (ignore) {}
-    // No loguear e.postData.contents: el Base64 puede ser enorme y tumbar la ejecución.
+    if (typeof logErrorToSheet_ === "function") {
+      logErrorToSheet_({
+        origen: "adjuntos",
+        codigo: ctx.codigo,
+        tipo: ctx.tipo,
+        id_envio: ctx.id_envio,
+        usuario: ctx.usuario,
+        archivo: ctx.archivo,
+        mensaje_usuario: result.message,
+        detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
+      });
+    }
   }
 
   return jsonOut_(result);

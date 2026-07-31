@@ -9,8 +9,8 @@ disparar el PDF. Ahora el login emite un token HMAC; adjuntos y PDF lo exigen.
 |-------|---------|
 | Helpers HMAC (compartidos) | `auth-token.gs` |
 | Login | `login.gs` / `login.PARCHE.md` |
-| Adjuntos | `adjuntos.gs` |
-| PDF | `generar-pdf.gs` |
+| Adjuntos | `adjuntos.gs` + `log-errores.gs` |
+| PDF | `generar-pdf.gs` + `log-errores.gs` |
 | Front | `js/eiel-forms.js` + plantillas index/base |
 
 ### Despliegue (orden)
