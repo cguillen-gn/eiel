@@ -136,6 +136,15 @@
             if (success) success.classList.remove("hidden");
 
             if (global.lucide) lucide.createIcons();
+        },
+
+        hide() {
+            this._ensureEls();
+            if (this.container) this.container.classList.add("hidden");
+            const success = document.getElementById("successState");
+            if (success) success.classList.add("hidden");
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.remove("hidden");
         }
     };
 
@@ -148,34 +157,58 @@
                 reader.onerror = (error) => reject(error);
             }),
 
+        /**
+         * Sube un adjunto y exige respuesta JSON legible (status === "success").
+         * Usa Content-Type text/plain como el login, para evitar preflight CORS.
+         */
         async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio) {
+            const base64 = await this.toBase64(file);
+            const userEmail =
+                (document.getElementById("contactoEmail") &&
+                    document.getElementById("contactoEmail").value) ||
+                "anonimo";
+            const payload = {
+                filename: file.name,
+                mimeType: file.type || "application/octet-stream",
+                bytesBase64: base64,
+                municipio: muniCode,
+                usuario: userEmail,
+                tipo: tipoFicha,
+                seccion: seccion == null ? "DOCUMENTACION" : seccion,
+                id_envio: idEnvio
+            };
+
+            const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
+                method: "POST",
+                // Igual que el login: text/plain evita preflight y permite leer JSON
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload),
+                redirect: "follow"
+            });
+
+            let result = null;
+            const raw = await response.text();
             try {
-                const base64 = await this.toBase64(file);
-                const userEmail =
-                    (document.getElementById("contactoEmail") &&
-                        document.getElementById("contactoEmail").value) ||
-                    "anonimo";
-                const payload = {
-                    filename: file.name,
-                    mimeType: file.type,
-                    bytesBase64: base64,
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha,
-                    seccion: seccion == null ? "DOCUMENTACION" : seccion,
-                    id_envio: idEnvio
-                };
-                await fetch(global.EIEL_CONFIG.urlAdjuntos, {
-                    method: "POST",
-                    mode: "no-cors",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-                return true;
-            } catch (e) {
-                console.error("Error subiendo:", e);
-                return false;
+                result = JSON.parse(raw);
+            } catch (parseErr) {
+                throw new Error(
+                    'Respuesta no válida del servidor al subir "' +
+                        file.name +
+                        '". Compruebe el despliegue de Apps Script.'
+                );
             }
+
+            if (!response.ok || !result || result.status !== "success") {
+                const detalle =
+                    (result && result.message) ||
+                    "HTTP " + response.status ||
+                    "Error desconocido";
+                throw new Error(
+                    'No se pudo subir "' + file.name + '": ' + detalle
+                );
+            }
+
+            return true;
         }
     };
 
@@ -508,68 +541,77 @@
 
     /**
      * tasks: [{ file, seccion, tipo? }]
-     * Paridad con plantillas originales: se ignora el boolean de UploadService
-     * (solo reintenta / falla si la promesa lanza).
-     * options.retries: obras usa 2; resto 1.
-     * options.throwOnFail: obras relanza error de archivo; resto solo loguea.
+     * Sube en serie; reintenta si falla; si tras los reintentos sigue mal, aborta
+     * el lote (no se debe llamar a generar PDF).
+     * options.retries: por defecto 2
+     * options.throwOnFail: por defecto true
      */
     async function uploadTaskList(tasks, idBatch, options) {
         options = options || {};
-        const retries = options.retries || 1;
+        const retries = options.retries != null ? options.retries : 2;
         const delayMs = options.delayMs != null ? options.delayMs : 300;
         const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 1000;
-        const throwOnFail = !!options.throwOnFail;
+        const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
         const totalTareas = tasks.length;
         let completados = 0;
 
         for (const tarea of tasks) {
-            try {
-                UIProgress.update(
-                    completados,
-                    totalTareas,
-                    "Subiendo archivos adjuntos (Subido " +
-                        completados +
-                        " de " +
-                        totalTareas +
-                        " archivos)..."
-                );
+            UIProgress.update(
+                completados,
+                totalTareas,
+                "Subiendo archivos adjuntos (Subido " +
+                    completados +
+                    " de " +
+                    totalTareas +
+                    " archivos)..."
+            );
 
-                const tipo = tarea.tipo || defaultTipo;
-                let exitoSubida = false;
+            const tipo = tarea.tipo || defaultTipo;
+            let lastError = null;
+            let exitoSubida = false;
 
-                for (let intento = 1; intento <= retries; intento++) {
-                    try {
-                        await UploadService.uploadFile(
-                            tarea.file,
-                            tipo,
-                            global.EIEL_CONFIG.muniCode,
-                            tarea.seccion,
-                            idBatch
-                        );
-                        exitoSubida = true;
-                        break;
-                    } catch (e) {
-                        if (intento === retries) {
-                            if (throwOnFail) {
-                                throw new Error(
-                                    "No se pudo subir el archivo: " + tarea.file.name
-                                );
-                            }
-                            throw e;
-                        }
+            for (let intento = 1; intento <= retries; intento++) {
+                try {
+                    await UploadService.uploadFile(
+                        tarea.file,
+                        tipo,
+                        global.EIEL_CONFIG.muniCode,
+                        tarea.seccion,
+                        idBatch
+                    );
+                    exitoSubida = true;
+                    break;
+                } catch (e) {
+                    lastError = e;
+                    console.error(
+                        (options.logPrefix || "Fallo en subida:") +
+                            " intento " +
+                            intento +
+                            "/" +
+                            retries,
+                        e
+                    );
+                    if (intento < retries) {
                         await new Promise((r) => setTimeout(r, retryDelayMs));
                     }
                 }
-
-                if (exitoSubida) {
-                    completados++;
-                    await new Promise((r) => setTimeout(r, delayMs));
-                }
-            } catch (e) {
-                if (throwOnFail) throw e;
-                console.error(options.logPrefix || "Fallo en subida individual:", e);
             }
+
+            if (!exitoSubida) {
+                const msg =
+                    (lastError && lastError.message) ||
+                    "No se pudo subir el archivo: " + tarea.file.name;
+                if (throwOnFail) {
+                    UIProgress.hide();
+                    throw new Error(msg);
+                }
+                console.error(options.logPrefix || "Fallo en subida individual:", lastError);
+                continue;
+            }
+
+            completados++;
+            await new Promise((r) => setTimeout(r, delayMs));
         }
 
         return completados;
