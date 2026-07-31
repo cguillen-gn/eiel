@@ -205,7 +205,7 @@
             <div class="file-item">
                 <span>📄 ${f.name}</span>
                 <button type="button" onclick="eliminarArchivo(${i})" class="btn-danger-icon">
-                    <i data-lucide="trash-2" style="width:18px;"></i>
+                    <i data-lucide="trash-2" class="icon-trash-lg"></i>
                 </button>
             </div>
         `
@@ -282,10 +282,10 @@
         contenedor.innerHTML = archivosReq
             .map(
                 (f, i) => `
-            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
-                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
-                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+            <div class="file-item file-item--compact">
+                <span class="file-item-name"><i data-lucide="paperclip" class="icon-xs"></i> ${f.name}</span>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon btn-danger-icon--ghost">
+                    <i data-lucide="trash-2" class="icon-trash"></i>
                 </button>
             </div>
         `
@@ -301,12 +301,12 @@
         contenedor.innerHTML = archivosReq
             .map(
                 (f, i) => `
-            <div class="file-item" style="margin-bottom: 4px; padding: 4px 8px; background: #fdfdfd; border: 1px solid #e2e8f0; justify-content: space-between; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 0.75rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px;" title="${f.name}">
-                    <i data-lucide="paperclip" style="width:12px; height:12px; color: #64748b;"></i> ${f.name}
+            <div class="file-item file-item--compact">
+                <span class="file-item-name--ellipsis" title="${f.name}">
+                    <i data-lucide="paperclip" class="icon-xs-muted"></i> ${f.name}
                 </span>
-                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon" style="padding: 2px; background: transparent; border: none; cursor: pointer;">
-                    <i data-lucide="trash-2" style="width:16px; height:16px; color: #ef4444;"></i>
+                <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon btn-danger-icon--ghost">
+                    <i data-lucide="trash-2" class="icon-trash"></i>
                 </button>
             </div>
         `
@@ -322,10 +322,10 @@
         contenedor.innerHTML = archivosReq
             .map(
                 (f, i) => `
-            <div class="file-item" style="margin-bottom:4px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
+            <div class="file-item file-item--compact-plain">
+                <span class="file-item-name"><i data-lucide="paperclip" class="icon-xs"></i> ${f.name}</span>
                 <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon">
-                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+                    <i data-lucide="trash-2" class="icon-trash"></i>
                 </button>
             </div>
         `
@@ -341,10 +341,10 @@
         contenedor.innerHTML = archivosReq
             .map(
                 (f, i) => `
-            <div class="file-item" style="margin-bottom:4px; padding:4px 8px; border:1px solid #e2e8f0; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size: 0.75rem;"><i data-lucide="paperclip" style="width:12px;"></i> ${f.name}</span>
+            <div class="file-item file-item--compact-plain-nogap">
+                <span class="file-item-name"><i data-lucide="paperclip" class="icon-xs"></i> ${f.name}</span>
                 <button type="button" onclick="eliminarArchivoReq('${id}', ${i})" class="btn-danger-icon">
-                    <i data-lucide="trash-2" style="width:16px; color: #ef4444;"></i>
+                    <i data-lucide="trash-2" class="icon-trash"></i>
                 </button>
             </div>
         `
