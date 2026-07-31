@@ -482,7 +482,7 @@ function friendlyUserMessage_(err) {
     lower.indexOf("excedido el tiempo") !== -1
   ) {
     return withAyuda_(
-      "La operación ha tardado demasiado. Inténtelo de nuevo; si adjunta muchos archivos, pruebe con menos o más ligeros."
+      "La operación ha tardado demasiado. Inténtelo de nuevo; si el envío incluye muchos adjuntos, repártalo en dos envíos (dos tandas) e indique en observaciones que es continuación del anterior."
     );
   }
   return withAyuda_(
