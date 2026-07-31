@@ -1,47 +1,57 @@
-# Apps Script — Adjuntos fiables + PDF legible
+# Apps Script — Adjuntos, PDF y token de sesión
 
-## A + B — Adjuntos (`appscript/adjuntos.gs`)
+## D — Token de sesión en el envío
 
-- Validación de municipio, `id_envio`, nombre y Base64
-- Límite 35 MB + gancho `FORZAR_ERROR*`
-- Respuesta JSON `{ status: "success"|"error", message, ... }`
-- `setSharing` público en try/catch (política Workspace)
+Sin token, cualquiera con la URL del Web App podía subir adjuntos o
+disparar el PDF. Ahora el login emite un token HMAC; adjuntos y PDF lo exigen.
 
-### Front adjuntos
+| Pieza | Archivo |
+|-------|---------|
+| Helpers HMAC (compartidos) | `auth-token.gs` |
+| Parche login | `login.PARCHE.md` |
+| Adjuntos | `adjuntos.gs` (llama `assertValidSessionToken_`) |
+| PDF | `generar-pdf.gs` (idem) |
+| Front | `js/eiel-forms.js` + plantillas index/base |
 
-- Sin `no-cors`; `Content-Type: text/plain`; exige `status === "success"`
-- Reintentos; si falla, no llama a generar PDF
+### Despliegue (orden)
 
-### Despliegue adjuntos
+1. **Login:** añadir fichero `auth-token` (`auth-token.gs`) + emitir `token`
+   en la respuesta (ver `login.PARCHE.md`) → **Nueva versión**
+2. **Front:** merge + regenerar (`index` guarda `eiel_session_token`;
+   formularios lo envían como `session_token`)
+3. **Adjuntos y PDF:** añadir el mismo `auth-token.gs` + pegar scripts
+   actualizados → **Nueva versión** cada uno
+4. **Cerrar sesión** en el navegador y volver a entrar (sesiones antiguas
+   sin token se invalidan)
 
-1. Pegar `appscript/adjuntos.gs` en **URL_ADJUNTOS**
-2. Implementar → **Nueva versión** (Yo + Cualquiera)
+### Secreto
 
-## C — PDF / justificante (`appscript/generar-pdf.gs`)
+Mismo valor en los 3 proyectos:
+- Script Properties → `EIEL_TOKEN_SECRET` (recomendado), o
+- el fallback dentro de `auth-token.gs`
 
-### Front (`sendPdfPayload`)
+### Pruebas
 
-- Sin `no-cors`; `Content-Type: text/plain`
-- Acepta `{ status: "success"|"error" }` **o** el histórico `{ success: bool }`
-- Si falla: cierra overlay y muestra error (no pantalla de éxito falsa)
+1. Login normal → menú OK  
+2. Envío con adjunto → OK  
+3. Sin token (borrar `eiel_session_token` en DevTools) → error / redirect login  
+4. Contacto `FORZAR_ERROR` → sigue fallando el PDF a propósito  
 
-### Apps Script
+---
 
-1. Pegar **todo** `appscript/generar-pdf.gs` en el proyecto **URL_GENERAR_PDF**
-2. Implementar → **Nueva versión** (Yo + Cualquiera)
-3. Cambios respecto al script anterior:
-   - Respuesta con `status` + `success`
-   - Gancho de prueba: contacto = `FORZAR_ERROR`
-   - `is_test` se pasa a `logToSheet` (prefijo `TEST-` en el ID)
-   - Eliminado bloque muerto `URL_DE_TU_SCRIPT_ADJUNTOS` (los adjuntos ya los sube el front)
+## A + B — Adjuntos (`adjuntos.gs`)
 
-### Prueba
+- Validación, límite 35 MB, `FORZAR_ERROR*`, JSON legible
+- `setSharing` no bloqueante
+- Front sin `no-cors`; exige `status === "success"`
 
-1. Envío normal → éxito + email PDF
-2. Nombre de contacto `FORZAR_ERROR` → error visible, sin pantalla de éxito
+## C — PDF (`generar-pdf.gs`)
+
+- JSON `{ status, success, message }`
+- Front sin `no-cors`; interpreta `status` o `success`
+- Gancho contacto `FORZAR_ERROR`
 
 ## Nota DriveApp / setSharing
 
-En muchos Workspace, `ANYONE_WITH_LINK` está bloqueado. El flujo EIEL no necesita
-enlace público (el script PDF actúa como propietario). En adjuntos, `setSharing`
-ya no es bloqueante; en PDF sigue comentado.
+En muchos Workspace, `ANYONE_WITH_LINK` está bloqueado. El flujo EIEL no
+necesita enlace público.

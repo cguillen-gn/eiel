@@ -9,6 +9,20 @@
     const LIMITE_BYTES = 35 * 1024 * 1024;
     const REGEX_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+    function getSessionToken() {
+        return localStorage.getItem("eiel_session_token") || "";
+    }
+
+    function requireSessionToken() {
+        const token = getSessionToken();
+        if (!token) {
+            throw new Error(
+                "Sesión caducada o no válida. Vuelva a iniciar sesión en el portal."
+            );
+        }
+        return token;
+    }
+
     function getIsTest() {
         return localStorage.getItem("eiel_is_test") === "true";
     }
@@ -175,7 +189,8 @@
                 usuario: userEmail,
                 tipo: tipoFicha,
                 seccion: seccion == null ? "DOCUMENTACION" : seccion,
-                id_envio: idEnvio
+                id_envio: idEnvio,
+                session_token: requireSessionToken()
             };
 
             const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
@@ -533,7 +548,8 @@
                 email_contacto: fields.email,
                 municipio_codigo: cfg.muniCode,
                 municipio_nombre: localStorage.getItem("eiel_muni_name") || cfg.muniName,
-                timestamp_envio: new Date().toISOString()
+                timestamp_envio: new Date().toISOString(),
+                session_token: requireSessionToken()
             },
             fields.extra || {}
         );
@@ -724,6 +740,8 @@
     global.EIEL = {
         LIMITE_BYTES: LIMITE_BYTES,
         getIsTest: getIsTest,
+        getSessionToken: getSessionToken,
+        requireSessionToken: requireSessionToken,
         mergeConfig: mergeConfig,
         applyHeaderTheme: applyHeaderTheme,
         mostrarMensaje: mostrarMensaje,

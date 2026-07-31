@@ -4,9 +4,12 @@
 // Pegar en el proyecto Apps Script de URL_GENERAR_PDF y redesplegar
 // una NUEVA VERSIÓN (Implementar → Nueva versión → /exec).
 //
+// Requiere auth-token.gs en el MISMO proyecto (mismas funciones HMAC).
+//
 // Contrato de respuesta JSON (front sendPdfPayload):
 //   { status: "success"|"error", success: boolean, message: string, ... }
 // ====================================================================
+
 
 // --- CONFIGURACIÓN GENERAL ---
 const CARPETA_PDF_ID = "1QVELCBWRTdLDfr-RTGrnJUXzpA85A4JO"; 
@@ -50,6 +53,14 @@ function doPost(e) {
        data = e.parameter;
     }
 
+    // Sesión firmada (antes de cualquier lógica de negocio)
+    const municipioCodigoEarly =
+      data.municipio_codigo || data.muni_code || "000";
+    assertValidSessionToken_(
+      data.session_token || data.token || "",
+      municipioCodigoEarly
+    );
+
     // Gancho de prueba: forzar fallo controlado
     if ((data.nombre_contacto || "") === "FORZAR_ERROR") {
       throw new Error("Error de prueba forzado (FORZAR_ERROR).");
@@ -63,7 +74,7 @@ function doPost(e) {
       is_test: isTestMode,
       fase: data.fase || "----",
       municipio_nombre: data.municipio_nombre || data.muni_display || "Desconocido",
-      municipio_codigo: data.municipio_codigo || data.muni_code || "000",
+      municipio_codigo: municipioCodigoEarly,
       
       // Bloque Gestión
       gestion_tipo: data.gestion_tipo || "No indicado",
