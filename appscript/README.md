@@ -3,56 +3,45 @@
 ## A + B — Adjuntos (`appscript/adjuntos.gs`)
 
 - Validación de municipio, `id_envio`, nombre y Base64
-- Límite 35 MB
-- Gancho de prueba: nombre que empiece por `FORZAR_ERROR`
+- Límite 35 MB + gancho `FORZAR_ERROR*`
 - Respuesta JSON `{ status: "success"|"error", message, ... }`
-- Logs en `Logger` de Apps Script
-- `setSharing` público envuelto en try/catch: si el Workspace lo deniega,
-  el archivo **sigue** como éxito (antes tumba toda la subida con
-  `Acceso denegado: DriveApp`)
+- `setSharing` público en try/catch (política Workspace)
 
-### Front adjuntos (`js/eiel-forms.js`)
+### Front adjuntos
 
-- Sin `no-cors` en adjuntos
-- `Content-Type: text/plain` (como el login) para leer la respuesta
-- Exige `status === "success"`
-- 2 reintentos por fichero
-- Si falla: cierra overlay, muestra error, **no** llama a generar PDF
+- Sin `no-cors`; `Content-Type: text/plain`; exige `status === "success"`
+- Reintentos; si falla, no llama a generar PDF
 
 ### Despliegue adjuntos
 
-1. Abrir el proyecto Apps Script de **URL_ADJUNTOS**
-2. Sustituir el código por el de `appscript/adjuntos.gs`
-3. (Opcional) Ejecutar `testDrivePermisos` en el editor
-4. **Implementar** → nueva versión → Web app `/exec`
-   - Ejecutar como: **Yo**
-   - Acceso: **Cualquiera**
+1. Pegar `appscript/adjuntos.gs` en **URL_ADJUNTOS**
+2. Implementar → **Nueva versión** (Yo + Cualquiera)
 
-## C — PDF / justificante (respuesta legible)
+## C — PDF / justificante (`appscript/generar-pdf.gs`)
 
-### Front
+### Front (`sendPdfPayload`)
 
-- `sendPdfPayload` ya **no** usa `no-cors`
-- Usa `Content-Type: text/plain` y lee JSON
-- Si el script antiguo no devuelve `{ status }`, no bloquea (compatibilidad)
-- Si devuelve `status !== "success"`, cierra overlay y muestra error
+- Sin `no-cors`; `Content-Type: text/plain`
+- Acepta `{ status: "success"|"error" }` **o** el histórico `{ success: bool }`
+- Si falla: cierra overlay y muestra error (no pantalla de éxito falsa)
 
 ### Apps Script
 
-Ver instrucciones de parche en [`generar-pdf.PARCHE.md`](./generar-pdf.PARCHE.md).
+1. Pegar **todo** `appscript/generar-pdf.gs` en el proyecto **URL_GENERAR_PDF**
+2. Implementar → **Nueva versión** (Yo + Cualquiera)
+3. Cambios respecto al script anterior:
+   - Respuesta con `status` + `success`
+   - Gancho de prueba: contacto = `FORZAR_ERROR`
+   - `is_test` se pasa a `logToSheet` (prefijo `TEST-` en el ID)
+   - Eliminado bloque muerto `URL_DE_TU_SCRIPT_ADJUNTOS` (los adjuntos ya los sube el front)
 
-Resumen: envolver `doPost` en try/catch y **siempre** devolver
+### Prueba
 
-```javascript
-ContentService.createTextOutput(JSON.stringify(result))
-  .setMimeType(ContentService.MimeType.JSON);
-```
+1. Envío normal → éxito + email PDF
+2. Nombre de contacto `FORZAR_ERROR` → error visible, sin pantalla de éxito
 
-Luego **Implementar → Nueva versión**.
+## Nota DriveApp / setSharing
 
-## Nota sobre "Acceso denegado: DriveApp"
-
-Si el editor puede leer la carpeta pero la web falla al subir, suele ser
-`file.setSharing(ANYONE_WITH_LINK)` bloqueado por política de Google Workspace.
-El flujo EIEL **no necesita** enlace público: el script de PDF accede a Drive
-como propietario. Por eso `setSharing` ya no es obligatorio.
+En muchos Workspace, `ANYONE_WITH_LINK` está bloqueado. El flujo EIEL no necesita
+enlace público (el script PDF actúa como propietario). En adjuntos, `setSharing`
+ya no es bloqueante; en PDF sigue comentado.

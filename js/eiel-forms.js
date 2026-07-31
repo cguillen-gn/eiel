@@ -618,10 +618,24 @@
     }
 
     /**
+     * Interpreta la respuesta del script Generar PDF.
+     * Acepta contrato nuevo { status: "success"|"error" } y el histórico { success: bool }.
+     * null = JSON sin indicador conocido (legado opaco) → no bloquea.
+     */
+    function interpretPdfResult(result) {
+        if (!result || typeof result !== "object") return null;
+        if (typeof result.status === "string") {
+            return result.status === "success";
+        }
+        if (typeof result.success === "boolean") {
+            return result.success === true;
+        }
+        return null;
+    }
+
+    /**
      * Envía el payload al script de generar PDF.
      * Misma estrategia que adjuntos: text/plain (sin preflight) y JSON legible.
-     * Compatibilidad: si el despliegue antiguo no devuelve { status }, no bloquea
-     * (comportamiento previo tipo no-cors). Tras actualizar Apps Script, exige success.
      */
     async function sendPdfPayload(payload) {
         const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
@@ -636,20 +650,22 @@
         try {
             result = JSON.parse(raw);
         } catch (parseErr) {
-            // Despliegue antiguo sin JSON: no podemos verificar; no fingimos fallo.
             console.warn(
                 "[EIEL] Respuesta PDF no JSON (¿Apps Script antiguo?). " +
-                    "Actualice generar-pdf.gs para respuestas legibles."
+                    "Actualice appscript/generar-pdf.gs y redespliegue."
             );
             return true;
         }
 
-        if (!result || typeof result.status === "undefined") {
-            console.warn("[EIEL] Respuesta PDF sin campo status; se asume OK (legado).");
+        const ok = interpretPdfResult(result);
+        if (ok === null) {
+            console.warn(
+                "[EIEL] Respuesta PDF sin status/success; se asume OK (legado)."
+            );
             return true;
         }
 
-        if (!response.ok || result.status !== "success") {
+        if (!response.ok || !ok) {
             UIProgress.hide();
             const detalle =
                 (result && result.message) ||
