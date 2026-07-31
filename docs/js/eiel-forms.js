@@ -136,6 +136,15 @@
             if (success) success.classList.remove("hidden");
 
             if (global.lucide) lucide.createIcons();
+        },
+
+        hide() {
+            this._ensureEls();
+            if (this.container) this.container.classList.add("hidden");
+            const success = document.getElementById("successState");
+            if (success) success.classList.add("hidden");
+            const elements = document.getElementById("progressElements");
+            if (elements) elements.classList.remove("hidden");
         }
     };
 
@@ -593,7 +602,10 @@
                 const msg =
                     (lastError && lastError.message) ||
                     "No se pudo subir el archivo: " + tarea.file.name;
-                if (throwOnFail) throw new Error(msg);
+                if (throwOnFail) {
+                    UIProgress.hide();
+                    throw new Error(msg);
+                }
                 console.error(options.logPrefix || "Fallo en subida individual:", lastError);
                 continue;
             }
