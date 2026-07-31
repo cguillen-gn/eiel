@@ -35,7 +35,8 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       success: false, 
-      message: "Servidor temporalmente ocupado. Por favor, espere unos segundos y reintente."
+      message:
+        "El servidor está ocupado en este momento. Espere unos segundos e inténtelo de nuevo. Si necesita ayuda, escriba a eiel@geonet.es."
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
