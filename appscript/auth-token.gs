@@ -64,7 +64,9 @@ function assertValidSessionToken_(token, expectedMuniCode) {
 
   var data;
   try {
-    var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(payload)).getDataAsString();
+    var json = Utilities.newBlob(Utilities.base64DecodeWebSafe(payload)).getDataAsString(
+      "UTF-8"
+    );
     data = JSON.parse(json);
   } catch (e) {
     throw new Error("Sesión corrupta. Vuelva a iniciar sesión.");
