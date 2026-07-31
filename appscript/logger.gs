@@ -46,10 +46,20 @@ function handleLoggerPost_(e) {
       data = e.parameter || {};
     }
 
+    // Forzar texto con ceros a la izquierda (Sheets convierte "006" → 6)
+    var codigoRaw = String(data.codigo || "").trim();
+    var codigoTxt = codigoRaw.replace(/\D/g, "");
+    if (codigoTxt.length > 0 && codigoTxt.length < 3) {
+      while (codigoTxt.length < 3) codigoTxt = "0" + codigoTxt;
+    } else if (codigoTxt.length > 3) {
+      codigoTxt = codigoTxt.slice(-3);
+    }
+    if (!codigoTxt) codigoTxt = codigoRaw;
+
     const fila = [
       new Date(),
       data.municipio || "",
-      data.codigo || "",
+      "'" + codigoTxt,
       data.fase || "",
       data.tipo || "",
       data.contacto || "",
