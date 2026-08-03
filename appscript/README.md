@@ -59,8 +59,18 @@ no crear otra) + publicar `docs/index.html`.
 ## C — PDF (`generar-pdf.gs`)
 
 - JSON `{ status, success, message }`
-- Mensajes de error amigables (Drive, Gmail, cuota, sesión…)
+- Mensajes de error amigables (Gmail, cuota, sesión, adjuntos…)
 - Front sin `no-cors`; interpreta `status` o `success`
+- **Verificación de adjuntos en Drive** antes de generar PDF/email:
+  si `lista_archivos` no está vacía, debe existir cada fichero bajo
+  `adjuntos/[muni]/[id_envio|id_registro]/…`. Si falta alguno → error
+  (y fila en `logs_errores`), sin enviar el justificante.
+
+### Despliegue PDF
+1. Pegar `generar-pdf.gs` → **Nueva versión** (misma app web).
+2. Probar envío con adjunto → OK.
+3. Prueba negativa (opcional): manipular `lista_archivos` o borrar el
+   fichero en Drive antes del PDF → mensaje de adjuntos faltantes.
 
 ## E — Logger de accesos (`logger.gs`)
 
@@ -71,7 +81,6 @@ no crear otra) + publicar `docs/index.html`.
 
 ## F — Hoja `logs_errores` (`log-errores.gs`)
 
-Las pestañas `logs_errores` y `verificaciones` no se usaban en código.
 Ahora Adjuntos y PDF escriben fallos en **`logs_errores`** (misma hoja
 de cálculo que `logs_envios` / `logs_acceso`).
 
@@ -91,8 +100,6 @@ id_envio, id_registro, Usuario, Archivo, Mensaje usuario, Detalle técnico.
 
 Si el error se ve en pantalla pero no hay fila: falta el fichero
 `log-errores`, faltan permisos sobre la hoja, o no se redesplegó.
-
-`verificaciones` sigue sin uso en código (se puede archivar/borrar).
 
 ## Nota DriveApp / setSharing
 
