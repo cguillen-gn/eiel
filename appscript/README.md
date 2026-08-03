@@ -31,6 +31,17 @@ Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
 2. Envío con adjunto → OK  
 3. Sin token (borrar `eiel_session_token`) → redirect / error de sesión  
 
+### Login lento / “Error de conexión”
+
+Apps Script a veces falla el **primer** POST tras inactividad (cold start →
+HTML 404 sin CORS; el portal lo ve como “Error de conexión”). El login:
+
+- **Front:** hasta 3 intentos automáticos si la respuesta no es JSON.
+- **`login.gs`:** caché 2 min de la hoja de credenciales; con `MASTER_PASS`
+  no abre la hoja (el nombre del municipio lo pone el portal).
+
+Tras actualizar: pegar `login.gs` → **Nueva versión** + publicar `docs/index.html`.
+
 ---
 
 ## A + B — Adjuntos (`adjuntos.gs`)
