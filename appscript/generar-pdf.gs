@@ -65,13 +65,13 @@ function doPost(e) {
        data = e.parameter;
     }
 
-    // Sesión firmada (antes de cualquier lógica de negocio)
+    // Sesión firmada (opcional; tokens desactivados en el portal)
     const municipioCodigoEarly =
       data.municipio_codigo || data.muni_code || "000";
-    assertValidSessionToken_(
-      data.session_token || data.token || "",
-      municipioCodigoEarly
-    );
+    var sessionTokenPdf = data.session_token || data.token || "";
+    if (sessionTokenPdf && typeof assertValidSessionToken_ === "function") {
+      assertValidSessionToken_(sessionTokenPdf, municipioCodigoEarly);
+    }
 
     const TIPO_FORMULARIO = (data.tipo_formulario || data.tipo_ficha || "agua").toLowerCase();
 

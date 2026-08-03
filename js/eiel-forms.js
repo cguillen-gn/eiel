@@ -14,13 +14,8 @@
     }
 
     function requireSessionToken() {
-        const token = getSessionToken();
-        if (!token) {
-            throw new Error(
-                "Sesión caducada o no válida. Vuelva a iniciar sesión en el portal."
-            );
-        }
-        return token;
+        // Tokens desactivados temporalmente: no bloquear envíos.
+        return localStorage.getItem("eiel_session_token") || "";
     }
 
     function getIsTest() {
