@@ -215,6 +215,15 @@ function doPost(e) {
     ctx.id_registro = registro.id;
     ctx.municipio = templateData.MUNI_NOMBRE || ctx.municipio;
 
+    // 5b. VERIFICAR QUE LOS ADJUNTOS DECLARADOS ESTÁN EN DRIVE
+    // (evita éxito/email si la subida falló o la carpeta no existe)
+    assertAdjuntosPresentes_(
+      templateData.MUNI_CODIGO,
+      data.id_envio,
+      registro.id,
+      templateData.NOMBRES_ADJUNTOS
+    );
+
     // 6. GENERACIÓN Y ORGANIZACIÓN DEL ARCHIVO PDF POR MUNICIPIO
     const htmlContent = generarHTML(templateData, subjectForm);
     const pdfBlob = Utilities.newBlob(htmlContent, MimeType.HTML).getAs(MimeType.PDF);
@@ -242,7 +251,7 @@ function doPost(e) {
     //pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     actualizarUrlLog(registro.fila, pdfFile.getUrl());
 
-    // Los adjuntos se suben por el script de adjuntos (antes de llamar a este PDF).
+    // Adjuntos ya verificados en Drive (assertAdjuntosPresentes_).
 
     // 7. ENVÍO DE NOTIFICACIONES POR EMAIL
     const subject = `[Ref: ${templateData.ID_REGISTRO}] Justificante EIEL - ${templateData.MUNI_NOMBRE} - ${subjectForm}`;
@@ -444,6 +453,118 @@ function safeParse(val) {
   try { return JSON.parse(val); } catch(e) { return []; }
 }
 
+/**
+ * Lista nombres de ficheros bajo una carpeta (incluye subcarpetas: DOCUMENTACION, REQUERIMIENTO_N, …).
+ */
+function listFileNamesRecursive_(folder, out) {
+  out = out || [];
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    out.push(files.next().getName());
+  }
+  var folders = folder.getFolders();
+  while (folders.hasNext()) {
+    listFileNamesRecursive_(folders.next(), out);
+  }
+  return out;
+}
+
+/**
+ * Carpeta del expediente: tras renombrar es id_registro; si no, id_envio temporal.
+ */
+function findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro) {
+  var raiz = DriveApp.getFolderById(CARPETA_RAIZ_ADJUNTOS_ID);
+  var munCode = String(muniCode || "").slice(-3);
+  if (!munCode) return null;
+
+  var itMun = raiz.getFoldersByName(munCode);
+  if (!itMun.hasNext()) return null;
+  var carpetaMun = itMun.next();
+
+  if (idRegistro) {
+    var itReg = carpetaMun.getFoldersByName(String(idRegistro));
+    if (itReg.hasNext()) return itReg.next();
+  }
+  if (idEnvio) {
+    var itEnv = carpetaMun.getFoldersByName(String(idEnvio));
+    if (itEnv.hasNext()) return itEnv.next();
+  }
+  return null;
+}
+
+function missingAdjuntosFromList_(expected, foundNames) {
+  var lowerMap = {};
+  for (var i = 0; i < foundNames.length; i++) {
+    lowerMap[String(foundNames[i]).toLowerCase()] = true;
+  }
+  var missing = [];
+  for (var j = 0; j < expected.length; j++) {
+    var exp = expected[j];
+    if (foundNames.indexOf(exp) !== -1) continue;
+    if (lowerMap[exp.toLowerCase()]) continue;
+    missing.push(exp);
+  }
+  return missing;
+}
+
+/**
+ * Exige que cada nombre de lista_archivos exista bajo la carpeta del envío.
+ * Sin lista (envío sin adjuntos) no hace nada.
+ * Reintenta 1 vez tras 1,5 s por posible retraso de indexación de Drive.
+ */
+function assertAdjuntosPresentes_(muniCode, idEnvio, idRegistro, expectedNames) {
+  var expected = [];
+  var seen = {};
+  (expectedNames || []).forEach(function (n) {
+    var name = String(n || "").trim();
+    if (!name || seen[name]) return;
+    seen[name] = true;
+    expected.push(name);
+  });
+  if (!expected.length) return;
+
+  var carpeta = findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro);
+  if (!carpeta) {
+    Utilities.sleep(1500);
+    carpeta = findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro);
+  }
+  if (!carpeta) {
+    throw new Error(
+      "No se han encontrado los archivos adjuntos del envío. Vuelva a adjuntarlos e inténtelo de nuevo."
+    );
+  }
+
+  var found = listFileNamesRecursive_(carpeta, []);
+  var missing = missingAdjuntosFromList_(expected, found);
+  if (missing.length) {
+    Utilities.sleep(1500);
+    found = listFileNamesRecursive_(carpeta, []);
+    missing = missingAdjuntosFromList_(expected, found);
+  }
+
+  if (missing.length) {
+    var preview = missing.slice(0, 5).join(", ");
+    if (missing.length > 5) preview += "…";
+    console.error(
+      "ADJUNTOS FALTANTES id_envio=" +
+        idEnvio +
+        " id_registro=" +
+        idRegistro +
+        " missing=" +
+        missing.join(" | ")
+    );
+    throw new Error(
+      "Faltan archivos adjuntos en el envío (" +
+        preview +
+        "). Vuelva a subirlos e inténtelo de nuevo."
+    );
+  }
+
+  console.log(
+    "Adjuntos verificados OK: " + expected.length + " archivo(s) en " + carpeta.getName()
+  );
+}
+
 /** Quita prefijos repetidos "Error:" de Exceptions / toString(). */
 function cleanErrorText_(err) {
   var s = "";
@@ -474,6 +595,14 @@ function friendlyUserMessage_(err) {
   var raw = cleanErrorText_(err);
   var lower = raw.toLowerCase();
 
+  if (
+    lower.indexOf("faltan archivos adjuntos") !== -1 ||
+    lower.indexOf("no se han encontrado los archivos adjuntos") !== -1
+  ) {
+    return withAyuda_(
+      "No se han podido comprobar todos los archivos adjuntos del envío. Vuelva a subirlos e inténtelo de nuevo."
+    );
+  }
   if (lower.indexOf("sesión") !== -1) {
     return withAyuda_(
       "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
