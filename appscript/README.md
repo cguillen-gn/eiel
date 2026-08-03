@@ -39,9 +39,10 @@ Los reintentos automáticos encadenados empeoran la espera (p. ej. 75 s).
 Enfoque actual:
 - Al abrir el portal se hace un **POST de warmup** (`codigo=__warmup__`)
   en segundo plano (no GET: si falta `doGet` Google responde HTML sin CORS).
-- El botón Entrar hace **un solo POST** y **espera al warmup** si aún no
-  ha terminado. **Sin timeout AbortController** (cortaba cold starts a medias).
-- Si falla de verdad (HTML/404): mensaje para pulsar Entrar otra vez.
+- El botón Entrar hace **un solo POST** y espera al warmup **máx. 10 s**
+  (si el warmup cuelga, no bloquea la UI).
+- Espera del login **máx. 45 s** con `Promise.race` (sin AbortController).
+- Si supera el tiempo o la respuesta no es JSON: mensaje claro y se libera Entrar.
 - Caché 2 min de credenciales; con `MASTER_PASS` no se abre la hoja.
 - `doGet` sigue existiendo como respaldo, pero el portal ya no depende de él.
 
