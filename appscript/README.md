@@ -33,12 +33,14 @@ Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
 
 ### Login lento / “Error de conexión”
 
-Apps Script a veces falla el **primer** POST tras inactividad (cold start →
-HTML 404 sin CORS; el portal lo ve como “Error de conexión”). El login:
+Apps Script a veces tarda en el **primer** uso tras inactividad (cold start).
+Los reintentos automáticos encadenados empeoran la espera (p. ej. 75 s).
 
-- **Front:** hasta 3 intentos automáticos si la respuesta no es JSON.
-- **`login.gs`:** caché 2 min de la hoja de credenciales; con `MASTER_PASS`
-  no abre la hoja (el nombre del municipio lo pone el portal).
+Enfoque actual:
+- Al abrir el portal se hace un **GET de warmup** (`doGet`) en segundo plano.
+- El botón Entrar hace **un solo POST** con timeout de 12 s.
+- Si falla: mensaje para pulsar Entrar otra vez (el 2º clic suele ser rápido).
+- Caché 2 min de credenciales; con `MASTER_PASS` no se abre la hoja.
 
 Tras actualizar: pegar `login.gs` → **Nueva versión** + publicar `docs/index.html`.
 

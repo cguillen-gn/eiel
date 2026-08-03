@@ -153,39 +153,47 @@
 
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
-     * Manejo de autenticación y peticiones externas.
-     * Reintenta ante fallos intermitentes de Apps Script (cold start → 404 HTML).
+     * Un solo intento con timeout corto. El cold start se mitiga con
+     * warmup en segundo plano al cargar la página (no encadenar reintentos:
+     * 3×20s ≈ 1 minuto parado).
      */
-    async function fetchLoginJson(codigo, password, onAttempt) {
-        const maxAttempts = 3;
-        let lastError = null;
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            if (typeof onAttempt === "function") onAttempt(attempt, maxAttempts);
-            try {
-                const response = await fetch(URL_LOGIN_API, {
-                    method: "POST",
-                    headers: { "Content-Type": "text/plain;charset=utf-8" },
-                    body: JSON.stringify({ codigo: codigo, password: password }),
-                    redirect: "follow"
-                });
-                const raw = await response.text();
-                let data = null;
-                try {
-                    data = JSON.parse(raw);
-                } catch (parseErr) {
-                    throw new Error("RESPUESTA_NO_JSON");
-                }
-                return data;
-            } catch (err) {
-                lastError = err;
-                console.error("Login intento " + attempt + "/" + maxAttempts, err);
-                if (attempt < maxAttempts) {
-                    await new Promise((r) => setTimeout(r, 800 * attempt));
-                }
-            }
-        }
-        throw lastError || new Error("LOGIN_FALLIDO");
+    const LOGIN_TIMEOUT_MS = 12000;
+
+    function warmLoginServer() {
+        // Fire-and-forget: despierta Apps Script + precarga caché (doGet)
+        fetch(URL_LOGIN_API, {
+            method: "GET",
+            redirect: "follow",
+            cache: "no-store"
+        }).catch(function () {});
     }
+
+    async function fetchLoginJson(codigo, password) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(function () {
+            ctrl.abort();
+        }, LOGIN_TIMEOUT_MS);
+        try {
+            const response = await fetch(URL_LOGIN_API, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ codigo: codigo, password: password }),
+                redirect: "follow",
+                signal: ctrl.signal
+            });
+            const raw = await response.text();
+            try {
+                return JSON.parse(raw);
+            } catch (parseErr) {
+                throw new Error("RESPUESTA_NO_JSON");
+            }
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    // Calentar el servidor en cuanto se abre el portal (mientras eligen municipio)
+    warmLoginServer();
 
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
@@ -201,12 +209,7 @@
         ui.error.style.display = 'none';
 
         try {
-            const data = await fetchLoginJson(selectedCode, enteredPass, (attempt, max) => {
-                ui.btn.textContent =
-                    attempt === 1
-                        ? "Verificando..."
-                        : "Reintentando (" + attempt + "/" + max + ")...";
-            });
+            const data = await fetchLoginJson(selectedCode, enteredPass);
 
             if (data.success === false) {
                 showError("Error de Servidor: " + data.message); 
@@ -231,9 +234,11 @@
                 showError("Código de acceso incorrecto.");
             }
         } catch (error) {
-            console.error(error); 
+            console.error(error);
+            // Re-calentar por si el fallo fue cold start; el 2º clic suele ser rápido
+            warmLoginServer();
             showError(
-                "Error de conexión con el servidor. Espere unos segundos e inténtelo de nuevo. Si necesita ayuda, escriba a eiel@geonet.es."
+                "No se pudo conectar ahora. Espere 2–3 segundos y pulse Entrar de nuevo."
             );
         } finally {
             ui.btn.disabled = false; 
