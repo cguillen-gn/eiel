@@ -128,6 +128,17 @@ function doPost(e) {
 }
 
 /**
+ * Wake-up al abrir el portal (GET). Despierta el contenedor y precarga
+ * la caché de credenciales para que el POST de login sea rápido.
+ */
+function doGet(e) {
+  try {
+    loadCredencialesRows_();
+  } catch (ignore) {}
+  return jsonLogin_({ ok: true, pong: true });
+}
+
+/**
  * Ejecutar desde el editor tras cambiar claves en la hoja, si hace falta
  * invalidar la caché antes de los 2 minutos.
  */
