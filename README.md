@@ -32,6 +32,8 @@ La separación entre **Código Fuente** (Raíz) y **Distribución** (`docs/`) ga
  ┣ 📂 data               # Base de datos local (municipios.tsv)
  ┣ 📂 js                 # Lógica de subida (upload.js fuente)
  ┣ 📂 templates          # Plantillas maestras Jinja2 (.html.j2)
+ ┣ 📂 appscript          # Código Google Apps Script + diagnóstico login
+ ┣ 📂 cloudflare         # Worker opcional de login (gratis, fiable)
  ┣ 📂 docs               # DISTRIBUCIÓN (Lo que ve el usuario final)
  ┃ ┣ 📂 assets           # Copia procesada de recursos visuales para la web final
  ┃ ┣ 📂 css              # Copia de estilos para la web final
@@ -113,6 +115,9 @@ A continuación se detallan los errores más comunes y cómo resolverlos sistem�
     * Asegúrate de que los scripts de Google tengan los permisos configurados para ejecutarse como "Yo (el propietario)" y sean accesibles por "Cualquiera".
 * **¿Los archivos adjuntos no llegan a Drive?**:
     * Revisa el log de la Web App en Google para verificar si hay errores de cuota de almacenamiento o permisos de carpeta.
+* **¿Login: «Error de conexión» / 404 en `macros/echo`?**:
+    * No es la contraseña. Apps Script a veces responde HTML en frío. Ver `appscript/LOGIN-POR-QUE-FALLA.md`.
+    * Solución estable (gratis): desplegar `cloudflare/login-worker/` y apuntar `URL_LOGIN_SCRIPT` al Worker.
 
 ---
 

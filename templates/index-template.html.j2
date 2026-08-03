@@ -168,7 +168,16 @@
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify({ codigo: selectedCode, password: enteredPass })
             });
-            const data = await response.json();
+            const raw = await response.text();
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (parseErr) {
+                // Apps Script a veces responde HTML 404 en macros/echo (cold start)
+                console.error("Login: respuesta no JSON", response.status, raw.slice(0, 120));
+                showError("Google Apps Script no respondió (suele pasar en frío). Espera 2–3 s y pulsa Entrar otra vez.");
+                return;
+            }
 
             if (data.success === false) {
                 showError("Error de Servidor: " + data.message); 

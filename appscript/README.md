@@ -23,14 +23,18 @@ en Apps Script (como antes). El portal ya no emite ni exige
 
 ### Login
 
-Flujo simple otra vez: un POST, sin warmup ni timeouts raros.
-Sigue la caché 2 min de credenciales y, con `MASTER_PASS`, no abre la hoja.
+Flujo simple: un POST a Apps Script (`login.gs` original), sin tokens.
+
+**Si ves «Error de conexión» / 404 en `macros/echo`:** no es la contraseña.
+Es un fallo intermitente de Web Apps de Google (HTML en vez de JSON).
+Ver **`LOGIN-POR-QUE-FALLA.md`**. La solución estable y gratis es el
+Worker en `cloudflare/login-worker/`.
 
 ### Nota de seguridad
 
 Sin token, cualquiera que conozca las URLs de Adjuntos/PDF podría
 invocarlas. Es un trade-off consciente (gratis + rápido). Se puede
-reactivar el token más adelante o mover el login a un Worker gratuito.
+reactivar el token más adelante.
 
 ---
 
