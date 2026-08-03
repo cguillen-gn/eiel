@@ -23,8 +23,8 @@ en Apps Script (como antes). El portal ya no emite ni exige
 
 ### Login
 
-Flujo simple otra vez: un POST, sin warmup ni timeouts raros.
-Sigue la caché 2 min de credenciales y, con `MASTER_PASS`, no abre la hoja.
+Flujo simple (sin token). Si Apps Script devuelve HTML/404 en frío, el
+portal hace **un solo reintento** automático tras 1,5 s.
 
 ### Nota de seguridad
 
