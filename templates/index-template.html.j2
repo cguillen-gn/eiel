@@ -153,16 +153,17 @@
 
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
-     * Un solo intento con timeout corto. El cold start se mitiga con
-     * warmup en segundo plano al cargar la página (no encadenar reintentos:
-     * 3×20s ≈ 1 minuto parado).
+     * Warmup con POST (doPost siempre existe). No usar GET: si falta doGet
+     * Google devuelve HTML sin CORS y ensucia la consola.
+     * Timeout holgado: un cold start real puede superar 12s.
      */
-    const LOGIN_TIMEOUT_MS = 12000;
+    const LOGIN_TIMEOUT_MS = 25000;
 
     function warmLoginServer() {
-        // Fire-and-forget: despierta Apps Script + precarga caché (doGet)
         fetch(URL_LOGIN_API, {
-            method: "GET",
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ codigo: "__warmup__", password: "", warmup: true }),
             redirect: "follow",
             cache: "no-store"
         }).catch(function () {});
@@ -235,7 +236,6 @@
             }
         } catch (error) {
             console.error(error);
-            // Re-calentar por si el fallo fue cold start; el 2º clic suele ser rápido
             warmLoginServer();
             showError(
                 "No se pudo conectar ahora. Espere 2–3 segundos y pulse Entrar de nuevo."

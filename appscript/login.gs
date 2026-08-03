@@ -78,6 +78,21 @@ function doPost(e) {
     var codigoInput = String(data.codigo || "").trim();
     var passwordInput = String(data.password || "").trim();
 
+    // Warmup del portal (no es un login real): despierta + precarga caché.
+    if (codigoInput === "__warmup__" || data.warmup === true) {
+      try {
+        loadCredencialesRows_();
+      } catch (ignore) {}
+      return jsonLogin_({
+        success: true,
+        valid: false,
+        warmup: true,
+        nombre: "",
+        isTest: false,
+        token: ""
+      });
+    }
+
     var MASTER_PASS = PropertiesService.getScriptProperties().getProperty("MASTER_PASS");
 
     var loginExitoso = false;
