@@ -146,9 +146,36 @@
 
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
-     * Login simple (sin token de sesión ni warmup). Tokens desactivados
-     * temporalmente para recuperar la velocidad/fiabilidad de Apps Script.
+     * Login simple (sin token). Si Apps Script devuelve HTML/404 en frío,
+     * se hace UN solo reintento tras 1,5 s (el 2º suele ir en caliente).
      */
+    async function postLoginOnce(codigo, password) {
+        const response = await fetch(URL_LOGIN_API, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ codigo: codigo, password: password })
+        });
+        const raw = await response.text();
+        try {
+            return JSON.parse(raw);
+        } catch (parseErr) {
+            const err = new Error("RESPUESTA_NO_JSON");
+            err.rawPreview = String(raw || "").slice(0, 80);
+            throw err;
+        }
+    }
+
+    async function postLoginWithOneRetry(codigo, password, onRetry) {
+        try {
+            return await postLoginOnce(codigo, password);
+        } catch (firstErr) {
+            if (!firstErr || firstErr.message !== "RESPUESTA_NO_JSON") throw firstErr;
+            if (typeof onRetry === "function") onRetry();
+            await new Promise(function (r) { setTimeout(r, 1500); });
+            return await postLoginOnce(codigo, password);
+        }
+    }
+
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
         const enteredPass = ui.input.value.trim();
@@ -163,12 +190,9 @@
         ui.error.style.display = 'none';
 
         try {
-            const response = await fetch(URL_LOGIN_API, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ codigo: selectedCode, password: enteredPass })
+            const data = await postLoginWithOneRetry(selectedCode, enteredPass, function () {
+                ui.btn.textContent = "Reintentando...";
             });
-            const data = await response.json();
 
             if (data.success === false) {
                 showError("Error de Servidor: " + data.message); 
@@ -181,7 +205,6 @@
                     ? (muniLocal.name_bonito || muniLocal.name)
                     : (data.nombre || selectedCode);
 
-                // Limpiar token antiguo si existía (ya no se usa)
                 localStorage.removeItem("eiel_session_token");
 
                 loginSuccess(selectedCode, nombreParaGuardar, data.isTest || false);
@@ -190,7 +213,7 @@
             }
         } catch (error) {
             console.error(error); 
-            showError("Error de conexión con el servidor.");
+            showError("Error de conexión con el servidor. Espere un momento y pulse Entrar de nuevo.");
         } finally {
             ui.btn.disabled = false; 
             ui.btn.textContent = "Entrar";
