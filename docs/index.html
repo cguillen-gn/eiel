@@ -153,43 +153,54 @@
 
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
-     * Warmup con POST (doPost siempre existe). No usar GET: si falta doGet
-     * Google devuelve HTML sin CORS y ensucia la consola.
-     * Timeout holgado: un cold start real puede superar 12s.
+     * Warmup POST al cargar. Sin AbortController: cortar a 25s provocaba
+     * AbortError mientras Apps Script aún arrancaba (cold start).
+     * Antes de Entrar se espera a que termine el warmup si sigue en curso.
      */
-    const LOGIN_TIMEOUT_MS = 25000;
+    let loginWarmupPromise = null;
 
     function warmLoginServer() {
-        fetch(URL_LOGIN_API, {
+        loginWarmupPromise = fetch(URL_LOGIN_API, {
             method: "POST",
             headers: { "Content-Type": "text/plain;charset=utf-8" },
             body: JSON.stringify({ codigo: "__warmup__", password: "", warmup: true }),
             redirect: "follow",
             cache: "no-store"
-        }).catch(function () {});
+        })
+            .then(function (response) {
+                return response.text().then(function (raw) {
+                    try {
+                        JSON.parse(raw);
+                    } catch (parseErr) {
+                        throw new Error("WARMUP_NO_JSON");
+                    }
+                });
+            })
+            .catch(function (err) {
+                console.warn("Warmup login:", err);
+                loginWarmupPromise = null;
+            });
+        return loginWarmupPromise;
     }
 
     async function fetchLoginJson(codigo, password) {
-        const ctrl = new AbortController();
-        const timer = setTimeout(function () {
-            ctrl.abort();
-        }, LOGIN_TIMEOUT_MS);
-        try {
-            const response = await fetch(URL_LOGIN_API, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ codigo: codigo, password: password }),
-                redirect: "follow",
-                signal: ctrl.signal
-            });
-            const raw = await response.text();
+        if (loginWarmupPromise) {
             try {
-                return JSON.parse(raw);
-            } catch (parseErr) {
-                throw new Error("RESPUESTA_NO_JSON");
-            }
-        } finally {
-            clearTimeout(timer);
+                await loginWarmupPromise;
+            } catch (ignore) {}
+        }
+
+        const response = await fetch(URL_LOGIN_API, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ codigo: codigo, password: password }),
+            redirect: "follow"
+        });
+        const raw = await response.text();
+        try {
+            return JSON.parse(raw);
+        } catch (parseErr) {
+            throw new Error("RESPUESTA_NO_JSON");
         }
     }
 
