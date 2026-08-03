@@ -295,7 +295,7 @@ function doPost(e) {
         }
 
       if (typeof logErrorToSheet_ === "function") {
-        logErrorToSheet_({
+        var wrote = logErrorToSheet_({
           origen: "pdf",
           municipio: ctx.municipio,
           codigo: ctx.codigo,
@@ -306,6 +306,15 @@ function doPost(e) {
           mensaje_usuario: result.message,
           detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
         });
+        if (!wrote) {
+          console.error(
+            "AVISO: logErrorToSheet_ no escribió fila (permisos hoja / pestaña logs_errores)."
+          );
+        }
+      } else {
+        console.error(
+          "AVISO: falta log-errores.gs en el proyecto PDF (logErrorToSheet_ no definida)."
+        );
       }
     // -----------------------------------------------------------
 
