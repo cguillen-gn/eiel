@@ -37,6 +37,40 @@
     }
 
     /**
+     * Errores definitivos: reintentar no ayuda y puede tapar el mensaje útil
+     * (p. ej. 2º intento Apps Script → HTML 404 → "Respuesta no válida").
+     */
+    function isNonRetryableUploadError(err) {
+        const s = cleanErrorText(err && err.message != null ? err.message : err).toLowerCase();
+        if (!s) return false;
+        if (s.indexOf("sesión") !== -1) return true;
+        if (s.indexOf("caducad") !== -1) return true;
+        if (s.indexOf("vuelva a iniciar sesión") !== -1) return true;
+        if (s.indexOf("vuelva a entrar") !== -1) return true;
+        if (s.indexOf("35 mb") !== -1 || s.indexOf("supera el") !== -1) return true;
+        if (s.indexOf("faltan datos") !== -1) return true;
+        if (s.indexOf("no autorizado") !== -1) return true;
+        return false;
+    }
+
+    /** Prefiere un error con mensaje de negocio frente a fallo opaco de red/HTML. */
+    function isOpaqueUploadError(err) {
+        const s = cleanErrorText(err && err.message != null ? err.message : err).toLowerCase();
+        return (
+            s.indexOf("respuesta no válida") !== -1 ||
+            s.indexOf("failed to fetch") !== -1 ||
+            s.indexOf("networkerror") !== -1 ||
+            s.indexOf("comprobar el despliegue") !== -1
+        );
+    }
+
+    /** Texto para mostrar al técnico tras un fallo de envío/subida. */
+    function formatUserError(err) {
+        const msg = cleanErrorText(err && err.message != null ? err.message : err);
+        return "❌ " + msg;
+    }
+
+    /**
      * Fusiona configuración del formulario preservando / refrescando isTest.
      */
     function mergeConfig(partial) {
@@ -595,6 +629,7 @@
 
             const tipo = tarea.tipo || defaultTipo;
             let lastError = null;
+            let bestError = null;
             let exitoSubida = false;
 
             for (let intento = 1; intento <= retries; intento++) {
@@ -610,6 +645,11 @@
                     break;
                 } catch (e) {
                     lastError = e;
+                    if (!bestError || (isOpaqueUploadError(bestError) && !isOpaqueUploadError(e))) {
+                        bestError = e;
+                    } else if (!isOpaqueUploadError(e) && isNonRetryableUploadError(e)) {
+                        bestError = e;
+                    }
                     console.error(
                         (options.logPrefix || "Fallo en subida:") +
                             " intento " +
@@ -618,6 +658,10 @@
                             retries,
                         e
                     );
+                    // Sesión inválida, tamaño, etc.: no reintentar (evita 404 HTML que tapa el mensaje).
+                    if (isNonRetryableUploadError(e)) {
+                        break;
+                    }
                     if (intento < retries) {
                         await new Promise((r) => setTimeout(r, retryDelayMs));
                     }
@@ -625,14 +669,15 @@
             }
 
             if (!exitoSubida) {
+                const errFinal = bestError || lastError;
                 const msg =
-                    (lastError && lastError.message) ||
+                    (errFinal && errFinal.message) ||
                     "No se pudo subir el archivo: " + tarea.file.name;
                 if (throwOnFail) {
                     UIProgress.hide();
                     throw new Error(msg);
                 }
-                console.error(options.logPrefix || "Fallo en subida individual:", lastError);
+                console.error(options.logPrefix || "Fallo en subida individual:", errFinal);
                 continue;
             }
 
@@ -753,6 +798,8 @@
         getIsTest: getIsTest,
         getSessionToken: getSessionToken,
         requireSessionToken: requireSessionToken,
+        cleanErrorText: cleanErrorText,
+        formatUserError: formatUserError,
         mergeConfig: mergeConfig,
         applyHeaderTheme: applyHeaderTheme,
         mostrarMensaje: mostrarMensaje,
