@@ -1,116 +1,82 @@
 // ====================================================================
-// SCRIPT DE LOGIN (sin token de sesión — modo rápido)
+// SCRIPT DE LOGIN
 // ====================================================================
-// Tokens desactivados temporalmente para recuperar la fiabilidad del
-// login en Apps Script. Adjuntos/PDF no exigen session_token.
-//
-// Tras pegar: Implementar → Nueva versión (misma app web).
-// auth-token.gs puede quedarse en el proyecto, pero no es obligatorio.
+// Restaurado tal como funcionaba antes de los tokens.
+// Tras pegar: Implementar → Nueva versión (misma app web, no crear otra).
 // ====================================================================
 
 const ID_HOJA_CREDENCIALES = "1MtFPW_FDMCKaAnMeYRCyr-qnTIyUUOrSOK5N7cj6Hu8";
 const NOMBRE_PESTANA = "Hoja 1";
-const CACHE_CREDENCIALES_KEY = "eiel_creds_v1";
-const CACHE_CREDENCIALES_TTL_SEC = 120;
-
-function jsonLogin_(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
-    ContentService.MimeType.JSON
-  );
-}
-
-/**
- * Filas [codigo, clave, nombre] desde caché o hoja.
- */
-function loadCredencialesRows_() {
-  var cache = CacheService.getScriptCache();
-  try {
-    var cached = cache.get(CACHE_CREDENCIALES_KEY);
-    if (cached) {
-      var parsed = JSON.parse(cached);
-      if (parsed && parsed.length) return parsed;
-    }
-  } catch (ignore) {}
-
-  var ss = SpreadsheetApp.openById(ID_HOJA_CREDENCIALES);
-  var sheet = ss.getSheetByName(NOMBRE_PESTANA) || ss.getSheets()[0];
-  var values = sheet.getDataRange().getValues();
-  var rows = [];
-  for (var i = 1; i < values.length; i++) {
-    rows.push([
-      String(values[i][0] != null ? values[i][0] : "").trim(),
-      String(values[i][1] != null ? values[i][1] : "").trim(),
-      String(values[i][2] != null ? values[i][2] : "").trim()
-    ]);
-  }
-
-  try {
-    cache.put(CACHE_CREDENCIALES_KEY, JSON.stringify(rows), CACHE_CREDENCIALES_TTL_SEC);
-  } catch (ignore) {}
-
-  return rows;
-}
 
 function doPost(e) {
+  const output = ContentService.createTextOutput().setMimeType(ContentService.MimeType.JSON);
+
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return jsonLogin_({
-        success: false,
-        message: "No se recibieron datos de acceso."
-      });
-    }
+    const data = JSON.parse(e.postData.contents);
 
-    var data;
-    try {
-      data = JSON.parse(e.postData.contents);
-    } catch (parseErr) {
-      return jsonLogin_({
-        success: false,
-        message: "Petición de acceso no válida."
-      });
-    }
+    const codigoInput = String(data.codigo || "").trim();
+    const passwordInput = String(data.password || "").trim();
 
-    var codigoInput = String(data.codigo || "").trim();
-    var passwordInput = String(data.password || "").trim();
+    // 1. OBTENER LA CONTRASEÑA MAESTRA
+    const MASTER_PASS = PropertiesService.getScriptProperties().getProperty("MASTER_PASS");
 
-    var MASTER_PASS = PropertiesService.getScriptProperties().getProperty("MASTER_PASS");
+    let loginExitoso = false;
+    let nombreMunicipio = "";
+    let isTestMode = false;
 
-    var loginExitoso = false;
-    var nombreMunicipio = "";
-    var isTestMode = false;
-
-    // Contraseña maestra: no abrimos la hoja (el front ya tiene el nombre).
+    // 2. VERIFICACIÓN DE CONTRASEÑA MAESTRA (Prioridad)
     if (MASTER_PASS && passwordInput == MASTER_PASS) {
       loginExitoso = true;
       isTestMode = true;
-      nombreMunicipio = "";
+
+      // Buscamos el nombre real del municipio seleccionado para no devolver "ADMIN"
+      const ss = SpreadsheetApp.openById(ID_HOJA_CREDENCIALES);
+      const sheet = ss.getSheetByName(NOMBRE_PESTANA);
+      const dataRange = sheet.getDataRange().getValues();
+
+      for (var i = 1; i < dataRange.length; i++) {
+        if (String(dataRange[i][0]).trim() == codigoInput) {
+          nombreMunicipio = dataRange[i][2]; // Guardamos el nombre real (ej: Adsubia)
+          break;
+        }
+      }
+      // Si por lo que sea no lo encuentra en la lista, ponemos un genérico
+      if (!nombreMunicipio) nombreMunicipio = "Municipio Desconocido";
     } else {
-      var rows = loadCredencialesRows_();
-      for (var i = 0; i < rows.length; i++) {
-        if (rows[i][0] === codigoInput && rows[i][1] === passwordInput) {
+      // 3. VALIDACIÓN CONTRA EL SPREADSHEET ACTUALIZADO
+      const sheet = SpreadsheetApp.openById(ID_HOJA_CREDENCIALES).getSheets()[0];
+      const dataRange = sheet.getDataRange().getValues();
+
+      // Empezamos en i=1 para saltar la fila de encabezados (codigo, clave, nombre)
+      for (var i = 1; i < dataRange.length; i++) {
+        var rowCode = String(dataRange[i][0] || "").trim(); // Columna 'codigo'
+        var rowPass = String(dataRange[i][1] || "").trim(); // Columna 'clave'
+
+        // Comparación estricta de texto para evitar fallos de formato
+        if (rowCode === codigoInput && rowPass === passwordInput) {
           loginExitoso = true;
-          nombreMunicipio = rows[i][2];
+          nombreMunicipio = dataRange[i][2]; // Columna 'nombre'
           isTestMode = false;
           break;
         }
       }
     }
 
-    return jsonLogin_({
-      success: true,
-      valid: loginExitoso,
-      nombre: nombreMunicipio,
-      isTest: isTestMode
-    });
+    return output.setContent(
+      JSON.stringify({
+        success: true,
+        valid: loginExitoso,
+        nombre: nombreMunicipio,
+        isTest: isTestMode
+      })
+    );
   } catch (error) {
-    return jsonLogin_({
-      success: false,
-      message: error.toString()
-    });
+    // Si algo falla, enviamos el error real para que lo veas en el index
+    return output.setContent(
+      JSON.stringify({
+        success: false,
+        message: error.toString()
+      })
+    );
   }
-}
-
-function clearCredencialesCache() {
-  CacheService.getScriptCache().remove(CACHE_CREDENCIALES_KEY);
-  Logger.log("Caché de credenciales borrada");
 }
