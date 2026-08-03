@@ -64,10 +64,17 @@ id_envio, id_registro, Usuario, Archivo, Mensaje usuario, Detalle técnico.
 
 ### Despliegue
 1. En **Adjuntos** y **PDF**: crear/actualizar fichero `log-errores` con
-   `appscript/log-errores.gs`
-2. Actualizar `Código.gs` de cada uno (`adjuntos.gs` / `generar-pdf.gs`)
-3. **Nueva versión** en ambos
-4. Probar: borrar token e intentar enviar → fila nueva en `logs_errores`
+   `appscript/log-errores.gs` (junto a `Código.gs` y `auth-token.gs`).
+2. En el editor de **Adjuntos**: función `testLogErrores` → Ejecutar →
+   aceptar permisos de Hojas de cálculo. Debe crear una fila
+   `origen=test` en `logs_errores`.
+3. Repetir `testLogErrores` en el proyecto **PDF**.
+4. Actualizar `Código.gs` (`adjuntos.gs` / `generar-pdf.gs`) y
+   **Implementar → Nueva versión** en ambos.
+5. Probar: token inválido e intentar subir → fila con origen `adjuntos`.
+
+Si el error se ve en pantalla pero no hay fila: falta el fichero
+`log-errores`, faltan permisos sobre la hoja, o no se redesplegó.
 
 `verificaciones` sigue sin uso en código (se puede archivar/borrar).
 

@@ -31,6 +31,10 @@ function doPost(e) {
         mensaje_usuario: fatalMsg,
         detalle: fatal.toString() + (fatal.stack ? "\n" + fatal.stack : "")
       });
+    } else {
+      Logger.log(
+        "AVISO: falta log-errores.gs en el proyecto Adjuntos (logErrorToSheet_ no definida)."
+      );
     }
     return jsonOut_({
       status: "error",
@@ -190,7 +194,7 @@ function handleAdjuntosPost_(e) {
       Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
     } catch (ignore) {}
     if (typeof logErrorToSheet_ === "function") {
-      logErrorToSheet_({
+      var wrote = logErrorToSheet_({
         origen: "adjuntos",
         codigo: ctx.codigo,
         tipo: ctx.tipo,
@@ -200,6 +204,15 @@ function handleAdjuntosPost_(e) {
         mensaje_usuario: result.message,
         detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
       });
+      if (!wrote) {
+        Logger.log(
+          "AVISO: logErrorToSheet_ no escribió fila (permisos hoja / pestaña logs_errores)."
+        );
+      }
+    } else {
+      Logger.log(
+        "AVISO: falta log-errores.gs en el proyecto Adjuntos (logErrorToSheet_ no definida)."
+      );
     }
   }
 
