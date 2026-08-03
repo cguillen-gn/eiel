@@ -154,7 +154,39 @@
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
      * Manejo de autenticación y peticiones externas.
+     * Reintenta ante fallos intermitentes de Apps Script (cold start → 404 HTML).
      */
+    async function fetchLoginJson(codigo, password, onAttempt) {
+        const maxAttempts = 3;
+        let lastError = null;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (typeof onAttempt === "function") onAttempt(attempt, maxAttempts);
+            try {
+                const response = await fetch(URL_LOGIN_API, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify({ codigo: codigo, password: password }),
+                    redirect: "follow"
+                });
+                const raw = await response.text();
+                let data = null;
+                try {
+                    data = JSON.parse(raw);
+                } catch (parseErr) {
+                    throw new Error("RESPUESTA_NO_JSON");
+                }
+                return data;
+            } catch (err) {
+                lastError = err;
+                console.error("Login intento " + attempt + "/" + maxAttempts, err);
+                if (attempt < maxAttempts) {
+                    await new Promise((r) => setTimeout(r, 800 * attempt));
+                }
+            }
+        }
+        throw lastError || new Error("LOGIN_FALLIDO");
+    }
+
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
         const enteredPass = ui.input.value.trim();
@@ -169,12 +201,12 @@
         ui.error.style.display = 'none';
 
         try {
-            const response = await fetch(URL_LOGIN_API, {
-                method: 'POST',
-                headers: { "Content-Type": "text/plain" },
-                body: JSON.stringify({ codigo: selectedCode, password: enteredPass })
+            const data = await fetchLoginJson(selectedCode, enteredPass, (attempt, max) => {
+                ui.btn.textContent =
+                    attempt === 1
+                        ? "Verificando..."
+                        : "Reintentando (" + attempt + "/" + max + ")...";
             });
-            const data = await response.json();
 
             if (data.success === false) {
                 showError("Error de Servidor: " + data.message); 
@@ -183,7 +215,10 @@
 
             if (data.valid === true) {
                 const muniLocal = MUNICIPIOS.find(m => m.code === selectedCode);
-                const nombreParaGuardar = data.isTest ? data.nombre : (muniLocal ? muniLocal.name_bonito : data.nombre);
+                // Preferir nombre local (también en modo prueba: el login ya no consulta la hoja)
+                const nombreParaGuardar = muniLocal
+                    ? (muniLocal.name_bonito || muniLocal.name)
+                    : (data.nombre || selectedCode);
 
                 if (!data.token) {
                     showError("El servidor de acceso no devolvió token de sesión. Actualice el script de Login.");
@@ -197,7 +232,9 @@
             }
         } catch (error) {
             console.error(error); 
-            showError("Error de conexión con el servidor.");
+            showError(
+                "Error de conexión con el servidor. Espere unos segundos e inténtelo de nuevo. Si necesita ayuda, escriba a eiel@geonet.es."
+            );
         } finally {
             ui.btn.disabled = false; 
             ui.btn.textContent = "Entrar";
