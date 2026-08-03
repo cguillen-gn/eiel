@@ -57,12 +57,6 @@ function handleAdjuntosPost_(e) {
   try {
     if (!e) throw new Error("No hay datos de entrada.");
 
-    if (typeof assertValidSessionToken_ !== "function") {
-      throw new Error(
-        "Falta auth-token.gs en el proyecto Adjuntos (assertValidSessionToken_ no definida)."
-      );
-    }
-
     var data = {};
     var rawLen = 0;
     if (e.postData && e.postData.contents) {
@@ -105,7 +99,12 @@ function handleAdjuntosPost_(e) {
     );
 
     if (!munCode) throw new Error("Falta el código de municipio.");
-    assertValidSessionToken_(sessionToken, munCode);
+
+    // Tokens desactivados temporalmente: solo valida si llega token.
+    if (sessionToken && typeof assertValidSessionToken_ === "function") {
+      assertValidSessionToken_(sessionToken, munCode);
+    }
+
     if (!idEnvio) throw new Error("Falta id_envio.");
     if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");

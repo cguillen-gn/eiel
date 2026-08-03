@@ -1,53 +1,36 @@
-# Apps Script — Adjuntos, PDF, token y logger
+# Apps Script — Adjuntos, PDF, login y logger
 
-## D — Token de sesión en el envío
+## D — Token de sesión (**DESACTIVADO** temporalmente)
 
-Sin token, cualquiera con la URL del Web App podía subir adjuntos o
-disparar el PDF. Ahora el login emite un token HMAC; adjuntos y PDF lo exigen.
+Los tokens HMAC se desactivaron para recuperar un login **rápido y gratis**
+en Apps Script (como antes). El portal ya no emite ni exige
+`eiel_session_token`; Adjuntos/PDF solo validan token **si llega** (opcional).
 
 | Pieza | Archivo |
 |-------|---------|
-| Helpers HMAC (compartidos) | `auth-token.gs` |
-| Login | `login.gs` / `login.PARCHE.md` |
+| Login (simple) | `login.gs` |
 | Adjuntos | `adjuntos.gs` + `log-errores.gs` |
 | PDF | `generar-pdf.gs` + `log-errores.gs` |
-| Front | `js/eiel-forms.js` + plantillas index/base |
+| Front | `js/eiel-forms.js` + `docs/index.html` |
+| HMAC (opcional / futuro) | `auth-token.gs` |
 
-### Despliegue (orden)
+### Despliegue para quitar tokens
 
-1. **Login:** `auth-token.gs` + `login.gs` → **Nueva versión**
-2. **Front:** merge + regenerar
-3. **Adjuntos y PDF:** mismo `auth-token.gs` + scripts → **Nueva versión**
-4. Cerrar sesión y volver a entrar
+1. **Login:** pegar `login.gs` → **Nueva versión** (no hace falta `auth-token`).
+2. **Adjuntos** y **PDF:** pegar `adjuntos.gs` / `generar-pdf.gs` → **Nueva versión**.
+3. **Front:** merge + Pages (`index.html` + `js/eiel-forms.js?v=20260803b`).
+4. Hard refresh; cerrar sesión y entrar.
 
-### Secreto
+### Login
 
-Mismo `EIEL_TOKEN_SECRET` (Script Properties) o el mismo fallback en
-`auth-token.gs` en Login, Adjuntos y PDF.
+Flujo simple otra vez: un POST, sin warmup ni timeouts raros.
+Sigue la caché 2 min de credenciales y, con `MASTER_PASS`, no abre la hoja.
 
-### Pruebas
+### Nota de seguridad
 
-1. Login → menú OK  
-2. Envío con adjunto → OK  
-3. Sin token (borrar `eiel_session_token`) → redirect / error de sesión  
-
-### Login lento / “Error de conexión”
-
-Apps Script a veces tarda en el **primer** uso tras inactividad (cold start).
-Los reintentos automáticos encadenados empeoran la espera (p. ej. 75 s).
-
-Enfoque actual:
-- Al abrir el portal se hace un **POST de warmup** (`codigo=__warmup__`)
-  en segundo plano (no GET: si falta `doGet` Google responde HTML sin CORS).
-- El botón Entrar hace **un solo POST** y espera al warmup **máx. 10 s**
-  (si el warmup cuelga, no bloquea la UI).
-- Espera del login **máx. 45 s** con `Promise.race` (sin AbortController).
-- Si supera el tiempo o la respuesta no es JSON: mensaje claro y se libera Entrar.
-- Caché 2 min de credenciales; con `MASTER_PASS` no se abre la hoja.
-- `doGet` sigue existiendo como respaldo, pero el portal ya no depende de él.
-
-Tras actualizar: pegar `login.gs` → **Nueva versión** (misma implementación,
-no crear otra) + publicar `docs/index.html`.
+Sin token, cualquiera que conozca las URLs de Adjuntos/PDF podría
+invocarlas. Es un trade-off consciente (gratis + rápido). Se puede
+reactivar el token más adelante o mover el login a un Worker gratuito.
 
 ---
 

@@ -130,15 +130,8 @@
         const code = localStorage.getItem("eiel_muni_code");
         const name = localStorage.getItem("eiel_muni_name");
         const isTest = localStorage.getItem("eiel_is_test") === "true";
-        const token = localStorage.getItem("eiel_session_token");
 
-        // Tras el despliegue del token, sesiones antiguas deben re-autenticarse
-        if (code && name && !token) {
-            localStorage.clear();
-            return;
-        }
-
-        if (code && name && token) {
+        if (code && name) {
             loginSuccess(code, name, isTest);
         }
     }
@@ -153,95 +146,9 @@
 
     /**
      * [4] LÓGICA DE NEGOCIO Y COMUNICACIÓN (API)
-     * Warmup POST al cargar. No usamos AbortController (provocaba AbortError
-     * y 404 en el redirect de Google). Sí limitamos la ESPERA en UI con
-     * Promise.race: si el servidor no contesta, el botón se libera con mensaje.
+     * Login simple (sin token de sesión ni warmup). Tokens desactivados
+     * temporalmente para recuperar la velocidad/fiabilidad de Apps Script.
      */
-    const WARMUP_WAIT_MS = 10000;
-    const LOGIN_WAIT_MS = 45000;
-    let loginWarmupPromise = null;
-
-    function raceTimeout(promise, ms, label) {
-        return new Promise(function (resolve, reject) {
-            var settled = false;
-            var timer = setTimeout(function () {
-                if (settled) return;
-                settled = true;
-                reject(new Error(label || "TIMEOUT"));
-            }, ms);
-            promise.then(
-                function (value) {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    resolve(value);
-                },
-                function (err) {
-                    if (settled) return;
-                    settled = true;
-                    clearTimeout(timer);
-                    reject(err);
-                }
-            );
-        });
-    }
-
-    function warmLoginServer() {
-        var work = fetch(URL_LOGIN_API, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({ codigo: "__warmup__", password: "", warmup: true }),
-            redirect: "follow",
-            cache: "no-store"
-        }).then(function (response) {
-            return response.text().then(function (raw) {
-                try {
-                    JSON.parse(raw);
-                } catch (parseErr) {
-                    throw new Error("WARMUP_NO_JSON");
-                }
-            });
-        });
-
-        // La promesa de warmup siempre termina a lo sumo en WARMUP_WAIT_MS
-        // (aunque el fetch siga en segundo plano), para no bloquear Entrar.
-        loginWarmupPromise = raceTimeout(work, WARMUP_WAIT_MS, "WARMUP_TIMEOUT")
-            .catch(function (err) {
-                console.warn("Warmup login:", err);
-            });
-        return loginWarmupPromise;
-    }
-
-    async function fetchLoginJson(codigo, password) {
-        if (loginWarmupPromise) {
-            try {
-                await loginWarmupPromise;
-            } catch (ignore) {}
-        }
-
-        const raw = await raceTimeout(
-            fetch(URL_LOGIN_API, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ codigo: codigo, password: password }),
-                redirect: "follow"
-            }).then(function (response) {
-                return response.text();
-            }),
-            LOGIN_WAIT_MS,
-            "LOGIN_TIMEOUT"
-        );
-
-        try {
-            return JSON.parse(raw);
-        } catch (parseErr) {
-            throw new Error("RESPUESTA_NO_JSON");
-        }
-    }
-
-    // Calentar el servidor en cuanto se abre el portal (mientras eligen municipio)
-    warmLoginServer();
-
     ui.btn.addEventListener('click', async () => {
         const selectedCode = ui.select.value;
         const enteredPass = ui.input.value.trim();
@@ -256,7 +163,12 @@
         ui.error.style.display = 'none';
 
         try {
-            const data = await fetchLoginJson(selectedCode, enteredPass);
+            const response = await fetch(URL_LOGIN_API, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({ codigo: selectedCode, password: enteredPass })
+            });
+            const data = await response.json();
 
             if (data.success === false) {
                 showError("Error de Servidor: " + data.message); 
@@ -265,33 +177,20 @@
 
             if (data.valid === true) {
                 const muniLocal = MUNICIPIOS.find(m => m.code === selectedCode);
-                // Preferir nombre local (también en modo prueba: el login ya no consulta la hoja)
                 const nombreParaGuardar = muniLocal
                     ? (muniLocal.name_bonito || muniLocal.name)
                     : (data.nombre || selectedCode);
 
-                if (!data.token) {
-                    showError("El servidor de acceso no devolvió token de sesión. Actualice el script de Login.");
-                    return;
-                }
-                localStorage.setItem("eiel_session_token", data.token);
+                // Limpiar token antiguo si existía (ya no se usa)
+                localStorage.removeItem("eiel_session_token");
 
                 loginSuccess(selectedCode, nombreParaGuardar, data.isTest || false);
             } else {
                 showError("Código de acceso incorrecto.");
             }
         } catch (error) {
-            console.error(error);
-            warmLoginServer();
-            var msg = "No se pudo conectar con el servidor de acceso.";
-            if (error && String(error.message || error).indexOf("LOGIN_TIMEOUT") !== -1) {
-                msg =
-                    "El servidor de acceso tarda demasiado en responder. Espere unos segundos y pulse Entrar de nuevo.";
-            } else if (error && String(error.message || error).indexOf("RESPUESTA_NO_JSON") !== -1) {
-                msg =
-                    "El servidor de acceso no respondió correctamente. Espere unos segundos y pulse Entrar de nuevo.";
-            }
-            showError(msg);
+            console.error(error); 
+            showError("Error de conexión con el servidor.");
         } finally {
             ui.btn.disabled = false; 
             ui.btn.textContent = "Entrar";

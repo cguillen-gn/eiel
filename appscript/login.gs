@@ -1,13 +1,11 @@
 // ====================================================================
-// SCRIPT DE LOGIN
+// SCRIPT DE LOGIN (sin token de sesión — modo rápido)
 // ====================================================================
-// Requiere el fichero auth-token.gs en el MISMO proyecto
-// (issueSessionToken_ / assertValidSessionToken_).
-// Tras pegar: Implementar → Nueva versión.
+// Tokens desactivados temporalmente para recuperar la fiabilidad del
+// login en Apps Script. Adjuntos/PDF no exigen session_token.
 //
-// Optimización: CacheService de la hoja de credenciales (~2 min) para
-// evitar releer SpreadsheetApp en cada login (cold start + latencia).
-// Con MASTER_PASS no se abre la hoja: el nombre lo resuelve el portal.
+// Tras pegar: Implementar → Nueva versión (misma app web).
+// auth-token.gs puede quedarse en el proyecto, pero no es obligatorio.
 // ====================================================================
 
 const ID_HOJA_CREDENCIALES = "1MtFPW_FDMCKaAnMeYRCyr-qnTIyUUOrSOK5N7cj6Hu8";
@@ -23,7 +21,6 @@ function jsonLogin_(obj) {
 
 /**
  * Filas [codigo, clave, nombre] desde caché o hoja.
- * @return {Array<Array>}
  */
 function loadCredencialesRows_() {
   var cache = CacheService.getScriptCache();
@@ -38,7 +35,6 @@ function loadCredencialesRows_() {
   var ss = SpreadsheetApp.openById(ID_HOJA_CREDENCIALES);
   var sheet = ss.getSheetByName(NOMBRE_PESTANA) || ss.getSheets()[0];
   var values = sheet.getDataRange().getValues();
-  // Guardamos solo filas de datos (sin cabecera) como texto
   var rows = [];
   for (var i = 1; i < values.length; i++) {
     rows.push([
@@ -49,7 +45,6 @@ function loadCredencialesRows_() {
   }
 
   try {
-    // CacheService límite ~100 KB; credenciales de municipios caben sobrado
     cache.put(CACHE_CREDENCIALES_KEY, JSON.stringify(rows), CACHE_CREDENCIALES_TTL_SEC);
   } catch (ignore) {}
 
@@ -78,21 +73,6 @@ function doPost(e) {
     var codigoInput = String(data.codigo || "").trim();
     var passwordInput = String(data.password || "").trim();
 
-    // Warmup del portal (no es un login real): despierta + precarga caché.
-    if (codigoInput === "__warmup__" || data.warmup === true) {
-      try {
-        loadCredencialesRows_();
-      } catch (ignore) {}
-      return jsonLogin_({
-        success: true,
-        valid: false,
-        warmup: true,
-        nombre: "",
-        isTest: false,
-        token: ""
-      });
-    }
-
     var MASTER_PASS = PropertiesService.getScriptProperties().getProperty("MASTER_PASS");
 
     var loginExitoso = false;
@@ -116,23 +96,11 @@ function doPost(e) {
       }
     }
 
-    var token = "";
-    if (loginExitoso) {
-      if (typeof issueSessionToken_ !== "function") {
-        return jsonLogin_({
-          success: false,
-          message: "Falta auth-token.gs en el proyecto Login."
-        });
-      }
-      token = issueSessionToken_(codigoInput, isTestMode);
-    }
-
     return jsonLogin_({
       success: true,
       valid: loginExitoso,
       nombre: nombreMunicipio,
-      isTest: isTestMode,
-      token: token
+      isTest: isTestMode
     });
   } catch (error) {
     return jsonLogin_({
@@ -142,21 +110,6 @@ function doPost(e) {
   }
 }
 
-/**
- * Wake-up al abrir el portal (GET). Despierta el contenedor y precarga
- * la caché de credenciales para que el POST de login sea rápido.
- */
-function doGet(e) {
-  try {
-    loadCredencialesRows_();
-  } catch (ignore) {}
-  return jsonLogin_({ ok: true, pong: true });
-}
-
-/**
- * Ejecutar desde el editor tras cambiar claves en la hoja, si hace falta
- * invalidar la caché antes de los 2 minutos.
- */
 function clearCredencialesCache() {
   CacheService.getScriptCache().remove(CACHE_CREDENCIALES_KEY);
   Logger.log("Caché de credenciales borrada");
