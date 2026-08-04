@@ -331,7 +331,7 @@
                     document.getElementById("contactoEmail").value) ||
                 "anonimo";
             const payload = {
-                filename: ready.name || file.name,
+                filename: file.name,
                 mimeType: ready.type || file.type || "application/octet-stream",
                 bytesBase64: base64,
                 municipio: muniCode,
