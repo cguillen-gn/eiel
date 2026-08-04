@@ -646,14 +646,14 @@
      * tasks: [{ file, seccion, tipo? }]
      * Sube en serie; reintenta si falla; si tras los reintentos sigue mal, aborta
      * el lote (no se debe llamar a generar PDF).
-     * options.retries: por defecto 3 (fotos grandes suelen fallar HTML 404 en frío)
+     * options.retries: por defecto 2 (el 3er intento duplicaba si Drive no indexaba a tiempo)
      * options.throwOnFail: por defecto true
      */
     async function uploadTaskList(tasks, idBatch, options) {
         options = options || {};
-        const retries = options.retries != null ? options.retries : 3;
-        const delayMs = options.delayMs != null ? options.delayMs : 600;
-        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 2000;
+        const retries = options.retries != null ? options.retries : 2;
+        const delayMs = options.delayMs != null ? options.delayMs : 800;
+        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 3500;
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
         const totalTareas = tasks.length;
