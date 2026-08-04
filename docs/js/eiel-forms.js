@@ -267,6 +267,49 @@
     };
 
     /**
+     * Extrae solo ficheros reales de un drop (rechaza carpetas).
+     * Usa webkitGetAsEntry cuando existe; si no, descarta stubs vacíos tipicos de carpetas.
+     * @returns {{ files: File[], skippedFolders: number }}
+     */
+    function collectDroppedFiles(dataTransfer) {
+        const files = [];
+        let skippedFolders = 0;
+        if (!dataTransfer) return { files, skippedFolders };
+
+        const items = dataTransfer.items;
+        if (items && items.length) {
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.kind !== "file") continue;
+                const entry =
+                    typeof item.webkitGetAsEntry === "function"
+                        ? item.webkitGetAsEntry()
+                        : null;
+                if (entry) {
+                    if (entry.isDirectory) {
+                        skippedFolders += 1;
+                        continue;
+                    }
+                    if (!entry.isFile) continue;
+                }
+                const f = item.getAsFile();
+                if (f) files.push(f);
+            }
+            return { files, skippedFolders };
+        }
+
+        // Fallback (navegadores sin items): filtrar stubs de carpeta (size 0, sin type).
+        Array.from(dataTransfer.files || []).forEach((f) => {
+            if (f && f.size === 0 && !f.type) {
+                skippedFolders += 1;
+                return;
+            }
+            files.push(f);
+        });
+        return { files, skippedFolders };
+    }
+
+    /**
      * Gestor de adjuntos generales (input + lista + drop zone opcional).
      * options.markDirtyOnDrop: default true (equipamientos usa false).
      * options.clearEmptyList: default true (equipamientos usa false → siempre map).
@@ -333,11 +376,16 @@
                 dropZone.addEventListener(name, () => dropZone.classList.remove("drag-over"));
             });
             dropZone.addEventListener("drop", (e) => {
-                const files = Array.from(e.dataTransfer.files);
-                if (files.length > 0) {
+                const picked = collectDroppedFiles(e.dataTransfer);
+                if (picked.skippedFolders > 0) {
+                    alert(
+                        "No se pueden adjuntar carpetas. Seleccione o arrastre solo archivos."
+                    );
+                }
+                if (picked.files.length > 0) {
                     if (markDirtyOnDrop) global.formSucio = true;
                     // Paridad: el drop histórico no filtraba 35 MB (sí el input y el submit).
-                    archivos.push(...files);
+                    archivos.push(...picked.files);
                     renderArchivos();
                 }
             });
@@ -802,6 +850,7 @@
         setupConformidad: setupConformidad,
         setupSelectHasValue: setupSelectHasValue,
         filterFilesBySize: filterFilesBySize,
+        collectDroppedFiles: collectDroppedFiles,
         UIProgress: UIProgress,
         UploadService: UploadService,
         createGeneralFileManager: createGeneralFileManager,
