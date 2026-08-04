@@ -940,8 +940,11 @@ function generarHTML(data, tituloFormulario) {
               
               data.DATOS_EQUIPAMIENTOS.filter(e => e.categoria === cat).forEach(e => {
                   let displayEstado = e.modificado ? `<strong>${e.estado}</strong>` : e.estado;
+                  const fotoNueva = e.foto_nueva
+                    ? `<div style="font-size:10px; color:#1e3a8a; margin-top:4px;">📷 Foto nueva: ${e.foto_nueva}</div>`
+                    : "";
                   detalles += `<tr>
-                      <td><b>${e.nombre}</b><br><small>Cód: ${e.id}</small></td>
+                      <td><b>${e.nombre}</b><br><small>Cód: ${e.id}</small>${fotoNueva}</td>
                       <td>${displayEstado}<br><i>${e.obs || '-'}</i></td>
                   </tr>`;
               });
@@ -961,8 +964,11 @@ function generarHTML(data, tituloFormulario) {
           
           data.DATOS_SIN_USO.forEach(su => {
               let usoTxt = (su.tiene_uso === "SI") ? "<b>SÍ, ya tiene uso</b>" : "No, sigue sin uso";
+              const fotoNueva = su.foto_nueva
+                ? `<div style="font-size:10px; color:#1e3a8a; margin-top:4px;">📷 Foto nueva: ${su.foto_nueva}</div>`
+                : "";
               detalles += `<tr>
-                <td><b>${su.nombre}</b><br><small>Cód: ${su.id}</small></td>
+                <td><b>${su.nombre}</b><br><small>Cód: ${su.id}</small>${fotoNueva}</td>
                 <td style="text-align:center;">${usoTxt}</td>
                 <td><i>${su.nuevo_uso || '-'}</i></td>
               </tr>`;

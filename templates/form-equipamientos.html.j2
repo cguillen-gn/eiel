@@ -15,7 +15,7 @@
         Despliegue cada temática para ver los equipamientos disponibles en la EIEL. Pulse en el botón de Mapa para ver el equipamiento en un visor.
         <li><strong>Estado: </strong>Seleccione el estado de conservación en el que se encuentra cada equipamiento. Por defecto se muestra el último estado disponible en la EIEL.</li>
         <li><strong>Observaciones: </strong>Añada cualquier observación que pueda ser de interés para algún equipamiento como <strong>cambio de nombre</strong>, <strong>cambio de uso</strong> o si <strong>deja de prestar servicio</strong> temporal o definitivamente.</li>
-
+        <li><strong>Foto: </strong>Si la foto mostrada <strong>no refleja la realidad</strong>, pulse el icono de cámara junto a la imagen y suba una foto actualizada. Se enviará como adjunto del envío.</li>
     </ul>
 </div>
 
@@ -82,7 +82,15 @@
                                             <i data-lucide="camera-off" class="icon-camera-off"></i>
                                         </div>
                                     {% endif %}
+                                    <button type="button"
+                                            class="btn-foto-eq"
+                                            onclick="event.stopPropagation(); gestionarFotoEquip('{{ eq.cod }}')"
+                                            title="Subir nueva foto"
+                                            aria-label="Subir nueva foto">
+                                        <i data-lucide="camera" class="icon-sm"></i>
+                                    </button>
                                 </div>
+                                <div id="lista_foto_{{ eq.cod }}" class="lista-foto-eq"></div>
                             </td>
                             <td class="td-ubicacion">
                                 <a href="{{ eq.url_visor }}" target="_blank" class="btn btn-secondary btn-sm">
@@ -160,7 +168,15 @@
                                     <i data-lucide="camera-off" class="icon-camera-off"></i>
                                 </div>
                             {% endif %}
+                            <button type="button"
+                                    class="btn-foto-eq"
+                                    onclick="event.stopPropagation(); gestionarFotoEquip('{{ su.cod }}')"
+                                    title="Subir nueva foto"
+                                    aria-label="Subir nueva foto">
+                                <i data-lucide="camera" class="icon-sm"></i>
+                            </button>
                         </div>
+                        <div id="lista_foto_{{ su.cod }}" class="lista-foto-eq"></div>
                     </td>
 
                                         <td class="td-ubicacion">
@@ -345,6 +361,7 @@
 </div>
 
 <input type="file" id="hiddenInputNuevos" multiple class="input-file-hidden">
+<input type="file" id="hiddenInputFotosEquip" accept="image/*" class="input-file-hidden">
 
 {% endblock %}
 
@@ -388,9 +405,56 @@ document.addEventListener("DOMContentLoaded", () => {
     const reqMgr = EIEL.createReqAttachmentManager({ variant: 'equipamientos' });
 
     let colaAdjuntosNuevos = {};
+    let colaFotosEquip = {};
     let filaActualAdjuntos = null;
+    let equipFotoActual = null;
     let contadorNuevosEq = 0;
     const inputNuevos = document.getElementById('hiddenInputNuevos');
+    const inputFotosEquip = document.getElementById('hiddenInputFotosEquip');
+
+    window.gestionarFotoEquip = (cod) => {
+        equipFotoActual = cod;
+        if (inputFotosEquip) inputFotosEquip.click();
+    };
+
+    if (inputFotosEquip) {
+        inputFotosEquip.addEventListener('change', () => {
+            formSucio = true;
+            const files = Array.from(inputFotosEquip.files || []);
+            if (!files.length || !equipFotoActual) return;
+            const validos = EIEL.filterFilesBySize(files);
+            if (validos.length > 0) {
+                // Una foto por equipamiento: sustituye la anterior si había.
+                colaFotosEquip[equipFotoActual] = [validos[0]];
+                renderFotoEquip(equipFotoActual);
+            }
+            inputFotosEquip.value = "";
+            equipFotoActual = null;
+        });
+    }
+
+    function renderFotoEquip(cod) {
+        const contenedor = document.getElementById(`lista_foto_${cod}`);
+        if (!contenedor) return;
+        const lista = colaFotosEquip[cod] || [];
+        contenedor.innerHTML = lista.map((f, i) => `
+            <div class="file-item file-item--micro lista-foto-eq-item">
+                <span title="${f.name}"><i data-lucide="image" class="icon-xs-10"></i> ${f.name.length > 14 ? f.name.substring(0, 12) + '…' : f.name}</span>
+                <button type="button" onclick="eliminarFotoEquip('${cod}', ${i})" class="btn-danger-icon" title="Quitar foto">
+                    <i data-lucide="trash-2" class="icon-trash-sm"></i>
+                </button>
+            </div>
+        `).join('');
+        if (window.lucide) lucide.createIcons();
+    }
+
+    window.eliminarFotoEquip = (cod, index) => {
+        formSucio = true;
+        if (!colaFotosEquip[cod]) return;
+        colaFotosEquip[cod].splice(index, 1);
+        if (!colaFotosEquip[cod].length) delete colaFotosEquip[cod];
+        renderFotoEquip(cod);
+    };
 
     window.agregarFilaNuevoEquipamiento = () => {
         formSucio = true;
@@ -513,7 +577,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const oversized = EIEL.findOversizedFile([
             archivosMgr.getFiles(),
             reqMgr.getCola(),
-            colaAdjuntosNuevos
+            colaAdjuntosNuevos,
+            colaFotosEquip
         ]);
         if (oversized) {
             EIEL.mostrarMensaje(`⚠️ El archivo "${oversized.name}" excede los 35 MB permitidos. Por favor, optimícelo antes de enviar.`, "error");
@@ -529,7 +594,7 @@ document.addEventListener("DOMContentLoaded", () => {
         formSucio = false;
         toggleFormFreeze(true);
 
-        // Paridad: orden GENERAL → REQUERIMIENTOS → NUEVOS
+        // Paridad: orden GENERAL → REQUERIMIENTOS → NUEVOS → FOTOS
         const listaTareas = [];
         archivosMgr.getFiles().forEach(file => listaTareas.push({ file, seccion: 'GENERAL' }));
         Object.entries(reqMgr.getCola()).forEach(([id, listado]) => {
@@ -538,6 +603,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         Object.entries(colaAdjuntosNuevos).forEach(([id, listado]) => {
             listado.forEach(file => listaTareas.push({ file, seccion: id }));
+        });
+        Object.entries(colaFotosEquip).forEach(([cod, listado]) => {
+            listado.forEach(file => listaTareas.push({ file, seccion: `FOTO_${cod}`, tipo: 'equipamientos' }));
         });
 
         const totalTasks = listaTareas.length;
@@ -550,22 +618,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const datosEquipamientos = Array.from(document.querySelectorAll('.fila-equip')).map(tr => {
                 const select = tr.querySelector('.select-estado');
+                const id = tr.dataset.id;
                 return {
-                    id: tr.dataset.id,
+                    id: id,
                     nombre: tr.querySelector('.nombre-eq strong').textContent,
                     categoria: tr.closest('details').querySelector('.acc-title-box span').textContent,
                     estado: select.value,
                     modificado: select.value !== select.dataset.original,
-                    obs: tr.querySelector('.txt-obs-eq').value.trim()
+                    obs: tr.querySelector('.txt-obs-eq').value.trim(),
+                    foto_nueva: (colaFotosEquip[id] || []).map(f => f.name).join("; ")
                 };
             });
 
-            const datosSinUso = Array.from(document.querySelectorAll('.fila-sin-uso')).map(tr => ({
-                id: tr.dataset.id,
-                nombre: tr.querySelector('.nombre-eq strong').textContent,
-                tiene_uso: tr.querySelector('.select-sin-uso').value,
-                nuevo_uso: tr.querySelector('.txt-nuevo-uso').value.trim()
-            }));
+            const datosSinUso = Array.from(document.querySelectorAll('.fila-sin-uso')).map(tr => {
+                const id = tr.dataset.id;
+                return {
+                    id: id,
+                    nombre: tr.querySelector('.nombre-eq strong').textContent,
+                    tiene_uso: tr.querySelector('.select-sin-uso').value,
+                    nuevo_uso: tr.querySelector('.txt-nuevo-uso').value.trim(),
+                    foto_nueva: (colaFotosEquip[id] || []).map(f => f.name).join("; ")
+                };
+            });
 
             const dataNuevos = Array.from(document.querySelectorAll('.fila-nuevo-eq')).map(fila => {
                 const idFila = fila.id.replace('fila_', '');
@@ -601,6 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
             archivosMgr.clear();
             reqMgr.clear();
             colaAdjuntosNuevos = {};
+            colaFotosEquip = {};
             EIEL.resetFormAfterSuccess();
         } catch (error) {
             console.error(error);
