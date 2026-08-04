@@ -120,97 +120,118 @@ function handleAdjuntosPost_(e) {
       );
     }
 
-    const carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
-    const carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
-    const carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
-
-    let carpetaDestino;
-    if (
-      idEnvio.indexOf("-E-") !== -1 ||
-      idEnvio.indexOf("_E_") !== -1 ||
-      idEnvio.indexOf("EXP_E") === 0
-    ) {
-      carpetaDestino = carpetaExpediente;
-    } else {
-      carpetaDestino = getOrCreateFolder(carpetaExpediente, seccion);
-    }
-
-    const blob = Utilities.newBlob(
-      Utilities.base64Decode(base64Data),
-      mimeType,
-      fileName
-    );
-    const realBytes = blob.getBytes().length;
-    if (realBytes > LIMITE_BYTES) {
+    // Candado: evita carreras entre reintentos del mismo fichero.
+    const lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(30000);
+    } catch (lockErr) {
       throw new Error(
-        'El archivo "' + fileName + '" supera el límite de 35 MB tras decodificar.'
+        "El servidor está ocupado subiendo otro archivo. Espere unos segundos e inténtelo de nuevo."
       );
     }
 
-    // Idempotencia: si el mismo nombre ya está en la carpeta (reintento tras
-    // HTML 404 de Apps Script que a veces llega DESPUÉS de guardar), no duplicar.
-    var existentes = carpetaDestino.getFilesByName(fileName);
-    if (existentes.hasNext()) {
-      var ya = existentes.next();
+    try {
+      const cacheKey = adjuntosIdempotencyKey_(idEnvio, seccion, fileName);
+      const cache = CacheService.getScriptCache();
+      const cachedId = cache.get(cacheKey);
+      if (cachedId) {
+        try {
+          var cachedFile = DriveApp.getFileById(cachedId);
+          return jsonOut_(
+            successIdempotent_(result, cachedFile, fileName, "cache")
+          );
+        } catch (cacheMiss) {
+          cache.remove(cacheKey);
+        }
+      }
+
+      const carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
+      const carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
+      const carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
+
+      let carpetaDestino;
+      if (
+        idEnvio.indexOf("-E-") !== -1 ||
+        idEnvio.indexOf("_E_") !== -1 ||
+        idEnvio.indexOf("EXP_E") === 0
+      ) {
+        carpetaDestino = carpetaExpediente;
+      } else {
+        carpetaDestino = getOrCreateFolder(carpetaExpediente, seccion);
+      }
+
+      // Drive a veces tarda en indexar getFilesByName; la caché cubre el hueco.
+      var existentes = carpetaDestino.getFilesByName(fileName);
+      if (existentes.hasNext()) {
+        var ya = existentes.next();
+        cache.put(cacheKey, ya.getId(), 600);
+        return jsonOut_(successIdempotent_(result, ya, fileName, "drive"));
+      }
+
+      const blob = Utilities.newBlob(
+        Utilities.base64Decode(base64Data),
+        mimeType,
+        fileName
+      );
+      const realBytes = blob.getBytes().length;
+      if (realBytes > LIMITE_BYTES) {
+        throw new Error(
+          'El archivo "' + fileName + '" supera el límite de 35 MB tras decodificar.'
+        );
+      }
+
+      // Segunda comprobación por si otro intento ganó la carrera durante el decode.
+      existentes = carpetaDestino.getFilesByName(fileName);
+      if (existentes.hasNext()) {
+        ya = existentes.next();
+        cache.put(cacheKey, ya.getId(), 600);
+        return jsonOut_(successIdempotent_(result, ya, fileName, "drive-post-decode"));
+      }
+
+      const file = carpetaDestino.createFile(blob);
+      cache.put(cacheKey, file.getId(), 600);
+
+      let sharingOk = false;
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        sharingOk = true;
+      } catch (shareErr) {
+        Logger.log(
+          "[ADJUNTOS] setSharing omitido (política Workspace?): " + shareErr.toString()
+        );
+      }
+
       result.status = "success";
-      result.fileId = ya.getId();
-      result.url = ya.getUrl();
-      result.message = "Archivo ya estaba subido (reintento idempotente).";
+      result.fileId = file.getId();
+      result.url = file.getUrl();
+      result.message = sharingOk
+        ? "Archivo subido correctamente."
+        : "Archivo subido correctamente (sin enlace público; política de Drive).";
       result.filename = fileName;
-      result.bytes = ya.getSize();
-      result.sharing = false;
-      result.idempotent = true;
+      result.bytes = realBytes;
+      result.sharing = sharingOk;
+
       Logger.log(
-        "[ADJUNTOS IDEMPOTENTE] mun=" +
+        "[ADJUNTOS OK] mun=" +
           munCode +
           " id_envio=" +
           idEnvio +
           " seccion=" +
           seccion +
+          " tipo=" +
+          tipo +
           " file=" +
-          fileName
+          fileName +
+          " bytes=" +
+          realBytes +
+          " user=" +
+          usuario
       );
-      return jsonOut_(result);
+    } finally {
+      try {
+        lock.releaseLock();
+      } catch (ignoreUnlock) {}
     }
-
-    const file = carpetaDestino.createFile(blob);
-
-    let sharingOk = false;
-    try {
-      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      sharingOk = true;
-    } catch (shareErr) {
-      Logger.log(
-        "[ADJUNTOS] setSharing omitido (política Workspace?): " + shareErr.toString()
-      );
-    }
-
-    result.status = "success";
-    result.fileId = file.getId();
-    result.url = file.getUrl();
-    result.message = sharingOk
-      ? "Archivo subido correctamente."
-      : "Archivo subido correctamente (sin enlace público; política de Drive).";
-    result.filename = fileName;
-    result.bytes = realBytes;
-    result.sharing = sharingOk;
-
-    Logger.log(
-      "[ADJUNTOS OK] mun=" +
-        munCode +
-        " id_envio=" +
-        idEnvio +
-        " seccion=" +
-        seccion +
-        " tipo=" +
-        tipo +
-        " file=" +
-        fileName +
-        " bytes=" +
-        realBytes +
-        " user=" +
-        usuario
-    );
   } catch (error) {
     result.status = "error";
     result.message = friendlyUserMessageAdjuntos_(error);
@@ -242,6 +263,44 @@ function handleAdjuntosPost_(e) {
   }
 
   return jsonOut_(result);
+}
+
+/** Clave de idempotencia por envío + sección + nombre. */
+function adjuntosIdempotencyKey_(idEnvio, seccion, fileName) {
+  return (
+    "up:" +
+    String(idEnvio || "") +
+    "|" +
+    String(seccion || "") +
+    "|" +
+    String(fileName || "")
+  ).substring(0, 240);
+}
+
+/** Respuesta success cuando el fichero ya existía (reintento). */
+function successIdempotent_(result, file, fileName, via) {
+  result.status = "success";
+  result.fileId = file.getId();
+  result.url = file.getUrl();
+  result.message = "Archivo ya estaba subido (reintento idempotente).";
+  result.filename = fileName;
+  try {
+    result.bytes = file.getSize();
+  } catch (e) {
+    result.bytes = 0;
+  }
+  result.sharing = false;
+  result.idempotent = true;
+  result.idempotent_via = via || "";
+  Logger.log(
+    "[ADJUNTOS IDEMPOTENTE via=" +
+      (via || "") +
+      "] file=" +
+      fileName +
+      " id=" +
+      result.fileId
+  );
+  return result;
 }
 
 function isJson(str) {
