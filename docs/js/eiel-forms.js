@@ -210,18 +210,129 @@
             }),
 
         /**
+         * Comprime imágenes grandes antes de subir (Apps Script falla con JPG enormes).
+         * Max lado 1600px, JPEG ~0.82. Si no es imagen o falla, devuelve el original.
+         */
+        maybeCompressImage(file) {
+            return new Promise((resolve) => {
+                try {
+                    const type = (file && file.type) || "";
+                    if (!type || type.indexOf("image/") !== 0) {
+                        resolve(file);
+                        return;
+                    }
+                    // HEIC/SVG/etc.: dejar pasar
+                    if (
+                        type.indexOf("svg") !== -1 ||
+                        type.indexOf("heic") !== -1 ||
+                        type.indexOf("heif") !== -1
+                    ) {
+                        resolve(file);
+                        return;
+                    }
+                    // Ya es pequeña: no tocar
+                    if (file.size && file.size < 900 * 1024) {
+                        resolve(file);
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(file);
+                    const img = new Image();
+                    img.onload = () => {
+                        try {
+                            const maxSide = 1600;
+                            let w = img.naturalWidth || img.width;
+                            let h = img.naturalHeight || img.height;
+                            if (!w || !h) {
+                                URL.revokeObjectURL(url);
+                                resolve(file);
+                                return;
+                            }
+                            const scale = Math.min(1, maxSide / Math.max(w, h));
+                            w = Math.round(w * scale);
+                            h = Math.round(h * scale);
+                            const canvas = document.createElement("canvas");
+                            canvas.width = w;
+                            canvas.height = h;
+                            const ctx = canvas.getContext("2d");
+                            ctx.drawImage(img, 0, 0, w, h);
+                            canvas.toBlob(
+                                (blob) => {
+                                    URL.revokeObjectURL(url);
+                                    if (!blob || blob.size >= file.size) {
+                                        resolve(file);
+                                        return;
+                                    }
+                                    // Conservar el nombre original (la verificación PDF usa ese nombre).
+                                    resolve(
+                                        new File([blob], file.name, {
+                                            type: "image/jpeg",
+                                            lastModified: Date.now()
+                                        })
+                                    );
+                                },
+                                "image/jpeg",
+                                0.82
+                            );
+                        } catch (e) {
+                            URL.revokeObjectURL(url);
+                            resolve(file);
+                        }
+                    };
+                    img.onerror = () => {
+                        URL.revokeObjectURL(url);
+                        resolve(file);
+                    };
+                    img.src = url;
+                } catch (e) {
+                    resolve(file);
+                }
+            });
+        },
+
+        /**
+         * Comprueba si el fichero ya está en Drive (tras un 404 opaco), sin reenviar bytes.
+         */
+        async checkExists(fileName, tipoFicha, muniCode, seccion, idEnvio) {
+            const payload = {
+                action: "check",
+                filename: fileName,
+                municipio: muniCode,
+                tipo: tipoFicha,
+                seccion: seccion == null ? "DOCUMENTACION" : seccion,
+                id_envio: idEnvio,
+                session_token: requireSessionToken()
+            };
+            const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload),
+                redirect: "follow"
+            });
+            const raw = await response.text();
+            let result = null;
+            try {
+                result = JSON.parse(raw);
+            } catch (e) {
+                return false;
+            }
+            return !!(result && result.status === "success");
+        },
+
+        /**
          * Sube un adjunto y exige respuesta JSON legible (status === "success").
          * Usa Content-Type text/plain como el login, para evitar preflight CORS.
          */
         async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio) {
-            const base64 = await this.toBase64(file);
+            const ready = await this.maybeCompressImage(file);
+            const base64 = await this.toBase64(ready);
             const userEmail =
                 (document.getElementById("contactoEmail") &&
                     document.getElementById("contactoEmail").value) ||
                 "anonimo";
             const payload = {
-                filename: file.name,
-                mimeType: file.type || "application/octet-stream",
+                filename: ready.name || file.name,
+                mimeType: ready.type || file.type || "application/octet-stream",
                 bytesBase64: base64,
                 municipio: muniCode,
                 usuario: userEmail,
@@ -707,6 +818,31 @@
                     if (isNonRetryableUploadError(e)) {
                         break;
                     }
+
+                    // Tras 404 opaco: ¿ya quedó en Drive? (check ligero, sin reenviar la foto)
+                    if (isOpaqueUploadError(e)) {
+                        try {
+                            await new Promise((r) => setTimeout(r, 1500));
+                            const yaEsta = await UploadService.checkExists(
+                                tarea.file.name,
+                                tipo,
+                                global.EIEL_CONFIG.muniCode,
+                                tarea.seccion,
+                                idBatch
+                            );
+                            if (yaEsta) {
+                                console.warn(
+                                    "[EIEL] Adjunto ya en Drive tras respuesta opaca:",
+                                    tarea.file.name
+                                );
+                                exitoSubida = true;
+                                break;
+                            }
+                        } catch (checkErr) {
+                            console.warn("[EIEL] checkExists falló:", checkErr);
+                        }
+                    }
+
                     if (intento < retries) {
                         const wait =
                             retryDelayMs * sizeFactor * intento;

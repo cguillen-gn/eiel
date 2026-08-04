@@ -107,6 +107,12 @@ function handleAdjuntosPost_(e) {
 
     if (!idEnvio) throw new Error("Falta id_envio.");
     if (!fileName) throw new Error("Falta el nombre del archivo.");
+
+    // Comprobación ligera (sin base64): ¿el fichero ya está tras un 404 opaco?
+    if (String(data.action || "").toLowerCase() === "check") {
+      return jsonOut_(checkAdjuntoExists_(munCode, idEnvio, seccion, fileName));
+    }
+
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
@@ -275,6 +281,60 @@ function adjuntosIdempotencyKey_(idEnvio, seccion, fileName) {
     "|" +
     String(fileName || "")
   ).substring(0, 240);
+}
+
+/**
+ * ¿Existe ya el fichero en caché o en Drive para este envío/sección?
+ * Usado por action=check (reintento tras HTML 404 sin reenviar el base64).
+ */
+function checkAdjuntoExists_(munCode, idEnvio, seccion, fileName) {
+  var out = {
+    status: "missing",
+    success: false,
+    message: "No encontrado",
+    filename: fileName
+  };
+  try {
+    var cacheKey = adjuntosIdempotencyKey_(idEnvio, seccion, fileName);
+    var cache = CacheService.getScriptCache();
+    var cachedId = cache.get(cacheKey);
+    if (cachedId) {
+      try {
+        var cachedFile = DriveApp.getFileById(cachedId);
+        return successIdempotent_(out, cachedFile, fileName, "check-cache");
+      } catch (e) {
+        cache.remove(cacheKey);
+      }
+    }
+
+    var carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
+    var carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
+    var itExp = carpetaMun.getFoldersByName(idEnvio);
+    if (!itExp.hasNext()) return out;
+    var carpetaExpediente = itExp.next();
+
+    var carpetaDestino = carpetaExpediente;
+    if (
+      idEnvio.indexOf("-E-") === -1 &&
+      idEnvio.indexOf("_E_") === -1 &&
+      idEnvio.indexOf("EXP_E") !== 0
+    ) {
+      var itSec = carpetaExpediente.getFoldersByName(seccion);
+      if (!itSec.hasNext()) return out;
+      carpetaDestino = itSec.next();
+    }
+
+    var existentes = carpetaDestino.getFilesByName(fileName);
+    if (existentes.hasNext()) {
+      var ya = existentes.next();
+      cache.put(cacheKey, ya.getId(), 600);
+      return successIdempotent_(out, ya, fileName, "check-drive");
+    }
+  } catch (err) {
+    Logger.log("[ADJUNTOS CHECK] " + err.toString());
+    out.message = cleanErrorTextAdjuntos_(err);
+  }
+  return out;
 }
 
 /** Respuesta success cuando el fichero ya existía (reintento). */
