@@ -147,6 +147,32 @@ function handleAdjuntosPost_(e) {
       );
     }
 
+    // Idempotencia: si el mismo nombre ya está en la carpeta (reintento tras
+    // HTML 404 de Apps Script que a veces llega DESPUÉS de guardar), no duplicar.
+    var existentes = carpetaDestino.getFilesByName(fileName);
+    if (existentes.hasNext()) {
+      var ya = existentes.next();
+      result.status = "success";
+      result.fileId = ya.getId();
+      result.url = ya.getUrl();
+      result.message = "Archivo ya estaba subido (reintento idempotente).";
+      result.filename = fileName;
+      result.bytes = ya.getSize();
+      result.sharing = false;
+      result.idempotent = true;
+      Logger.log(
+        "[ADJUNTOS IDEMPOTENTE] mun=" +
+          munCode +
+          " id_envio=" +
+          idEnvio +
+          " seccion=" +
+          seccion +
+          " file=" +
+          fileName
+      );
+      return jsonOut_(result);
+    }
+
     const file = carpetaDestino.createFile(blob);
 
     let sharingOk = false;

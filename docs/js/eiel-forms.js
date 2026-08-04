@@ -646,14 +646,14 @@
      * tasks: [{ file, seccion, tipo? }]
      * Sube en serie; reintenta si falla; si tras los reintentos sigue mal, aborta
      * el lote (no se debe llamar a generar PDF).
-     * options.retries: por defecto 2
+     * options.retries: por defecto 3 (fotos grandes suelen fallar HTML 404 en frío)
      * options.throwOnFail: por defecto true
      */
     async function uploadTaskList(tasks, idBatch, options) {
         options = options || {};
-        const retries = options.retries != null ? options.retries : 2;
-        const delayMs = options.delayMs != null ? options.delayMs : 300;
-        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 1000;
+        const retries = options.retries != null ? options.retries : 3;
+        const delayMs = options.delayMs != null ? options.delayMs : 600;
+        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 2000;
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
         const totalTareas = tasks.length;
@@ -674,6 +674,8 @@
             let lastError = null;
             let bestError = null;
             let exitoSubida = false;
+            // Archivos grandes (fotos): más pausa entre intentos
+            const sizeFactor = tarea.file && tarea.file.size > 2 * 1024 * 1024 ? 2 : 1;
 
             for (let intento = 1; intento <= retries; intento++) {
                 try {
@@ -706,16 +708,24 @@
                         break;
                     }
                     if (intento < retries) {
-                        await new Promise((r) => setTimeout(r, retryDelayMs));
+                        const wait =
+                            retryDelayMs * sizeFactor * intento;
+                        await new Promise((r) => setTimeout(r, wait));
                     }
                 }
             }
 
             if (!exitoSubida) {
                 const errFinal = bestError || lastError;
-                const msg =
+                let msg =
                     (errFinal && errFinal.message) ||
                     "No se pudo subir el archivo: " + tarea.file.name;
+                if (isOpaqueUploadError(errFinal)) {
+                    msg =
+                        'Google Apps Script no respondió al subir "' +
+                        tarea.file.name +
+                        '". Espere unos segundos e inténtelo de nuevo (a veces el archivo ya quedó en Drive).';
+                }
                 if (throwOnFail) {
                     UIProgress.hide();
                     throw new Error(msg);
@@ -725,7 +735,11 @@
             }
 
             completados++;
-            await new Promise((r) => setTimeout(r, delayMs));
+            // Pausa entre ficheros: más larga si el anterior era grande
+            const pause =
+                delayMs *
+                (tarea.file && tarea.file.size > 2 * 1024 * 1024 ? 2 : 1);
+            await new Promise((r) => setTimeout(r, pause));
         }
 
         return completados;
