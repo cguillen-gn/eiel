@@ -162,42 +162,44 @@ def obtener_depositos(conn, mun):
 def obtener_obras(conn, mun):
     with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
         sql = """
-                SELECT clave, mun, orden, nombre, plan_obra, estado, proyecto,
-                CASE WHEN estado = 'FI' THEN 2 ELSE 0 END as cond
-                FROM geonet_obras
-                WHERE fase = (SELECT max(fase) FROM geonet_fase)
-                AND mun = %s
+                SELECT o.clave, o.mun, o.orden, o.nombre, o.plan_obra, o.estado, o.proyecto,
+                CASE WHEN o.estado = 'FI' THEN 2 ELSE 0 END as cond,
+                lic.link_licitacion
+                FROM geonet_obras o
+                LEFT JOIN coordinador.licitaciones lic ON lic.identificador = o.id_contratacion
+                WHERE o.fase = (SELECT max(fase) FROM geonet_fase)
+                AND o.mun = %s
                 AND (
-                    (equipamientos IS NULL OR equipamientos = 'SI') OR
-                    (alumbrado IS NULL OR alumbrado = 'SI') OR
-                    (infra_viaria IS NULL OR infra_viaria = 'SI') OR
-                    (abastecimiento IS NULL OR abastecimiento = 'SI') OR
-                    (saneamiento IS NULL OR saneamiento = 'SI')
+                    (o.equipamientos IS NULL OR o.equipamientos = 'SI') OR
+                    (o.alumbrado IS NULL OR o.alumbrado = 'SI') OR
+                    (o.infra_viaria IS NULL OR o.infra_viaria = 'SI') OR
+                    (o.abastecimiento IS NULL OR o.abastecimiento = 'SI') OR
+                    (o.saneamiento IS NULL OR o.saneamiento = 'SI')
                 ) 
                 -- Se descartan las anuladas
-                AND (estado IS NULL OR estado <> 'AN') 
+                AND (o.estado IS NULL OR o.estado <> 'AN') 
                 -- Se descartan las finalizadas con proyecto
-                AND NOT (estado IS NOT DISTINCT FROM 'FI' AND proyecto IS NOT DISTINCT FROM 'RE')
+                AND NOT (o.estado IS NOT DISTINCT FROM 'FI' AND o.proyecto IS NOT DISTINCT FROM 'RE')
                 -- Se descartan las obras de EATIMS (ELM), que se piden por otro canal (email o similar)
                 AND NOT (
-                    (mun = '063' AND nombre ILIKE ANY(ARRAY['%%JESÚS POBRE%%','%%JESUS POBRE%%','%%LA XARA%%','%%LA JARA%%']))
+                    (o.mun = '063' AND o.nombre ILIKE ANY(ARRAY['%%JESÚS POBRE%%','%%JESUS POBRE%%','%%LA XARA%%','%%LA JARA%%']))
                     OR
-                    (mun = '006' AND nombre ILIKE ANY(ARRAY['%%LLOSA DE CAMACHO%%','%%LLOSA DE CAMATXO%%']))
+                    (o.mun = '006' AND o.nombre ILIKE ANY(ARRAY['%%LLOSA DE CAMACHO%%','%%LLOSA DE CAMATXO%%']))
                 )
                 AND (
                     -- Municipios en los que no se desea filtrar obras, y se prefiere que aparezcan todas
-                    mun IN ('001','002','008','016','022','024','026','030','033','045','048','051','062','073','075','085','086','088','101','106','107','110','112','120','130','135','136','137') 
+                    o.mun IN ('001','002','008','016','022','024','026','030','033','045','048','051','062','073','075','085','086','088','101','106','107','110','112','120','130','135','136','137') 
                     -- Filtros de obras que no se desea que aparezcan
                     OR (
                         -- Se descartan las ejecutadas por el Área de Infraestructuras (Cooperacion) ya que ellos nos pasan estados y proyectos finales
-                        (ejecucion IS NULL OR ejecucion NOT IN ('DIIN')) 
+                        (o.ejecucion IS NULL OR o.ejecucion NOT IN ('DIIN')) 
                         -- Se descartan actuaciones del PAE ya que el Área de Medio Ambiente nos facilita estados y proyectos
-                        AND (plan_obra IS NULL OR plan_obra NOT ILIKE '%%PAE %%')
+                        AND (o.plan_obra IS NULL OR o.plan_obra NOT ILIKE '%%PAE %%')
                         -- Se descartan actuaciones del Área de Ciclo Hídrico ya que ellos nos facilita estados y proyectos
-                        AND (subvencion IS NULL OR subvencion <> 'DICH')
+                        AND (o.subvencion IS NULL OR o.subvencion <> 'DICH')
                         )
                     )
-                ORDER BY orden;
+                ORDER BY o.orden;
         """
         cur.execute(sql, (mun,))
         rows = cur.fetchall()
@@ -212,7 +214,8 @@ def obtener_obras(conn, mun):
                 "plan_obra": r["plan_obra"], 
                 "estado": r["estado"],
                 "proyecto": r["proyecto"], 
-                "cond": r["cond"]
+                "cond": r["cond"],
+                "link_licitacion": (r["link_licitacion"] or "").strip() if r["link_licitacion"] else ""
             })
         return obras
 
