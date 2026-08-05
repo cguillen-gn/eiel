@@ -24,7 +24,7 @@ function doGet(e) {
         status: "success",
         message: "adjuntos ok",
         supports_check: true,
-        version: "adjuntos-20260805"
+        version: "adjuntos-20260805b"
       });
     }
     if (action === "check") {
@@ -43,10 +43,14 @@ function doGet(e) {
       }
       return jsonOut_(checkAdjuntoExists_(mun, idEnvio, seccion, fileName));
     }
+    // A veces el navegador/Apps Script reescribe un POST como GET vacío al
+    // seguir un 302. No es un error de negocio: el cliente debe reintentar.
     return jsonOut_({
       status: "error",
       message:
-        "Use POST para subir archivos, o GET ?action=ping / ?action=check&..."
+        "Respuesta no válida del servidor (GET inesperado). Reintente la subida.",
+      retryable: true,
+      opaque: true
     });
   } catch (fatal) {
     Logger.log("FATAL ADJUNTOS doGet: " + fatal.toString());
