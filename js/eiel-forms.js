@@ -89,6 +89,28 @@
         mensajeDiv.textContent = texto;
         mensajeDiv.className = "message " + tipo;
         mensajeDiv.classList.remove("hidden");
+        // Si hay campos marcados inválidos, priorizar scroll/foco a ellos
+        // (el aviso suele estar abajo junto a Enviar y taparía el campo).
+        const invalid = document.querySelector(".is-invalid");
+        if (invalid) {
+            try {
+                invalid.scrollIntoView({ behavior: "smooth", block: "center" });
+            } catch (e) {
+                /* ignore */
+            }
+            try {
+                if (typeof invalid.focus === "function") {
+                    invalid.focus({ preventScroll: true });
+                }
+            } catch (e2) {
+                try {
+                    invalid.focus();
+                } catch (e3) {
+                    /* ignore */
+                }
+            }
+            return;
+        }
         mensajeDiv.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
@@ -753,6 +775,127 @@
      * Gestor de adjuntos por requerimiento (hiddenInputReq).
      * options.variant: 'standard' | 'alumbrado' | 'obras' | 'equipamientos'
      */
+    const INVALID_CLASS = "is-invalid";
+
+    function bindClearInvalidOnce() {
+        if (document.documentElement.dataset.eielInvalidBound === "1") return;
+        document.documentElement.dataset.eielInvalidBound = "1";
+        const clearIfMarked = (e) => {
+            const t = e.target;
+            if (t && t.classList && t.classList.contains(INVALID_CLASS)) {
+                t.classList.remove(INVALID_CLASS);
+            }
+        };
+        document.addEventListener("input", clearIfMarked, true);
+        document.addEventListener("change", clearIfMarked, true);
+    }
+
+    function markInvalid(el) {
+        if (!el) return;
+        bindClearInvalidOnce();
+        el.classList.add(INVALID_CLASS);
+    }
+
+    function clearInvalid(root) {
+        const scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll("." + INVALID_CLASS).forEach((el) => {
+            el.classList.remove(INVALID_CLASS);
+        });
+    }
+
+    function focusFirstInvalid(root) {
+        const scope = root && root.querySelectorAll ? root : document;
+        const el = scope.querySelector("." + INVALID_CLASS);
+        if (!el) return;
+        try {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (e) {
+            /* ignore */
+        }
+        try {
+            if (typeof el.focus === "function") el.focus({ preventScroll: true });
+        } catch (e2) {
+            try {
+                el.focus();
+            } catch (e3) {
+                /* ignore */
+            }
+        }
+    }
+
+    function validateContact() {
+        bindClearInvalidOnce();
+        const elNombre = document.getElementById("contactoNombre");
+        const elEmail = document.getElementById("contactoEmail");
+        const elEmailConf = document.getElementById("contactoEmailConfirm");
+        [elNombre, elEmail, elEmailConf].forEach((el) => {
+            if (el) el.classList.remove(INVALID_CLASS);
+        });
+
+        const nombre = elNombre ? elNombre.value.trim() : "";
+        const email = elEmail ? elEmail.value.trim() : "";
+        const emailConf = elEmailConf ? elEmailConf.value.trim() : "";
+
+        if (nombre.length < 2) {
+            markInvalid(elNombre);
+            return {
+                ok: false,
+                message: "⚠️ Por favor, introduzca su nombre y apellidos."
+            };
+        }
+        if (!REGEX_EMAIL.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
+            markInvalid(elEmail);
+            markInvalid(elEmailConf);
+            return {
+                ok: false,
+                message: "⚠️ Verifique que el Email sea válido y coincida en ambos campos."
+            };
+        }
+        return {
+            ok: true,
+            nombre: nombre,
+            email: email,
+            departamento: document.getElementById("contactoDepartamento").value.trim()
+        };
+    }
+
+    /**
+     * options.message: texto exacto del aviso de requerimientos incompletos.
+     */
+    function validateRequerimientos(colaAdjuntosReq, options) {
+        options = options || {};
+        const message =
+            options.message ||
+            "⚠️ Debe dar una respuesta individualizada (texto o adjunto) a cada uno de los requerimientos del apartado «Otra Información Solicitada».";
+
+        const areasReq = document.querySelectorAll(".txt-resp-req");
+        let reqIncompletos = false;
+        const respuestasReq = [];
+
+        areasReq.forEach((area) => {
+            area.classList.remove(INVALID_CLASS);
+            const id = area.dataset.id;
+            const resp = area.value.trim();
+            const adjuntos = colaAdjuntosReq[id] || [];
+
+            if (resp === "" && adjuntos.length === 0) {
+                reqIncompletos = true;
+                markInvalid(area);
+            } else {
+                respuestasReq.push({
+                    pregunta: area.dataset.msg,
+                    respuesta: resp,
+                    archivos: adjuntos.map((f) => f.name).join("; ")
+                });
+            }
+        });
+
+        if (reqIncompletos) {
+            return { ok: false, message: message, respuestas: [] };
+        }
+        return { ok: true, respuestas: respuestasReq };
+    }
+
     function createReqAttachmentManager(options) {
         options = options || {};
         const variant = options.variant || "standard";
@@ -782,6 +925,10 @@
                     if (!colaAdjuntosReq[reqIdActual]) colaAdjuntosReq[reqIdActual] = [];
                     colaAdjuntosReq[reqIdActual].push(...validos);
                     renderColaReq(reqIdActual);
+                    const area = document.querySelector(
+                        '.txt-resp-req[data-id="' + reqIdActual + '"]'
+                    );
+                    if (area) area.classList.remove(INVALID_CLASS);
                 }
 
                 inputReq.value = "";
@@ -805,66 +952,6 @@
             },
             render: renderColaReq
         };
-    }
-
-    function validateContact() {
-        const nombre = document.getElementById("contactoNombre").value.trim();
-        const email = document.getElementById("contactoEmail").value.trim();
-        const emailConf = document.getElementById("contactoEmailConfirm").value.trim();
-
-        if (nombre.length < 2) {
-            return {
-                ok: false,
-                message: "⚠️ Por favor, introduzca su nombre y apellidos."
-            };
-        }
-        if (!REGEX_EMAIL.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
-            return {
-                ok: false,
-                message: "⚠️ Verifique que el Email sea válido y coincida en ambos campos."
-            };
-        }
-        return {
-            ok: true,
-            nombre: nombre,
-            email: email,
-            departamento: document.getElementById("contactoDepartamento").value.trim()
-        };
-    }
-
-    /**
-     * options.message: texto exacto del aviso de requerimientos incompletos.
-     */
-    function validateRequerimientos(colaAdjuntosReq, options) {
-        options = options || {};
-        const message =
-            options.message ||
-            "⚠️ Debe dar una respuesta individualizada (texto o adjunto) a cada uno de los requerimientos del apartado «Otra Información Solicitada».";
-
-        const areasReq = document.querySelectorAll(".txt-resp-req");
-        let reqIncompletos = false;
-        const respuestasReq = [];
-
-        areasReq.forEach((area) => {
-            const id = area.dataset.id;
-            const resp = area.value.trim();
-            const adjuntos = colaAdjuntosReq[id] || [];
-
-            if (resp === "" && adjuntos.length === 0) {
-                reqIncompletos = true;
-            } else {
-                respuestasReq.push({
-                    pregunta: area.dataset.msg,
-                    respuesta: resp,
-                    archivos: adjuntos.map((f) => f.name).join("; ")
-                });
-            }
-        });
-
-        if (reqIncompletos) {
-            return { ok: false, message: message, respuestas: [] };
-        }
-        return { ok: true, respuestas: respuestasReq };
     }
 
     function findOversizedFile(fileLists) {
@@ -1247,6 +1334,9 @@
         createReqAttachmentManager: createReqAttachmentManager,
         validateContact: validateContact,
         validateRequerimientos: validateRequerimientos,
+        markInvalid: markInvalid,
+        clearInvalid: clearInvalid,
+        focusFirstInvalid: focusFirstInvalid,
         findOversizedFile: findOversizedFile,
         buildBasePayload: buildBasePayload,
         startSubmitTimer: startSubmitTimer,
