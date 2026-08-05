@@ -210,84 +210,107 @@
             }),
 
         /**
-         * Comprime imágenes grandes antes de subir (Apps Script falla con JPG enormes).
-         * Max lado 1600px, JPEG ~0.82. Si no es imagen o falla, devuelve el original.
+         * Comprime imágenes antes de subir (Apps Script falla con JPG de cámara).
+         * options.maxSide (default 1280), quality (0.72), targetBytes (700KB).
          */
-        maybeCompressImage(file) {
-            return new Promise((resolve) => {
-                try {
-                    const type = (file && file.type) || "";
-                    if (!type || type.indexOf("image/") !== 0) {
-                        resolve(file);
-                        return;
-                    }
-                    // HEIC/SVG/etc.: dejar pasar
-                    if (
-                        type.indexOf("svg") !== -1 ||
-                        type.indexOf("heic") !== -1 ||
-                        type.indexOf("heif") !== -1
-                    ) {
-                        resolve(file);
-                        return;
-                    }
-                    // Ya es pequeña: no tocar
-                    if (file.size && file.size < 900 * 1024) {
-                        resolve(file);
-                        return;
-                    }
+        maybeCompressImage(file, options) {
+            options = options || {};
+            const maxSide = options.maxSide != null ? options.maxSide : 1280;
+            const quality = options.quality != null ? options.quality : 0.72;
+            const targetBytes = options.targetBytes != null ? options.targetBytes : 700 * 1024;
 
-                    const url = URL.createObjectURL(file);
-                    const img = new Image();
-                    img.onload = () => {
-                        try {
-                            const maxSide = 1600;
-                            let w = img.naturalWidth || img.width;
-                            let h = img.naturalHeight || img.height;
-                            if (!w || !h) {
-                                URL.revokeObjectURL(url);
-                                resolve(file);
-                                return;
-                            }
-                            const scale = Math.min(1, maxSide / Math.max(w, h));
-                            w = Math.round(w * scale);
-                            h = Math.round(h * scale);
-                            const canvas = document.createElement("canvas");
-                            canvas.width = w;
-                            canvas.height = h;
-                            const ctx = canvas.getContext("2d");
-                            ctx.drawImage(img, 0, 0, w, h);
-                            canvas.toBlob(
-                                (blob) => {
-                                    URL.revokeObjectURL(url);
-                                    if (!blob || blob.size >= file.size) {
-                                        resolve(file);
-                                        return;
-                                    }
-                                    // Conservar el nombre original (la verificación PDF usa ese nombre).
-                                    resolve(
-                                        new File([blob], file.name, {
-                                            type: "image/jpeg",
-                                            lastModified: Date.now()
-                                        })
-                                    );
-                                },
-                                "image/jpeg",
-                                0.82
-                            );
-                        } catch (e) {
-                            URL.revokeObjectURL(url);
-                            resolve(file);
+            const compressOnce = (srcFile, side, q) =>
+                new Promise((resolve) => {
+                    try {
+                        const type = (srcFile && srcFile.type) || "";
+                        if (!type || type.indexOf("image/") !== 0) {
+                            resolve(srcFile);
+                            return;
                         }
-                    };
-                    img.onerror = () => {
-                        URL.revokeObjectURL(url);
-                        resolve(file);
-                    };
-                    img.src = url;
-                } catch (e) {
-                    resolve(file);
+                        if (
+                            type.indexOf("svg") !== -1 ||
+                            type.indexOf("heic") !== -1 ||
+                            type.indexOf("heif") !== -1
+                        ) {
+                            resolve(srcFile);
+                            return;
+                        }
+                        const url = URL.createObjectURL(srcFile);
+                        const img = new Image();
+                        img.onload = () => {
+                            try {
+                                let w = img.naturalWidth || img.width;
+                                let h = img.naturalHeight || img.height;
+                                if (!w || !h) {
+                                    URL.revokeObjectURL(url);
+                                    resolve(srcFile);
+                                    return;
+                                }
+                                const scale = Math.min(1, side / Math.max(w, h));
+                                w = Math.max(1, Math.round(w * scale));
+                                h = Math.max(1, Math.round(h * scale));
+                                const canvas = document.createElement("canvas");
+                                canvas.width = w;
+                                canvas.height = h;
+                                const ctx = canvas.getContext("2d");
+                                ctx.drawImage(img, 0, 0, w, h);
+                                canvas.toBlob(
+                                    (blob) => {
+                                        URL.revokeObjectURL(url);
+                                        if (!blob) {
+                                            resolve(srcFile);
+                                            return;
+                                        }
+                                        resolve(
+                                            new File([blob], srcFile.name, {
+                                                type: "image/jpeg",
+                                                lastModified: Date.now()
+                                            })
+                                        );
+                                    },
+                                    "image/jpeg",
+                                    q
+                                );
+                            } catch (e) {
+                                URL.revokeObjectURL(url);
+                                resolve(srcFile);
+                            }
+                        };
+                        img.onerror = () => {
+                            URL.revokeObjectURL(url);
+                            resolve(srcFile);
+                        };
+                        img.src = url;
+                    } catch (e) {
+                        resolve(srcFile);
+                    }
+                });
+
+            return (async () => {
+                const type = (file && file.type) || "";
+                if (!type || type.indexOf("image/") !== 0) return file;
+                // Siempre recomprimir fotos de cámara (aunque el type diga jpeg "pequeño")
+                let current = file;
+                let side = maxSide;
+                let q = quality;
+                for (let pass = 0; pass < 3; pass++) {
+                    if (current.size && current.size <= targetBytes && pass > 0) break;
+                    if (current.size && current.size < 350 * 1024 && pass === 0) break;
+                    const next = await compressOnce(current, side, q);
+                    if (!next || next === current) break;
+                    console.info(
+                        "[EIEL] Foto comprimida",
+                        file.name,
+                        Math.round(file.size / 1024) + "KB → " + Math.round(next.size / 1024) + "KB",
+                        "(pass " + (pass + 1) + ")"
+                    );
+                    current = next;
+                    if (current.size <= targetBytes) break;
+                    side = Math.round(side * 0.75);
+                    q = Math.max(0.5, q - 0.12);
                 }
-            });
+                return current;
+            })();
         },
 
         /**
@@ -316,15 +339,36 @@
             } catch (e) {
                 return false;
             }
+            if (
+                result &&
+                result.status === "error" &&
+                String(result.message || "").toLowerCase().indexOf("faltan datos") !== -1
+            ) {
+                console.warn(
+                    "[EIEL] El Web App de Adjuntos no reconoce action=check. " +
+                        "Pegue appscript/adjuntos.gs del repo y publique Nueva versión."
+                );
+            }
             return !!(result && result.status === "success");
         },
 
         /**
          * Sube un adjunto y exige respuesta JSON legible (status === "success").
          * Usa Content-Type text/plain como el login, para evitar preflight CORS.
+         * options.compress: ajustes de maybeCompressImage
          */
-        async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio) {
-            const ready = await this.maybeCompressImage(file);
+        async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio, options) {
+            options = options || {};
+            const ready = await this.maybeCompressImage(file, options.compress || {});
+            if (ready && ready.size && file && file.size && ready.size < file.size) {
+                // ok
+            } else if (ready && file && /image\//.test(file.type || "") && ready.size > 1500 * 1024) {
+                console.warn(
+                    "[EIEL] Foto sigue siendo grande tras comprimir:",
+                    file.name,
+                    Math.round(ready.size / 1024) + "KB"
+                );
+            }
             const base64 = await this.toBase64(ready);
             const userEmail =
                 (document.getElementById("contactoEmail") &&
@@ -767,10 +811,16 @@
         const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 3500;
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
-        const totalTareas = tasks.length;
+        // No-imágenes primero (calientan Apps Script); fotos después, ya comprimidas.
+        const ordered = tasks.slice().sort((a, b) => {
+            const ai = ((a.file && a.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
+            const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
+            return ai - bi;
+        });
+        const totalTareas = ordered.length;
         let completados = 0;
 
-        for (const tarea of tasks) {
+        for (const tarea of ordered) {
             UIProgress.update(
                 completados,
                 totalTareas,
@@ -785,17 +835,33 @@
             let lastError = null;
             let bestError = null;
             let exitoSubida = false;
-            // Archivos grandes (fotos): más pausa entre intentos
-            const sizeFactor = tarea.file && tarea.file.size > 2 * 1024 * 1024 ? 2 : 1;
+            let uploadOpts = {};
+            const isImage =
+                tarea.file &&
+                tarea.file.type &&
+                tarea.file.type.indexOf("image/") === 0;
+            const sizeFactor =
+                isImage || (tarea.file && tarea.file.size > 1.5 * 1024 * 1024) ? 2 : 1;
 
             for (let intento = 1; intento <= retries; intento++) {
                 try {
+                    if (intento > 1 && isImage) {
+                        // Reintento: compresión más agresiva
+                        uploadOpts = {
+                            compress: {
+                                maxSide: 960,
+                                quality: 0.58,
+                                targetBytes: 450 * 1024
+                            }
+                        };
+                    }
                     await UploadService.uploadFile(
                         tarea.file,
                         tipo,
                         global.EIEL_CONFIG.muniCode,
                         tarea.seccion,
-                        idBatch
+                        idBatch,
+                        uploadOpts
                     );
                     exitoSubida = true;
                     break;
@@ -822,7 +888,7 @@
                     // Tras 404 opaco: ¿ya quedó en Drive? (check ligero, sin reenviar la foto)
                     if (isOpaqueUploadError(e)) {
                         try {
-                            await new Promise((r) => setTimeout(r, 1500));
+                            await new Promise((r) => setTimeout(r, 2000));
                             const yaEsta = await UploadService.checkExists(
                                 tarea.file.name,
                                 tipo,
