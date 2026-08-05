@@ -55,7 +55,10 @@
             s.indexOf("respuesta no válida") !== -1 ||
             s.indexOf("failed to fetch") !== -1 ||
             s.indexOf("networkerror") !== -1 ||
-            s.indexOf("comprobar el despliegue") !== -1
+            s.indexOf("comprobar el despliegue") !== -1 ||
+            // doGet vacío / redirect POST→GET de Apps Script
+            s.indexOf("use post para subir") !== -1 ||
+            s.indexOf("get inesperado") !== -1
         );
     }
 

@@ -30,7 +30,7 @@ y las fotos fallan con HTML 404 / CORS aunque la compresión del front funcione.
 curl -sL "$URL_ADJUNTOS?action=ping"
 ```
 
-Esperado: `{"status":"success","supports_check":true,"version":"adjuntos-20260805",...}`
+Esperado: `{"status":"success","supports_check":true,"version":"adjuntos-20260805b",...}`
 
 Si dice `Script function not found: doGet`, la versión desplegada es antigua o
 el fichero pegado no incluye `doGet`.
