@@ -761,6 +761,14 @@ function generarHTML(data, tituloFormulario) {
       data.DATOS_OBRAS.forEach(o => {
         let docsHtml = o.archivos ? `<ul style='margin:0; padding-left:15px; font-size:0.85em; color:#475569;'>${o.archivos.split(";").map(f => `<li>${f}</li>`).join('')}</ul>` : "-";
         let estadoHtml = o.modificado ? `<strong>${o.estado}</strong>` : o.estado;
+        if (o.contacto_dpto) {
+          const contactoSeguro = String(o.contacto_dpto)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+          estadoHtml += `<br><span style="font-size:0.8em; color:#475569;">Contacto: ${contactoSeguro}</span>`;
+        }
 
         detalles += `<tr>
           <td><span style="font-size:0.9em; color:#666">${o.orden || ''}</span></td>
