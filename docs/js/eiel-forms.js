@@ -408,6 +408,50 @@
         },
 
         /**
+         * Tras un 404 opaco: pregunta varias veces a check antes de reenviar.
+         * El archivo suele estar ya en Drive; evita reuploads lentos/duplicados.
+         * @returns {Promise<boolean>}
+         */
+        async pollCheckExists(fileName, tipoFicha, muniCode, seccion, idEnvio, options) {
+            options = options || {};
+            const attempts = options.attempts != null ? options.attempts : 3;
+            const firstDelayMs = options.firstDelayMs != null ? options.firstDelayMs : 800;
+            const gapMs = options.gapMs != null ? options.gapMs : 1000;
+            for (let i = 0; i < attempts; i++) {
+                await new Promise((r) =>
+                    setTimeout(r, i === 0 ? firstDelayMs : gapMs)
+                );
+                try {
+                    const yaEsta = await this.checkExists(
+                        fileName,
+                        tipoFicha,
+                        muniCode,
+                        seccion,
+                        idEnvio
+                    );
+                    if (yaEsta) {
+                        if (i > 0) {
+                            console.info(
+                                "[EIEL] check OK en intento de poll",
+                                i + 1 + "/" + attempts + ":",
+                                fileName
+                            );
+                        }
+                        return true;
+                    }
+                } catch (checkErr) {
+                    console.warn(
+                        "[EIEL] checkExists poll",
+                        i + 1 + "/" + attempts,
+                        "falló:",
+                        checkErr
+                    );
+                }
+            }
+            return false;
+        },
+
+        /**
          * Sube un adjunto y exige respuesta JSON legible (status === "success").
          * Usa Content-Type text/plain como el login, para evitar preflight CORS.
          * options.compress: ajustes de maybeCompressImage
@@ -866,6 +910,10 @@
         const delayMs = options.delayMs != null ? options.delayMs : 0;
         const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 1200;
         const checkDelayMs = options.checkDelayMs != null ? options.checkDelayMs : 800;
+        const checkPollAttempts =
+            options.checkPollAttempts != null ? options.checkPollAttempts : 3;
+        const checkPollGapMs =
+            options.checkPollGapMs != null ? options.checkPollGapMs : 1000;
         const concurrency = Math.max(
             1,
             options.concurrency != null ? options.concurrency : 3
@@ -971,25 +1019,25 @@
                     }
 
                     if (isOpaqueUploadError(e)) {
-                        try {
-                            await new Promise((r) => setTimeout(r, checkDelayMs));
-                            const yaEsta = await UploadService.checkExists(
-                                tarea.file.name,
-                                tipo,
-                                global.EIEL_CONFIG.muniCode,
-                                tarea.seccion,
-                                idBatch
-                            );
-                            if (yaEsta) {
-                                console.warn(
-                                    "[EIEL] Adjunto ya en Drive tras respuesta opaca:",
-                                    tarea.file.name
-                                );
-                                exitoSubida = true;
-                                break;
+                        const yaEsta = await UploadService.pollCheckExists(
+                            tarea.file.name,
+                            tipo,
+                            global.EIEL_CONFIG.muniCode,
+                            tarea.seccion,
+                            idBatch,
+                            {
+                                attempts: checkPollAttempts,
+                                firstDelayMs: checkDelayMs,
+                                gapMs: checkPollGapMs
                             }
-                        } catch (checkErr) {
-                            console.warn("[EIEL] checkExists falló:", checkErr);
+                        );
+                        if (yaEsta) {
+                            console.warn(
+                                "[EIEL] Adjunto ya en Drive tras respuesta opaca:",
+                                tarea.file.name
+                            );
+                            exitoSubida = true;
+                            break;
                         }
                     }
 
