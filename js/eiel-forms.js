@@ -877,8 +877,19 @@
         return todos.find((f) => f.size > LIMITE_BYTES) || null;
     }
 
+    let submitStartedAtIso = null;
+
+    function startSubmitTimer() {
+        submitStartedAtIso = new Date().toISOString();
+    }
+
+    function clearSubmitTimer() {
+        submitStartedAtIso = null;
+    }
+
     function buildBasePayload(fields) {
         const cfg = global.EIEL_CONFIG;
+        if (!submitStartedAtIso) startSubmitTimer();
         return Object.assign(
             {
                 fase: cfg.fase,
@@ -890,6 +901,7 @@
                 municipio_codigo: cfg.muniCode,
                 municipio_nombre: localStorage.getItem("eiel_muni_name") || cfg.muniName,
                 timestamp_envio: new Date().toISOString(),
+                envio_started_at: submitStartedAtIso,
                 session_token: requireSessionToken()
             },
             fields.extra || {}
@@ -906,6 +918,8 @@
      */
     async function uploadTaskList(tasks, idBatch, options) {
         options = options || {};
+        // Cronómetro de envío completo (adjuntos + PDF).
+        if (!submitStartedAtIso) startSubmitTimer();
         const retries = options.retries != null ? options.retries : 2;
         const delayMs = options.delayMs != null ? options.delayMs : 0;
         const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 1200;
@@ -1121,44 +1135,51 @@
      * Misma estrategia que adjuntos: text/plain (sin preflight) y JSON legible.
      */
     async function sendPdfPayload(payload) {
-        const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload),
-            redirect: "follow"
-        });
-
-        const raw = await response.text();
-        let result = null;
         try {
-            result = JSON.parse(raw);
-        } catch (parseErr) {
-            console.warn(
-                "[EIEL] Respuesta PDF no JSON (¿Apps Script antiguo?). " +
-                    "Actualice appscript/generar-pdf.gs y redespliegue."
-            );
+            if (payload && !payload.envio_started_at && submitStartedAtIso) {
+                payload.envio_started_at = submitStartedAtIso;
+            }
+            const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload),
+                redirect: "follow"
+            });
+
+            const raw = await response.text();
+            let result = null;
+            try {
+                result = JSON.parse(raw);
+            } catch (parseErr) {
+                console.warn(
+                    "[EIEL] Respuesta PDF no JSON (¿Apps Script antiguo?). " +
+                        "Actualice appscript/generar-pdf.gs y redespliegue."
+                );
+                return true;
+            }
+
+            const ok = interpretPdfResult(result);
+            if (ok === null) {
+                console.warn(
+                    "[EIEL] Respuesta PDF sin status/success; se asume OK (legado)."
+                );
+                return true;
+            }
+
+            if (!response.ok || !ok) {
+                UIProgress.hide();
+                const detalle = cleanErrorText(
+                    (result && result.message) ||
+                        "HTTP " + response.status ||
+                        "Error desconocido"
+                );
+                throw new Error(detalle);
+            }
+
             return true;
+        } finally {
+            clearSubmitTimer();
         }
-
-        const ok = interpretPdfResult(result);
-        if (ok === null) {
-            console.warn(
-                "[EIEL] Respuesta PDF sin status/success; se asume OK (legado)."
-            );
-            return true;
-        }
-
-        if (!response.ok || !ok) {
-            UIProgress.hide();
-            const detalle = cleanErrorText(
-                (result && result.message) ||
-                    "HTTP " + response.status ||
-                    "Error desconocido"
-            );
-            throw new Error(detalle);
-        }
-
-        return true;
     }
 
     /**
@@ -1228,6 +1249,7 @@
         validateRequerimientos: validateRequerimientos,
         findOversizedFile: findOversizedFile,
         buildBasePayload: buildBasePayload,
+        startSubmitTimer: startSubmitTimer,
         uploadTaskList: uploadTaskList,
         sendPdfPayload: sendPdfPayload,
         resetFormAfterSuccess: resetFormAfterSuccess,

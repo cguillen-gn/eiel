@@ -179,8 +179,10 @@ function doPost(e) {
         departamento: templateData.DEPARTAMENTO_CONTACTO,
         pdfUrl: "Generando...", 
         adjuntos: templateData.NOMBRES_ADJUNTOS.length > 0 ? templateData.NOMBRES_ADJUNTOS.join(", ") : "Ninguno",
-        is_test: isTestMode
+        is_test: isTestMode,
+        envio_started_at: data.envio_started_at || data.timestamp_envio || ""
     });
+    registro.envio_started_at = data.envio_started_at || data.timestamp_envio || "";
 
     // 5. ORGANIZACIÓN DE CARPETAS EN DRIVE (Blindado)
     try {
@@ -249,7 +251,7 @@ function doPost(e) {
     
     // Configuramos permisos y actualizamos el log
     //pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    actualizarUrlLog(registro.fila, pdfFile.getUrl());
+    actualizarUrlLog(registro.fila, pdfFile.getUrl(), registro.envio_started_at);
 
     // Adjuntos ya verificados en Drive (assertAdjuntosPresentes_).
 
@@ -298,7 +300,8 @@ function doPost(e) {
       // Forzamos el aviso incluso si 'registro' no se ha definido correctamente
       try {
         const filaAfectada = (registro && registro.fila) ? registro.fila : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(NOMBRE_PESTANA_LOGS).getLastRow();
-        actualizarUrlLog(filaAfectada, "ERROR: " + cleanErrorText_(error));
+        const startedAt = (registro && registro.envio_started_at) || "";
+        actualizarUrlLog(filaAfectada, "ERROR: " + cleanErrorText_(error), startedAt);
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
@@ -349,10 +352,25 @@ function logToSheet(info) {
   // Si la pestaña no existe, la creamos con sus encabezados 
   if (!sheet) {
     sheet = ss.insertSheet(NOMBRE_PESTANA_LOGS); 
-    const encabezados = ["ID", "Fecha Envío", "Municipio", "Código INE", "Fase", "Tipo Formulario", "Email Usuario", "Nombre Contacto", "Departamento", "Enlace PDF Justificante", "Archivos Adjuntos"]; 
+    const encabezados = [
+      "ID",
+      "Fecha Envío",
+      "Municipio",
+      "Código INE",
+      "Fase",
+      "Tipo Formulario",
+      "Email Usuario",
+      "Nombre Contacto",
+      "Departamento",
+      "Enlace PDF Justificante",
+      "Archivos Adjuntos",
+      "Duración (s)"
+    ]; 
     sheet.appendRow(encabezados); 
     sheet.getRange(1, 1, 1, encabezados.length).setFontWeight("bold").setBackground("#f3f3f3"); 
     sheet.setFrozenRows(1); 
+  } else {
+    ensureDuracionHeader_(sheet);
   }
 
   const filaNueva = sheet.getLastRow() + 1; 
@@ -399,7 +417,7 @@ function logToSheet(info) {
     idUnico = "TEST-" + idUnico;
   }
 
-  // Insertamos las 11 columnas exactas siguiendo el orden de encabezados
+  // Insertamos las columnas (Duración se rellena al final en actualizarUrlLog)
   sheet.appendRow([
     idUnico,            // A: ID (con prefijo TEST si aplica)
     info.fecha,         // B: Fecha Envío
@@ -411,36 +429,71 @@ function logToSheet(info) {
     info.contacto,      // H: Nombre Contacto
     info.departamento,  // I: Departamento
     info.pdfUrl,        // J: Enlace PDF Justificante
-    info.adjuntos       // K: Archivos Adjuntos
+    info.adjuntos,      // K: Archivos Adjuntos
+    ""                  // L: Duración (s) — se completa al terminar
   ]); 
 
-  return { id: idUnico, fila: filaNueva }; 
+  return { id: idUnico, fila: filaNueva, envio_started_at: info.envio_started_at || "" }; 
 }
 
 /**
- * Actualiza la celda correspondiente al enlace PDF una vez generado el archivo.
+ * Asegura la columna "Duración (s)" en el encabezado (hojas ya existentes).
+ * @return {number} Índice 1-based de la columna.
  */
-function actualizarUrlLog(fila, url) {
+function ensureDuracionHeader_(sheet) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, Math.max(lastCol, 12)).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i] || "").toLowerCase().indexOf("duraci") !== -1) {
+      return i + 1;
+    }
+  }
+  var col = lastCol < 12 ? 12 : lastCol + 1;
+  sheet
+    .getRange(1, col)
+    .setValue("Duración (s)")
+    .setFontWeight("bold")
+    .setBackground("#f3f3f3");
+  return col;
+}
+
+/**
+ * Actualiza el enlace PDF y, si hay marca de inicio, la duración del envío.
+ */
+function actualizarUrlLog(fila, url, envioStartedAt) {
   try {
     const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
     const sheet = ss.getSheetByName(NOMBRE_PESTANA_LOGS);
     
     if (sheet && fila > 0) {
-      // Intentamos escribir la URL oficial
       sheet.getRange(fila, 10).setValue(url);
+      escribirDuracionLog_(sheet, fila, envioStartedAt);
     }
   } catch (e) {
-    // Si falla la actualización (por permisos, por ID de hoja, etc.)
-    // Intentamos escribir el error técnico directamente en la celda
     console.error("Error actualizando URL en el log: " + e.toString());
     
     try {
       const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
       const sheet = ss.getSheetByName(NOMBRE_PESTANA_LOGS);
       sheet.getRange(fila, 10).setValue("ERROR EN actualizarUrlLog: " + e.toString());
+      escribirDuracionLog_(sheet, fila, envioStartedAt);
     } catch (errorInterno) {
       // Si falla esto, es que la hoja de cálculo es inaccesible
     }
+  }
+}
+
+/** Escribe duración en segundos desde envio_started_at (ISO) hasta ahora. */
+function escribirDuracionLog_(sheet, fila, envioStartedAt) {
+  if (!sheet || !fila || !envioStartedAt) return;
+  try {
+    var start = new Date(String(envioStartedAt)).getTime();
+    if (isNaN(start)) return;
+    var seg = Math.max(0, Math.round((Date.now() - start) / 1000));
+    var col = ensureDuracionHeader_(sheet);
+    sheet.getRange(fila, col).setValue(seg);
+  } catch (e) {
+    console.warn("No se pudo escribir duración: " + e.toString());
   }
 }
 
