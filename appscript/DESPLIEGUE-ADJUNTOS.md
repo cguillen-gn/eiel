@@ -30,7 +30,7 @@ y las fotos fallan con HTML 404 / CORS aunque la compresión del front funcione.
 curl -sL "$URL_ADJUNTOS?action=ping"
 ```
 
-Esperado: `{"status":"success","supports_check":true,"version":"adjuntos-20260805b",...}`
+Esperado: `{"status":"success","supports_check":true,"version":"adjuntos-20260805c",...}`
 
 Si dice `Script function not found: doGet`, la versión desplegada es antigua o
 el fichero pegado no incluye `doGet`.
@@ -52,3 +52,9 @@ curl -sL -X POST "$URL_ADJUNTOS" \
 En la consola del navegador, tras un fallo opaco, **no** debe aparecer el aviso
 de `action=check`. Si aparece, o el portal aborta al guardar con el mensaje de
 despliegue, vuelva al paso 1.
+
+## Paralelo (v 20260805c+)
+
+El portal sube hasta **3 adjuntos a la vez**. El script usa candado **por fichero**
+(no global). Tras pegar esta versión, publique **Nueva versión** o el candado
+viejo serializará de nuevo todas las subidas.

@@ -24,7 +24,7 @@ function doGet(e) {
         status: "success",
         message: "adjuntos ok",
         supports_check: true,
-        version: "adjuntos-20260805b"
+        version: "adjuntos-20260805c"
       });
     }
     if (action === "check") {
@@ -173,18 +173,9 @@ function handleAdjuntosPost_(e) {
       );
     }
 
-    // Candado: evita carreras entre reintentos del mismo fichero.
-    const lock = LockService.getScriptLock();
-    try {
-      lock.waitLock(30000);
-    } catch (lockErr) {
-      throw new Error(
-        "El servidor está ocupado subiendo otro archivo. Espere unos segundos e inténtelo de nuevo."
-      );
-    }
-
-    try {
-      const cacheKey = adjuntosIdempotencyKey_(idEnvio, seccion, fileName);
+    // Candado por fichero (no global): permite subidas paralelas de archivos distintos.
+    const cacheKey = adjuntosIdempotencyKey_(idEnvio, seccion, fileName);
+    return withAdjuntoFileLock_(cacheKey, function () {
       const cache = CacheService.getScriptCache();
       const cachedId = cache.get(cacheKey);
       if (cachedId) {
@@ -229,7 +220,9 @@ function handleAdjuntosPost_(e) {
       const realBytes = blob.getBytes().length;
       if (realBytes > LIMITE_BYTES) {
         throw new Error(
-          'El archivo "' + fileName + '" supera el límite de 35 MB tras decodificar.'
+          'El archivo "' +
+            fileName +
+            '" supera el límite de 35 MB tras decodificar.'
         );
       }
 
@@ -238,7 +231,9 @@ function handleAdjuntosPost_(e) {
       if (existentes.hasNext()) {
         ya = existentes.next();
         cache.put(cacheKey, ya.getId(), 600);
-        return jsonOut_(successIdempotent_(result, ya, fileName, "drive-post-decode"));
+        return jsonOut_(
+          successIdempotent_(result, ya, fileName, "drive-post-decode")
+        );
       }
 
       const file = carpetaDestino.createFile(blob);
@@ -280,11 +275,8 @@ function handleAdjuntosPost_(e) {
           " user=" +
           usuario
       );
-    } finally {
-      try {
-        lock.releaseLock();
-      } catch (ignoreUnlock) {}
-    }
+      return jsonOut_(result);
+    });
   } catch (error) {
     result.status = "error";
     result.message = friendlyUserMessageAdjuntos_(error);
@@ -316,6 +308,37 @@ function handleAdjuntosPost_(e) {
   }
 
   return jsonOut_(result);
+}
+
+/**
+ * Candado blando por clave de fichero (CacheService).
+ * Serializa reintentos del mismo archivo; permite paralelo entre archivos distintos.
+ */
+function withAdjuntoFileLock_(cacheKey, fn) {
+  var cache = CacheService.getScriptCache();
+  var lockKey = ("lk:" + String(cacheKey || "")).substring(0, 250);
+  var token = Utilities.getUuid();
+  var deadline = Date.now() + 25000;
+  while (Date.now() < deadline) {
+    var holder = cache.get(lockKey);
+    if (!holder) {
+      cache.put(lockKey, token, 60);
+      Utilities.sleep(40);
+      if (cache.get(lockKey) === token) {
+        try {
+          return fn();
+        } finally {
+          try {
+            if (cache.get(lockKey) === token) cache.remove(lockKey);
+          } catch (ignoreUnlock) {}
+        }
+      }
+    }
+    Utilities.sleep(120 + Math.floor(Math.random() * 180));
+  }
+  throw new Error(
+    "El servidor está ocupado subiendo el mismo archivo. Espere unos segundos e inténtelo de nuevo."
+  );
 }
 
 /** Clave de idempotencia por envío + sección + nombre. */
@@ -485,14 +508,19 @@ function friendlyUserMessageAdjuntos_(err) {
 }
 
 function getOrCreateFolder(parent, name) {
+  // Camino rápido sin candado (carpeta ya existe → paralelo OK).
+  var it = parent.getFoldersByName(name);
+  if (it.hasNext()) return it.next();
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(30000);
-    const it = parent.getFoldersByName(name);
+    lock.waitLock(15000);
+    it = parent.getFoldersByName(name);
     if (it.hasNext()) return it.next();
     return parent.createFolder(name);
   } finally {
-    lock.releaseLock();
+    try {
+      lock.releaseLock();
+    } catch (ignore) {}
   }
 }
 

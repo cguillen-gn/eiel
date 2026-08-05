@@ -854,19 +854,25 @@
 
     /**
      * tasks: [{ file, seccion, tipo? }]
-     * Sube en serie; reintenta si falla; si tras los reintentos sigue mal, aborta
-     * el lote (no se debe llamar a generar PDF).
-     * options.retries: por defecto 2 (el 3er intento duplicaba si Drive no indexaba a tiempo)
+     * Sube con cola limitada (paralelo suave); reintenta si falla; si tras los
+     * reintentos sigue mal, aborta el lote (no se debe llamar a generar PDF).
+     * options.retries: por defecto 2
+     * options.concurrency: por defecto 3 (1 = serie)
      * options.throwOnFail: por defecto true
      */
     async function uploadTaskList(tasks, idBatch, options) {
         options = options || {};
         const retries = options.retries != null ? options.retries : 2;
-        const delayMs = options.delayMs != null ? options.delayMs : 800;
-        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 3500;
+        const delayMs = options.delayMs != null ? options.delayMs : 0;
+        const retryDelayMs = options.retryDelayMs != null ? options.retryDelayMs : 1200;
+        const checkDelayMs = options.checkDelayMs != null ? options.checkDelayMs : 800;
+        const concurrency = Math.max(
+            1,
+            options.concurrency != null ? options.concurrency : 3
+        );
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
-        // No-imágenes primero (calientan Apps Script); fotos después, ya comprimidas.
+        // No-imágenes primero (calientan Apps Script); fotos después.
         const ordered = tasks.slice().sort((a, b) => {
             const ai = ((a.file && a.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
             const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
@@ -874,6 +880,20 @@
         });
         const totalTareas = ordered.length;
         let completados = 0;
+        let abortAll = false;
+        let fatalError = null;
+
+        function bumpProgress() {
+            UIProgress.update(
+                completados,
+                totalTareas,
+                "Subiendo archivos adjuntos (Subido " +
+                    completados +
+                    " de " +
+                    totalTareas +
+                    " archivos)..."
+            );
+        }
 
         // Sin action=check desplegado, los 404 opacos de Apps Script no se pueden
         // recuperar y los reintentos duplican ficheros en Drive.
@@ -893,16 +913,9 @@
             }
         }
 
-        for (const tarea of ordered) {
-            UIProgress.update(
-                completados,
-                totalTareas,
-                "Subiendo archivos adjuntos (Subido " +
-                    completados +
-                    " de " +
-                    totalTareas +
-                    " archivos)..."
-            );
+        async function uploadOne(tarea) {
+            if (abortAll) return;
+            bumpProgress();
 
             const tipo = tarea.tipo || defaultTipo;
             let lastError = null;
@@ -917,9 +930,9 @@
                 isImage || (tarea.file && tarea.file.size > 1.5 * 1024 * 1024) ? 2 : 1;
 
             for (let intento = 1; intento <= retries; intento++) {
+                if (abortAll) return;
                 try {
                     if (intento > 1 && isImage) {
-                        // Reintento: compresión más agresiva
                         uploadOpts = {
                             compress: {
                                 maxSide: 960,
@@ -953,15 +966,13 @@
                             retries,
                         e
                     );
-                    // Sesión inválida, tamaño, etc.: no reintentar (evita 404 HTML que tapa el mensaje).
                     if (isNonRetryableUploadError(e)) {
                         break;
                     }
 
-                    // Tras 404 opaco: ¿ya quedó en Drive? (check ligero, sin reenviar la foto)
                     if (isOpaqueUploadError(e)) {
                         try {
-                            await new Promise((r) => setTimeout(r, 2000));
+                            await new Promise((r) => setTimeout(r, checkDelayMs));
                             const yaEsta = await UploadService.checkExists(
                                 tarea.file.name,
                                 tipo,
@@ -983,8 +994,7 @@
                     }
 
                     if (intento < retries) {
-                        const wait =
-                            retryDelayMs * sizeFactor * intento;
+                        const wait = retryDelayMs * sizeFactor * intento;
                         await new Promise((r) => setTimeout(r, wait));
                     }
                 }
@@ -1002,19 +1012,41 @@
                         '". Espere unos segundos e inténtelo de nuevo (a veces el archivo ya quedó en Drive).';
                 }
                 if (throwOnFail) {
-                    UIProgress.hide();
-                    throw new Error(msg);
+                    abortAll = true;
+                    fatalError = new Error(msg);
+                    return;
                 }
                 console.error(options.logPrefix || "Fallo en subida individual:", errFinal);
-                continue;
+                return;
             }
 
             completados++;
-            // Pausa entre ficheros: más larga si el anterior era grande
-            const pause =
-                delayMs *
-                (tarea.file && tarea.file.size > 2 * 1024 * 1024 ? 2 : 1);
-            await new Promise((r) => setTimeout(r, pause));
+            bumpProgress();
+            if (delayMs > 0) {
+                await new Promise((r) => setTimeout(r, delayMs));
+            }
+        }
+
+        bumpProgress();
+        let cursor = 0;
+        async function worker() {
+            while (true) {
+                if (abortAll) return;
+                const idx = cursor++;
+                if (idx >= ordered.length) return;
+                await uploadOne(ordered[idx]);
+            }
+        }
+        const runners = Math.min(concurrency, Math.max(1, ordered.length));
+        await Promise.all(
+            Array.from({ length: runners }, function () {
+                return worker();
+            })
+        );
+
+        if (fatalError && throwOnFail) {
+            UIProgress.hide();
+            throw fatalError;
         }
 
         return completados;
