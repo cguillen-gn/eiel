@@ -891,7 +891,6 @@
         });
 
         if (reqIncompletos) {
-            focusFirstInvalid();
             return { ok: false, message: message, respuestas: [] };
         }
         return { ok: true, respuestas: respuestasReq };
