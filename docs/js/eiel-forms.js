@@ -89,6 +89,28 @@
         mensajeDiv.textContent = texto;
         mensajeDiv.className = "message " + tipo;
         mensajeDiv.classList.remove("hidden");
+        // Si hay campos marcados inválidos, priorizar scroll/foco a ellos
+        // (el aviso suele estar abajo junto a Enviar y taparía el campo).
+        const invalid = document.querySelector(".is-invalid");
+        if (invalid) {
+            try {
+                invalid.scrollIntoView({ behavior: "smooth", block: "center" });
+            } catch (e) {
+                /* ignore */
+            }
+            try {
+                if (typeof invalid.focus === "function") {
+                    invalid.focus({ preventScroll: true });
+                }
+            } catch (e2) {
+                try {
+                    invalid.focus();
+                } catch (e3) {
+                    /* ignore */
+                }
+            }
+            return;
+        }
         mensajeDiv.scrollIntoView({ behavior: "smooth", block: "center" });
     }
 
@@ -816,7 +838,6 @@
 
         if (nombre.length < 2) {
             markInvalid(elNombre);
-            focusFirstInvalid();
             return {
                 ok: false,
                 message: "⚠️ Por favor, introduzca su nombre y apellidos."
@@ -825,7 +846,6 @@
         if (!REGEX_EMAIL.test(email) || email.toLowerCase() !== emailConf.toLowerCase()) {
             markInvalid(elEmail);
             markInvalid(elEmailConf);
-            focusFirstInvalid();
             return {
                 ok: false,
                 message: "⚠️ Verifique que el Email sea válido y coincida en ambos campos."
