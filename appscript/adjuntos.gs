@@ -14,6 +14,49 @@ function jsonOut_(obj) {
   );
 }
 
+function doGet(e) {
+  // Health / action=check por query (curl y diagnóstico). Subidas van por doPost.
+  try {
+    var p = (e && e.parameter) || {};
+    var action = String(p.action || "").toLowerCase();
+    if (action === "ping" || action === "version") {
+      return jsonOut_({
+        status: "success",
+        message: "adjuntos ok",
+        supports_check: true,
+        version: "adjuntos-20260805"
+      });
+    }
+    if (action === "check") {
+      var munFull = (p.municipio || p.mun || "").toString().trim();
+      var mun = munFull ? munFull.slice(-3) : "";
+      var idEnvio = (p.id_envio || "").toString().trim();
+      var seccion = p.seccion || "DOCUMENTACION";
+      var fileName = (p.filename || p.nombre_archivo || p.nombre || "")
+        .toString()
+        .trim();
+      if (!mun || !idEnvio || !fileName) {
+        return jsonOut_({
+          status: "error",
+          message: "Para action=check hacen falta municipio, id_envio y filename."
+        });
+      }
+      return jsonOut_(checkAdjuntoExists_(mun, idEnvio, seccion, fileName));
+    }
+    return jsonOut_({
+      status: "error",
+      message:
+        "Use POST para subir archivos, o GET ?action=ping / ?action=check&..."
+    });
+  } catch (fatal) {
+    Logger.log("FATAL ADJUNTOS doGet: " + fatal.toString());
+    return jsonOut_({
+      status: "error",
+      message: friendlyUserMessageAdjuntos_(fatal)
+    });
+  }
+}
+
 function doPost(e) {
   // Envoltorio exterior: si algo revienta sin catch, igual intentamos JSON
   // (si no, Google devuelve HTML sin CORS → "Failed to fetch" en el navegador).
