@@ -314,6 +314,58 @@
         },
 
         /**
+         * Detecta si el Web App desplegado entiende action=check.
+         * La versión antigua responde «Faltan datos necesarios…» (exige bytesBase64).
+         * @returns {"ok"|"outdated"|"unknown"}
+         */
+        async probeCheckSupport() {
+            const payload = {
+                action: "check",
+                filename: "__eiel_probe__.jpg",
+                municipio: global.EIEL_CONFIG.muniCode || "000",
+                tipo: "general",
+                seccion: "GENERAL",
+                id_envio: "EIEL_PROBE_CHECK",
+                session_token: requireSessionToken()
+            };
+            try {
+                const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
+                    method: "POST",
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
+                    body: JSON.stringify(payload),
+                    redirect: "follow"
+                });
+                const raw = await response.text();
+                let result = null;
+                try {
+                    result = JSON.parse(raw);
+                } catch (e) {
+                    return "unknown";
+                }
+                if (
+                    result &&
+                    result.status === "error" &&
+                    String(result.message || "")
+                        .toLowerCase()
+                        .indexOf("faltan datos") !== -1
+                ) {
+                    return "outdated";
+                }
+                if (
+                    result &&
+                    (result.status === "success" ||
+                        result.status === "missing" ||
+                        result.supports_check === true)
+                ) {
+                    return "ok";
+                }
+                return "unknown";
+            } catch (e) {
+                return "unknown";
+            }
+        },
+
+        /**
          * Comprueba si el fichero ya está en Drive (tras un 404 opaco), sin reenviar bytes.
          */
         async checkExists(fileName, tipoFicha, muniCode, seccion, idEnvio) {
@@ -819,6 +871,24 @@
         });
         const totalTareas = ordered.length;
         let completados = 0;
+
+        // Sin action=check desplegado, los 404 opacos de Apps Script no se pueden
+        // recuperar y los reintentos duplican ficheros en Drive.
+        if (options.skipDeployProbe !== true && totalTareas > 0) {
+            const probe = await UploadService.probeCheckSupport();
+            if (probe === "outdated") {
+                const msg =
+                    "El Web App de Adjuntos en Google no está actualizado (no reconoce action=check). " +
+                    "En Apps Script: pegue appscript/adjuntos.gs del repo → Implementar → " +
+                    "Administrar implementaciones → editar la existente → Nueva versión. " +
+                    "Guía: appscript/DESPLIEGUE-ADJUNTOS.md. Hasta entonces las fotos fallarán o se duplicarán.";
+                console.error("[EIEL]", msg);
+                if (throwOnFail) {
+                    UIProgress.hide();
+                    throw new Error(msg);
+                }
+            }
+        }
 
         for (const tarea of ordered) {
             UIProgress.update(
