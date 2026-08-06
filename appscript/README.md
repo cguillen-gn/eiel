@@ -54,15 +54,25 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 - Mensajes de error amigables (Gmail, cuota, sesión, adjuntos…)
 - Front sin `no-cors`; interpreta `status` o `success`
 - **Verificación de adjuntos en Drive** antes de generar PDF/email:
-  si `lista_archivos` no está vacía, debe existir cada fichero bajo
-  `adjuntos/[muni]/[id_envio|id_registro]/…`. Si falta alguno → error
-  (y fila en `logs_errores`), sin enviar el justificante.
+  si hay nombres declarados (`lista_archivos` array o `archivos_adjuntos`
+  por líneas), comprueba la carpeta
+  `adjuntos/[muni]/[id_envio|id_registro]/…` con varios reintentos.
+  - Los nombres **no se parten por comas** (un PDF «Informe, final.pdf»
+    es un solo fichero).
+  - Match normalizado (+/espacios, mayúsculas, caracteres raros).
+  - Si tras reintentos los nombres no cuadran al 100 % pero la carpeta
+    **tiene ficheros** (conteo ≥ declarados, o al menos no vacía tras
+    subida OK del cliente) → **se genera el PDF y el envío es OK**
+    (aviso solo en el log de Apps Script). Solo falla si la carpeta no
+    existe o está vacía.
 
 ### Despliegue PDF
 1. Pegar `generar-pdf.gs` → **Nueva versión** (misma app web).
-2. Probar envío con adjunto → OK.
-3. Prueba negativa (opcional): manipular `lista_archivos` o borrar el
-   fichero en Drive antes del PDF → mensaje de adjuntos faltantes.
+2. Publicar también `docs/js/eiel-forms.js` (envía `lista_archivos` como
+   array JSON).
+3. Probar envío con adjunto (idealmente nombre con coma) → OK.
+4. Prueba negativa (opcional): carpeta de adjuntos vacía → mensaje de
+   adjuntos faltantes.
 
 ## E — Logger de accesos (`logger.gs`)
 
