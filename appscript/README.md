@@ -1,5 +1,12 @@
 # Apps Script — Adjuntos, PDF, login y logger
 
+## Login rápido (recomendado)
+
+El login por Apps Script sufre cold start. Preferir el **Cloudflare Worker**
+en `workers/login/` (misma API). `login.gs` queda como rollback.
+
+---
+
 ## D — Token de sesión (**DESACTIVADO** temporalmente)
 
 Los tokens HMAC se desactivaron para recuperar un login **rápido y gratis**
