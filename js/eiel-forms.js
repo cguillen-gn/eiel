@@ -379,7 +379,8 @@
                 tipo: "general",
                 seccion: "GENERAL",
                 id_envio: "EIEL_PROBE_CHECK",
-                session_token: requireSessionToken()
+                session_token: requireSessionToken(),
+                is_test: getIsTest()
             };
             try {
                 const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
@@ -429,7 +430,8 @@
                 tipo: tipoFicha,
                 seccion: seccion == null ? "DOCUMENTACION" : seccion,
                 id_envio: idEnvio,
-                session_token: requireSessionToken()
+                session_token: requireSessionToken(),
+                is_test: getIsTest()
             };
             const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
                 method: "POST",
@@ -532,7 +534,8 @@
                 tipo: tipoFicha,
                 seccion: seccion == null ? "DOCUMENTACION" : seccion,
                 id_envio: idEnvio,
-                session_token: requireSessionToken()
+                session_token: requireSessionToken(),
+                is_test: getIsTest()
             };
 
             const response = await fetch(global.EIEL_CONFIG.urlAdjuntos, {

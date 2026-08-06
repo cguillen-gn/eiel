@@ -81,26 +81,34 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 - Front sin `no-cors`; lee `{ status }`
 - Si falla: solo `console.warn` (no bloquea el formulario)
 - Código municipio con ceros (`'006`)
+- Modo prueba (`is_test` / municipio «PRUEBAS») → pestaña
+  `logs_acceso_pruebas` (producción sigue en `logs_acceso`)
 - Ver `logger.PARCHE.md`
 
 ## F — Hoja `logs_errores` (`log-errores.gs`)
 
-Ahora Adjuntos y PDF escriben fallos en **`logs_errores`** (misma hoja
-de cálculo que `logs_envios` / `logs_acceso`).
+Adjuntos y PDF escriben fallos en la misma hoja de cálculo que
+`logs_envios` / `logs_acceso`:
 
-Columnas: Fecha, Origen (`adjuntos`/`pdf`), Municipio, Código, Tipo,
+- Producción → `logs_errores`
+- Pruebas (`is_test` / «PRUEBAS» / id `TEST-…`) → `logs_errores_pruebas`
+
+Envíos PDF: `logs_envios` vs `logs_envios_pruebas` (correlativo independiente;
+IDs de prueba siguen con prefijo `TEST-`).
+
+Columnas errores: Fecha, Origen (`adjuntos`/`pdf`), Municipio, Código, Tipo,
 id_envio, id_registro, Usuario, Archivo, Mensaje usuario, Detalle técnico.
 
 ### Despliegue
 1. En **Adjuntos** y **PDF**: crear/actualizar fichero `log-errores` con
    `appscript/log-errores.gs` (junto a `Código.gs` y `auth-token.gs`).
 2. En el editor de **Adjuntos**: función `testLogErrores` → Ejecutar →
-   aceptar permisos de Hojas de cálculo. Debe crear una fila
-   `origen=test` en `logs_errores`.
+   aceptar permisos. Debe crear una fila `origen=test` en
+   **`logs_errores_pruebas`**.
 3. Repetir `testLogErrores` en el proyecto **PDF**.
 4. Actualizar `Código.gs` (`adjuntos.gs` / `generar-pdf.gs`) y
-   **Implementar → Nueva versión** en ambos.
-5. Probar: token inválido e intentar subir → fila con origen `adjuntos`.
+   **Implementar → Nueva versión** en ambos; también **Logger**.
+5. Probar envío/acceso en modo MASTER_PASS → filas solo en pestañas `_pruebas`.
 
 Si el error se ve en pantalla pero no hay fila: falta el fichero
 `log-errores`, faltan permisos sobre la hoja, o no se redesplegó.

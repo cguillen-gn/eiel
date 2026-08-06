@@ -1,10 +1,12 @@
 // ====================================================================
-// EIEL — Registro de errores en hoja "logs_errores"
+// EIEL — Registro de errores en hoja "logs_errores" / "logs_errores_pruebas"
 // ====================================================================
 // Pegar como fichero adicional en los proyectos:
 //   - Adjuntos
 //   - Generar PDF
 // (Misma hoja de cálculo que logs_envios / logs_acceso)
+//
+// Si info.is_test (o municipio con «PRUEBAS») → logs_errores_pruebas.
 //
 // Tras pegar: autorizar SpreadsheetApp (Ejecutar testLogErrores una vez)
 // y luego Implementar → Nueva versión en la app web.
@@ -12,9 +14,25 @@
 
 var EIEL_ID_HOJA_ERRORES = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM";
 var EIEL_PESTANA_ERRORES = "logs_errores";
+var EIEL_PESTANA_ERRORES_PRUEBAS = "logs_errores_pruebas";
+
+/** ¿Va a la pestaña de pruebas? */
+function esErrorPrueba_(info) {
+  info = info || {};
+  if (info.is_test === true || info.is_test === "true") return true;
+  if (String(info.municipio || "").indexOf("PRUEBAS") !== -1) return true;
+  if (String(info.id_registro || "").indexOf("TEST-") === 0) return true;
+  return false;
+}
+
+function pestanaErrores_(info) {
+  return esErrorPrueba_(info)
+    ? EIEL_PESTANA_ERRORES_PRUEBAS
+    : EIEL_PESTANA_ERRORES;
+}
 
 /**
- * Escribe una fila en logs_errores. Nunca lanza (no debe tumbar el flujo).
+ * Escribe una fila en logs_errores(_pruebas). Nunca lanza (no debe tumbar el flujo).
  *
  * @param {Object} info
  * @param {string} info.origen - "adjuntos" | "pdf" | ...
@@ -27,16 +45,18 @@ var EIEL_PESTANA_ERRORES = "logs_errores";
  * @param {string} [info.mensaje_usuario] - texto mostrado al técnico
  * @param {string} [info.detalle] - error técnico / stack corto
  * @param {string} [info.archivo] - nombre fichero (adjuntos)
+ * @param {boolean|string} [info.is_test] - modo prueba del portal
  * @return {boolean} true si escribió la fila
  */
 function logErrorToSheet_(info) {
   try {
     info = info || {};
+    var pestana = pestanaErrores_(info);
     var ss = SpreadsheetApp.openById(EIEL_ID_HOJA_ERRORES);
-    var sheet = ss.getSheetByName(EIEL_PESTANA_ERRORES);
+    var sheet = ss.getSheetByName(pestana);
 
     if (!sheet) {
-      sheet = ss.insertSheet(EIEL_PESTANA_ERRORES);
+      sheet = ss.insertSheet(pestana);
     }
 
     if (sheet.getLastRow() === 0) {
@@ -83,7 +103,9 @@ function logErrorToSheet_(info) {
       detalle
     ]);
     Logger.log(
-      "[logs_errores OK] origen=" +
+      "[logs_errores OK] pestana=" +
+        pestana +
+        " origen=" +
         (info.origen || "") +
         " codigo=" +
         codigoTxt +
@@ -102,29 +124,33 @@ function logErrorToSheet_(info) {
 
 /**
  * Ejecutar desde el editor (Adjuntos o PDF) para autorizar y comprobar escritura.
- * Debe crear una fila de prueba en la pestaña logs_errores.
+ * Escribe en logs_errores_pruebas (is_test).
  */
 function testLogErrores() {
   Logger.log("typeof logErrorToSheet_ = " + typeof logErrorToSheet_);
   var ok = logErrorToSheet_({
     origen: "test",
-    municipio: "PRUEBA EDITOR",
+    municipio: "(PRUEBAS) EDITOR",
     codigo: "001",
     tipo: "test",
     id_envio: "TEST_LOG_ERRORES",
     usuario: Session.getActiveUser().getEmail() || "editor",
     archivo: "",
     mensaje_usuario: "Fila de prueba desde testLogErrores()",
-    detalle: "Si ves esta fila, SpreadsheetApp y la pestaña logs_errores están OK."
+    detalle:
+      "Si ves esta fila, SpreadsheetApp y la pestaña logs_errores_pruebas están OK.",
+    is_test: true
   });
   if (!ok) {
     throw new Error(
-      "No se pudo escribir en logs_errores. Revisa permisos de la hoja " +
+      "No se pudo escribir en logs_errores_pruebas. Revisa permisos de la hoja " +
         EIEL_ID_HOJA_ERRORES +
         " y que exista la pestaña '" +
-        EIEL_PESTANA_ERRORES +
+        EIEL_PESTANA_ERRORES_PRUEBAS +
         "'."
     );
   }
-  Logger.log("testLogErrores terminado OK — revisa la hoja logs_errores");
+  Logger.log(
+    "testLogErrores terminado OK — revisa la hoja " + EIEL_PESTANA_ERRORES_PRUEBAS
+  );
 }

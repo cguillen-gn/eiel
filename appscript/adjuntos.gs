@@ -98,7 +98,8 @@ function handleAdjuntosPost_(e) {
     tipo: "",
     id_envio: "",
     usuario: "",
-    archivo: ""
+    archivo: "",
+    is_test: false
   };
 
   try {
@@ -127,12 +128,17 @@ function handleAdjuntosPost_(e) {
     const fileName = (data.filename || data.nombre_archivo || "").toString().trim();
     const usuario = (data.usuario || "anonimo").toString();
     const sessionToken = data.session_token || data.token || "";
+    const isTest =
+      data.is_test === true ||
+      data.is_test === "true" ||
+      String(data.municipio_nombre || "").indexOf("PRUEBAS") !== -1;
 
     ctx.codigo = munCode;
     ctx.tipo = tipo;
     ctx.id_envio = idEnvio;
     ctx.usuario = usuario;
     ctx.archivo = fileName;
+    ctx.is_test = isTest;
 
     Logger.log(
       "[ADJUNTOS] start mun=" +
@@ -293,7 +299,8 @@ function handleAdjuntosPost_(e) {
         usuario: ctx.usuario,
         archivo: ctx.archivo,
         mensaje_usuario: result.message,
-        detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
+        detalle: error.toString() + (error.stack ? "\n" + error.stack : ""),
+        is_test: !!ctx.is_test
       });
       if (!wrote) {
         Logger.log(
