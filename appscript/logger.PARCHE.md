@@ -20,10 +20,27 @@ Pestañas:
 El código INE se escribe como texto (`'006`) para que Sheets no quite
 los ceros a la izquierda.
 
-## Prueba
-1. Entrar con código municipal normal → fila en `logs_acceso`
-2. Entrar con MASTER_PASS → fila en `logs_acceso_pruebas`
-3. Columna código debe verse **006** (no 6)
+## Prueba / diagnóstico de pestañas
+1. Entrar con **MASTER_PASS** (no con la clave del municipio).
+2. Abrir formulario → DevTools → Network → petición al Logger:
+   - Debe devolver `"eiel_build":"logs-split-20260806"` y
+     `"log_pestana":"logs_acceso_pruebas"`.
+   - Si no aparece `eiel_build`: el `/exec` **no** tiene el `logger.gs`
+     nuevo (pegó código pero no publicó Nueva versión, o la URL del
+     portal apunta a otro despliegue).
+3. Enviar formulario → respuesta del PDF con
+   `"log_pestana":"logs_envios_pruebas"`.
+4. En Sheets deben existir (o crearse) las pestañas `*_pruebas`.
+
+**Orden correcto de despliegue:** pegar código → guardar →  
+Implementar → **Administrar implementaciones** → editar la del portal →  
+**Nueva versión** → Implementar. Si crea un «Nuevo despliegue» con otra
+URL, hay que actualizar esa URL en los HTML/`EIEL_CONFIG`.
+
+## Prueba (legacy)
+1. Abrir un formulario (logueado), p. ej. municipio 006
+2. DevTools → Network → logger → JSON `{ "status": "success", ... }`
+3. En `logs_acceso` / `logs_acceso_pruebas`, columna código debe verse **006** (no 6)
 
 Si tu script actual tiene más columnas o otra hoja, pégalo y lo adaptamos
 manteniendo el contrato `{ status, message }`.

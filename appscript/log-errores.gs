@@ -15,11 +15,14 @@
 var EIEL_ID_HOJA_ERRORES = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM";
 var EIEL_PESTANA_ERRORES = "logs_errores";
 var EIEL_PESTANA_ERRORES_PRUEBAS = "logs_errores_pruebas";
+/** Marcador de despliegue (mismo valor que PDF/Logger). */
+var EIEL_BUILD_ERRORES = "logs-split-20260806";
 
 /** ¿Va a la pestaña de pruebas? */
 function esErrorPrueba_(info) {
   info = info || {};
-  if (info.is_test === true || info.is_test === "true") return true;
+  var flag = info.is_test;
+  if (flag === true || flag === "true" || flag === 1 || flag === "1") return true;
   if (String(info.municipio || "").indexOf("PRUEBAS") !== -1) return true;
   if (String(info.id_registro || "").indexOf("TEST-") === 0) return true;
   return false;
