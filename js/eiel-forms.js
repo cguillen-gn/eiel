@@ -1221,11 +1221,55 @@
      * Envía el payload al script de generar PDF.
      * Misma estrategia que adjuntos: text/plain (sin preflight) y JSON legible.
      */
+    /**
+     * Normaliza nombres de adjuntos para el PDF: array JSON (sin partir por comas)
+     * + string con saltos de línea (compatibilidad).
+     */
+    function normalizeAdjuntosInPdfPayload(payload) {
+        if (!payload || typeof payload !== "object") return payload;
+        let names = [];
+        if (Array.isArray(payload.lista_archivos)) {
+            names = payload.lista_archivos;
+        } else if (typeof payload.lista_archivos === "string" && payload.lista_archivos.trim()) {
+            const t = payload.lista_archivos.trim();
+            if (t.charAt(0) === "[") {
+                try {
+                    const parsed = JSON.parse(t);
+                    if (Array.isArray(parsed)) names = parsed;
+                } catch (e) {
+                    names = t.split(/\r?\n/);
+                }
+            } else {
+                names = t.split(/\r?\n/);
+            }
+        } else if (typeof payload.archivos_adjuntos === "string" && payload.archivos_adjuntos.trim()) {
+            // Solo saltos de línea: "a, b.pdf" es UN nombre, no dos.
+            names = payload.archivos_adjuntos.split(/\r?\n/);
+        }
+        names = names
+            .map(function (n) {
+                return String(n == null ? "" : n).trim();
+            })
+            .filter(Boolean);
+        if (!names.length) return payload;
+        const seen = {};
+        const unique = [];
+        names.forEach(function (n) {
+            if (seen[n]) return;
+            seen[n] = true;
+            unique.push(n);
+        });
+        payload.lista_archivos = unique;
+        payload.archivos_adjuntos = unique.join("\n");
+        return payload;
+    }
+
     async function sendPdfPayload(payload) {
         try {
             if (payload && !payload.envio_started_at && submitStartedAtIso) {
                 payload.envio_started_at = submitStartedAtIso;
             }
+            payload = normalizeAdjuntosInPdfPayload(payload);
             const response = await fetch(global.EIEL_CONFIG.urlGenerarPdf, {
                 method: "POST",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },

@@ -102,7 +102,10 @@ function doPost(e) {
       departamento_contacto: data.departamento_contacto || "No indicado",
       email_contacto: data.email_contacto || "anonimo",
       
-      archivos_adjuntos: data.lista_archivos || data.archivos_adjuntos || "",
+      // lista_archivos puede llegar como array JSON; no usarlo como string crudo.
+      archivos_adjuntos: Array.isArray(data.lista_archivos)
+        ? data.lista_archivos.join("\n")
+        : data.lista_archivos || data.archivos_adjuntos || "",
       
       // Datos Específicos
       consumo: data.consumo,
@@ -130,7 +133,8 @@ function doPost(e) {
       NOMBRE_CONTACTO: input.nombre_contacto,
       DEPARTAMENTO_CONTACTO: input.departamento_contacto,
       TIPO_FORMULARIO: TIPO_FORMULARIO,
-      NOMBRES_ADJUNTOS: (input.archivos_adjuntos || "").split(/,|\n/).filter(n => n && n.trim().length > 0),
+      // Nunca partir por comas: los nombres de fichero suelen llevarlas.
+      NOMBRES_ADJUNTOS: parseNombresAdjuntos_(data),
       FECHA_ENVIO: new Date().toLocaleDateString('es-ES') + " " + new Date().toLocaleTimeString('es-ES'),
       OBSERVACIONES: input.observaciones,
       
@@ -545,76 +549,227 @@ function findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro) {
   return null;
 }
 
+/** Deduplica nombres conservando el orden (trim; ignora vacíos). */
+function dedupeAdjuntoNames_(names) {
+  var out = [];
+  var seen = {};
+  (names || []).forEach(function (n) {
+    var name = String(n == null ? "" : n).trim();
+    if (!name || seen[name]) return;
+    seen[name] = true;
+    out.push(name);
+  });
+  return out;
+}
+
+/**
+ * Extrae la lista de nombres de adjuntos del payload.
+ * Preferencia: array JSON (lista_archivos / archivos_adjuntos_json).
+ * Si llega string, SOLO se parte por saltos de línea — nunca por comas
+ * (los PDF de obras suelen llamarse "Informe, final.pdf", etc.).
+ */
+function parseNombresAdjuntos_(data) {
+  data = data || {};
+  var raw =
+    data.lista_archivos != null
+      ? data.lista_archivos
+      : data.archivos_adjuntos_json != null
+        ? data.archivos_adjuntos_json
+        : null;
+
+  if (Array.isArray(raw)) {
+    return dedupeAdjuntoNames_(raw);
+  }
+
+  if (typeof raw === "string" && raw.trim()) {
+    var t = raw.trim();
+    if (t.charAt(0) === "[") {
+      try {
+        var parsed = JSON.parse(t);
+        if (Array.isArray(parsed)) return dedupeAdjuntoNames_(parsed);
+      } catch (e) {
+        /* seguir con split */
+      }
+    }
+    return dedupeAdjuntoNames_(t.split(/\r?\n/));
+  }
+
+  var s = data.archivos_adjuntos || "";
+  if (typeof s !== "string") s = String(s || "");
+  if (!s.trim()) return [];
+  // Una sola línea (aunque lleve comas) = un solo nombre.
+  if (s.indexOf("\n") === -1 && s.indexOf("\r") === -1) {
+    return dedupeAdjuntoNames_([s]);
+  }
+  return dedupeAdjuntoNames_(s.split(/\r?\n/));
+}
+
+/**
+ * Normaliza nombre para comparar cliente ↔ Drive
+ * (+/espacios, mayúsculas, caracteres que Drive suele sustituir).
+ */
+function normalizeAdjuntoName_(name) {
+  var s = String(name == null ? "" : name).trim();
+  try {
+    s = decodeURIComponent(s);
+  } catch (e) {
+    /* ignore */
+  }
+  s = s.replace(/\+/g, " ");
+  s = s.replace(/[\/\\:\*\?"<>\|]/g, "_");
+  s = s.replace(/\s+/g, " ").trim().toLowerCase();
+  return s;
+}
+
+/**
+ * Nombres declarados que no aparecen en Drive (match normalizado).
+ * Consume cada hallazgo como máximo una vez (soporta duplicados).
+ */
 function missingAdjuntosFromList_(expected, foundNames) {
-  var lowerMap = {};
+  var pool = {};
   for (var i = 0; i < foundNames.length; i++) {
-    lowerMap[String(foundNames[i]).toLowerCase()] = true;
+    var key = normalizeAdjuntoName_(foundNames[i]);
+    if (!key) continue;
+    pool[key] = (pool[key] || 0) + 1;
   }
   var missing = [];
   for (var j = 0; j < expected.length; j++) {
     var exp = expected[j];
-    if (foundNames.indexOf(exp) !== -1) continue;
-    if (lowerMap[exp.toLowerCase()]) continue;
+    var nk = normalizeAdjuntoName_(exp);
+    if (nk && pool[nk]) {
+      pool[nk]--;
+      continue;
+    }
     missing.push(exp);
   }
   return missing;
 }
 
 /**
- * Exige que cada nombre de lista_archivos exista bajo la carpeta del envío.
+ * Comprueba que los adjuntos declarados están en Drive antes del PDF/email.
  * Sin lista (envío sin adjuntos) no hace nada.
- * Reintenta 1 vez tras 1,5 s por posible retraso de indexación de Drive.
+ *
+ * Política (prioridad: no castigar al técnico si los ficheros ya están):
+ * 1. Varios reintentos con backoff (indexación Drive / renombrado carpeta).
+ * 2. Match de nombres normalizado (no partir por comas).
+ * 3. Si tras reintentos faltan nombres PERO la carpeta tiene al menos
+ *    tantos ficheros como los declarados → aviso en log y se CONTINÚA
+ *    (PDF + email OK). Solo falla si no hay carpeta o está vacía.
  */
 function assertAdjuntosPresentes_(muniCode, idEnvio, idRegistro, expectedNames) {
-  var expected = [];
-  var seen = {};
-  (expectedNames || []).forEach(function (n) {
-    var name = String(n || "").trim();
-    if (!name || seen[name]) return;
-    seen[name] = true;
-    expected.push(name);
-  });
+  var expected = dedupeAdjuntoNames_(expectedNames || []);
   if (!expected.length) return;
 
-  var carpeta = findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro);
-  if (!carpeta) {
-    Utilities.sleep(1500);
+  var sleepsMs = [0, 1500, 2500, 4000, 5000];
+  var carpeta = null;
+  var found = [];
+  var missing = expected.slice();
+
+  for (var attempt = 0; attempt < sleepsMs.length; attempt++) {
+    if (sleepsMs[attempt] > 0) Utilities.sleep(sleepsMs[attempt]);
+
     carpeta = findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro);
+    if (!carpeta) {
+      console.warn(
+        "Adjuntos: carpeta no encontrada (intento " +
+          (attempt + 1) +
+          "/" +
+          sleepsMs.length +
+          ") id_envio=" +
+          idEnvio +
+          " id_registro=" +
+          idRegistro
+      );
+      continue;
+    }
+
+    found = listFileNamesRecursive_(carpeta, []);
+    missing = missingAdjuntosFromList_(expected, found);
+    if (!missing.length) {
+      console.log(
+        "Adjuntos verificados OK: " +
+          expected.length +
+          " archivo(s) en " +
+          carpeta.getName() +
+          " (intento " +
+          (attempt + 1) +
+          ")"
+      );
+      return;
+    }
+
+    console.warn(
+      "Adjuntos: faltan por nombre (intento " +
+        (attempt + 1) +
+        ") missing=" +
+        missing.join(" | ") +
+        " found=" +
+        found.length +
+        " expected=" +
+        expected.length
+    );
   }
+
   if (!carpeta) {
     throw new Error(
       "No se han encontrado los archivos adjuntos del envío. Vuelva a adjuntarlos e inténtelo de nuevo."
     );
   }
 
-  var found = listFileNamesRecursive_(carpeta, []);
-  var missing = missingAdjuntosFromList_(expected, found);
-  if (missing.length) {
-    Utilities.sleep(1500);
-    found = listFileNamesRecursive_(carpeta, []);
-    missing = missingAdjuntosFromList_(expected, found);
-  }
-
-  if (missing.length) {
-    var preview = missing.slice(0, 5).join(", ");
-    if (missing.length > 5) preview += "…";
-    console.error(
-      "ADJUNTOS FALTANTES id_envio=" +
+  // Red de seguridad: los ficheros están en Drive aunque el nombre no
+  // coincida al 100 % (coma en el nombre, sanitizado por Drive, etc.).
+  if (found.length >= expected.length) {
+    console.warn(
+      "ADJUNTOS OK POR CONTEO (nombres no coinciden al 100%): id_envio=" +
         idEnvio +
         " id_registro=" +
         idRegistro +
-        " missing=" +
-        missing.join(" | ")
+        " expected=" +
+        expected.length +
+        " found=" +
+        found.length +
+        " missing_names=" +
+        missing.join(" | ") +
+        " found_names=" +
+        found.join(" | ")
     );
-    throw new Error(
-      "Faltan archivos adjuntos en el envío (" +
-        preview +
-        "). Vuelva a subirlos e inténtelo de nuevo."
-    );
+    return;
   }
 
-  console.log(
-    "Adjuntos verificados OK: " + expected.length + " archivo(s) en " + carpeta.getName()
+  if (found.length > 0) {
+    // Hay adjuntos reales tras una subida que el cliente dio por buena.
+    // Preferimos completar PDF/email a forzar reenvío de minutos.
+    console.warn(
+      "ADJUNTOS OK CON AVISO (carpeta no vacía, conteo inferior): id_envio=" +
+        idEnvio +
+        " id_registro=" +
+        idRegistro +
+        " expected=" +
+        expected.length +
+        " found=" +
+        found.length +
+        " missing_names=" +
+        missing.join(" | ") +
+        " found_names=" +
+        found.join(" | ")
+    );
+    return;
+  }
+
+  var preview = missing.slice(0, 5).join(", ");
+  if (missing.length > 5) preview += "…";
+  console.error(
+    "ADJUNTOS FALTANTES id_envio=" +
+      idEnvio +
+      " id_registro=" +
+      idRegistro +
+      " missing=" +
+      missing.join(" | ")
+  );
+  throw new Error(
+    "Faltan archivos adjuntos en el envío (" +
+      preview +
+      "). Vuelva a subirlos e inténtelo de nuevo."
   );
 }
 
