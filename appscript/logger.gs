@@ -14,6 +14,8 @@
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM";
 const NOMBRE_PESTANA_ACCESOS = "logs_acceso";
 const NOMBRE_PESTANA_ACCESOS_PRUEBAS = "logs_acceso_pruebas";
+/** Marcador: debe verse al abrir /exec?action=ping en el navegador. */
+const EIEL_BUILD_LOGGER = "logs-split-20260806";
 
 function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
@@ -24,12 +26,34 @@ function jsonOut_(obj) {
 /** Acceso de prueba: flag del portal o prefijo (PRUEBAS) en municipio. */
 function esAccesoPrueba_(data) {
   data = data || {};
-  if (data.is_test === true || data.is_test === "true") return true;
+  var flag = data.is_test;
+  if (flag === true || flag === "true" || flag === 1 || flag === "1") return true;
   return String(data.municipio || "").indexOf("PRUEBAS") !== -1;
 }
 
 function pestanaAccesos_(esPrueba) {
   return esPrueba ? NOMBRE_PESTANA_ACCESOS_PRUEBAS : NOMBRE_PESTANA_ACCESOS;
+}
+
+/**
+ * Diagnóstico sin F12: abrir …/exec?action=ping en el navegador.
+ */
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  var action = String(p.action || "ping").toLowerCase();
+  return jsonOut_({
+    status: "success",
+    service: "logger",
+    eiel_build: EIEL_BUILD_LOGGER,
+    logs_split: true,
+    pestanas: {
+      prod: NOMBRE_PESTANA_ACCESOS,
+      pruebas: NOMBRE_PESTANA_ACCESOS_PRUEBAS
+    },
+    action: action,
+    message:
+      "Logger OK. Si ves este JSON, esta URL /exec tiene el código de pestañas _pruebas."
+  });
 }
 
 function doPost(e) {
@@ -110,6 +134,17 @@ function handleLoggerPost_(e) {
     result.message = esPrueba
       ? "Acceso de prueba registrado."
       : "Acceso registrado.";
+    result.is_test = esPrueba;
+    result.log_pestana = pestana;
+    result.eiel_build = EIEL_BUILD_LOGGER;
+    Logger.log(
+      "[EIEL LOGGER] build=" +
+        EIEL_BUILD_LOGGER +
+        " is_test=" +
+        esPrueba +
+        " log_pestana=" +
+        pestana
+    );
   } catch (error) {
     result.status = "error";
     result.message = error.toString();

@@ -23,8 +23,11 @@ function doGet(e) {
       return jsonOut_({
         status: "success",
         message: "adjuntos ok",
+        service: "adjuntos",
         supports_check: true,
-        version: "adjuntos-20260805c"
+        logs_split: true,
+        eiel_build: "logs-split-20260806",
+        version: "adjuntos-20260806-logs-split"
       });
     }
     if (action === "check") {

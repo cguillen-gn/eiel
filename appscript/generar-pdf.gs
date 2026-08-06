@@ -23,6 +23,8 @@ const EMAIL_FIJO_DESTINO = "eiel@geonet.es";
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM"; 
 const NOMBRE_PESTANA_LOGS = "logs_envios";
 const NOMBRE_PESTANA_LOGS_PRUEBAS = "logs_envios_pruebas";
+/** Marcador: debe verse al abrir /exec?action=ping en el navegador. */
+const EIEL_BUILD_PDF = "logs-split-20260806";
 
 /** Pestaña de envíos: producción vs pruebas. */
 function pestanaEnvios_(esPrueba) {
@@ -32,9 +34,36 @@ function pestanaEnvios_(esPrueba) {
 /** Detecta modo prueba (flag del portal o municipio con «PRUEBAS»). */
 function esEnvioPrueba_(info) {
   info = info || {};
-  if (info.is_test === true || info.is_test === "true") return true;
+  var flag = info.is_test;
+  if (flag === true || flag === "true" || flag === 1 || flag === "1") return true;
   var muni = String(info.muni || info.municipio || "");
   return muni.indexOf("PRUEBAS") !== -1;
+}
+
+/**
+ * Diagnóstico sin F12: abrir en el navegador
+ *   …/exec?action=ping
+ * Debe mostrar eiel_build = logs-split-20260806 y logs_split = true.
+ */
+function doGet(e) {
+  var p = (e && e.parameter) || {};
+  var action = String(p.action || "ping").toLowerCase();
+  var body = {
+    status: "success",
+    service: "pdf",
+    eiel_build: EIEL_BUILD_PDF,
+    logs_split: true,
+    pestanas: {
+      prod: NOMBRE_PESTANA_LOGS,
+      pruebas: NOMBRE_PESTANA_LOGS_PRUEBAS
+    },
+    action: action,
+    message:
+      "PDF OK. Si ves este JSON, esta URL /exec tiene el código de pestañas _pruebas."
+  };
+  return ContentService.createTextOutput(JSON.stringify(body, null, 2)).setMimeType(
+    ContentService.MimeType.JSON
+  );
 }
 
 /**
@@ -318,6 +347,19 @@ function doPost(e) {
     result.message = "PDF generado y enviado.";
     result.downloadUrl = pdfFile.getUrl();
     result.id_registro = registro.id;
+    result.is_test = !!ctx.is_test;
+    result.log_pestana = (registro && registro.pestana) || pestanaEnvios_(!!ctx.is_test);
+    result.eiel_build = EIEL_BUILD_PDF;
+    console.log(
+      "[EIEL PDF] build=" +
+        EIEL_BUILD_PDF +
+        " is_test=" +
+        !!ctx.is_test +
+        " log_pestana=" +
+        result.log_pestana +
+        " id=" +
+        registro.id
+    );
 
   } catch (error) {
       console.error("ERROR CRÍTICO: " + error.toString());
