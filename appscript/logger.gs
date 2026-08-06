@@ -14,6 +14,8 @@
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM";
 const NOMBRE_PESTANA_ACCESOS = "logs_acceso";
 const NOMBRE_PESTANA_ACCESOS_PRUEBAS = "logs_acceso_pruebas";
+/** Marcador de despliegue: debe verse en la respuesta JSON (eiel_build). */
+const EIEL_BUILD_LOGGER = "logs-split-20260806";
 
 function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
@@ -24,7 +26,8 @@ function jsonOut_(obj) {
 /** Acceso de prueba: flag del portal o prefijo (PRUEBAS) en municipio. */
 function esAccesoPrueba_(data) {
   data = data || {};
-  if (data.is_test === true || data.is_test === "true") return true;
+  var flag = data.is_test;
+  if (flag === true || flag === "true" || flag === 1 || flag === "1") return true;
   return String(data.municipio || "").indexOf("PRUEBAS") !== -1;
 }
 
@@ -110,6 +113,17 @@ function handleLoggerPost_(e) {
     result.message = esPrueba
       ? "Acceso de prueba registrado."
       : "Acceso registrado.";
+    result.is_test = esPrueba;
+    result.log_pestana = pestana;
+    result.eiel_build = EIEL_BUILD_LOGGER;
+    Logger.log(
+      "[EIEL LOGGER] build=" +
+        EIEL_BUILD_LOGGER +
+        " is_test=" +
+        esPrueba +
+        " log_pestana=" +
+        pestana
+    );
   } catch (error) {
     result.status = "error";
     result.message = error.toString();

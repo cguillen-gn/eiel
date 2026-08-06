@@ -23,6 +23,8 @@ const EMAIL_FIJO_DESTINO = "eiel@geonet.es";
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM"; 
 const NOMBRE_PESTANA_LOGS = "logs_envios";
 const NOMBRE_PESTANA_LOGS_PRUEBAS = "logs_envios_pruebas";
+/** Marcador de despliegue: debe verse en la respuesta JSON del PDF (eiel_build). */
+const EIEL_BUILD_PDF = "logs-split-20260806";
 
 /** Pestaña de envíos: producción vs pruebas. */
 function pestanaEnvios_(esPrueba) {
@@ -32,7 +34,8 @@ function pestanaEnvios_(esPrueba) {
 /** Detecta modo prueba (flag del portal o municipio con «PRUEBAS»). */
 function esEnvioPrueba_(info) {
   info = info || {};
-  if (info.is_test === true || info.is_test === "true") return true;
+  var flag = info.is_test;
+  if (flag === true || flag === "true" || flag === 1 || flag === "1") return true;
   var muni = String(info.muni || info.municipio || "");
   return muni.indexOf("PRUEBAS") !== -1;
 }
@@ -93,6 +96,8 @@ function doPost(e) {
     const isTestMode =
       data.is_test === true ||
       data.is_test === "true" ||
+      data.is_test === 1 ||
+      data.is_test === "1" ||
       String(data.municipio_nombre || data.muni_display || "").indexOf("PRUEBAS") !== -1;
 
     ctx.codigo = String(municipioCodigoEarly).slice(-3);
@@ -318,6 +323,19 @@ function doPost(e) {
     result.message = "PDF generado y enviado.";
     result.downloadUrl = pdfFile.getUrl();
     result.id_registro = registro.id;
+    result.is_test = !!ctx.is_test;
+    result.log_pestana = (registro && registro.pestana) || pestanaEnvios_(!!ctx.is_test);
+    result.eiel_build = EIEL_BUILD_PDF;
+    console.log(
+      "[EIEL PDF] build=" +
+        EIEL_BUILD_PDF +
+        " is_test=" +
+        !!ctx.is_test +
+        " log_pestana=" +
+        result.log_pestana +
+        " id=" +
+        registro.id
+    );
 
   } catch (error) {
       console.error("ERROR CRÍTICO: " + error.toString());

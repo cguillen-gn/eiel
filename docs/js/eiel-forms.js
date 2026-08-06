@@ -1345,6 +1345,24 @@
                 throw userFacingSendError(new Error(detalle));
             }
 
+            if (result && result.eiel_build) {
+                console.info(
+                    "[EIEL] PDF OK build=" +
+                        result.eiel_build +
+                        " is_test=" +
+                        result.is_test +
+                        " log_pestana=" +
+                        result.log_pestana
+                );
+            } else {
+                console.warn(
+                    "[EIEL] PDF respondió OK pero sin eiel_build/log_pestana. " +
+                        "El Web App de generar-pdf.gs NO tiene el código de pestañas _pruebas. " +
+                        "Pegue appscript/generar-pdf.gs y haga Implementar → Nueva versión " +
+                        "(sobre la misma URL /exec que usa el portal)."
+                );
+            }
+
             return true;
         } finally {
             clearSubmitTimer();
