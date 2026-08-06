@@ -21,7 +21,21 @@ const EMAIL_FIJO_DESTINO = "eiel@geonet.es";
 
 // --- CONFIGURACIÓN DE LOGS ---
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM"; 
-const NOMBRE_PESTANA_LOGS = "logs_envios"; 
+const NOMBRE_PESTANA_LOGS = "logs_envios";
+const NOMBRE_PESTANA_LOGS_PRUEBAS = "logs_envios_pruebas";
+
+/** Pestaña de envíos: producción vs pruebas. */
+function pestanaEnvios_(esPrueba) {
+  return esPrueba ? NOMBRE_PESTANA_LOGS_PRUEBAS : NOMBRE_PESTANA_LOGS;
+}
+
+/** Detecta modo prueba (flag del portal o municipio con «PRUEBAS»). */
+function esEnvioPrueba_(info) {
+  info = info || {};
+  if (info.is_test === true || info.is_test === "true") return true;
+  var muni = String(info.muni || info.municipio || "");
+  return muni.indexOf("PRUEBAS") !== -1;
+}
 
 /**
  * Punto de entrada para las peticiones POST desde el cliente.
@@ -51,7 +65,8 @@ function doPost(e) {
     tipo: "",
     id_envio: "",
     id_registro: "",
-    usuario: ""
+    usuario: "",
+    is_test: false
   };
 
   try {
@@ -75,13 +90,17 @@ function doPost(e) {
 
     const TIPO_FORMULARIO = (data.tipo_formulario || data.tipo_ficha || "agua").toLowerCase();
 
-    const isTestMode = data.is_test === true || data.is_test === "true";
+    const isTestMode =
+      data.is_test === true ||
+      data.is_test === "true" ||
+      String(data.municipio_nombre || data.muni_display || "").indexOf("PRUEBAS") !== -1;
 
     ctx.codigo = String(municipioCodigoEarly).slice(-3);
     ctx.tipo = TIPO_FORMULARIO;
     ctx.id_envio = (data.id_envio || "").toString();
     ctx.municipio = (data.municipio_nombre || data.muni_display || "").toString();
     ctx.usuario = (data.email_contacto || "").toString();
+    ctx.is_test = isTestMode;
     
     const input = {
       is_test: isTestMode,
@@ -255,7 +274,12 @@ function doPost(e) {
     
     // Configuramos permisos y actualizamos el log
     //pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    actualizarUrlLog(registro.fila, pdfFile.getUrl(), registro.envio_started_at);
+    actualizarUrlLog(
+      registro.fila,
+      pdfFile.getUrl(),
+      registro.envio_started_at,
+      registro.pestana
+    );
 
     // Adjuntos ya verificados en Drive (assertAdjuntosPresentes_).
 
@@ -303,9 +327,19 @@ function doPost(e) {
 
       // Forzamos el aviso incluso si 'registro' no se ha definido correctamente
       try {
-        const filaAfectada = (registro && registro.fila) ? registro.fila : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(NOMBRE_PESTANA_LOGS).getLastRow();
+        const pestanaLog =
+          (registro && registro.pestana) || pestanaEnvios_(!!ctx.is_test);
+        const filaAfectada =
+          registro && registro.fila
+            ? registro.fila
+            : SpreadsheetApp.openById(ID_HOJA_LOGS).getSheetByName(pestanaLog).getLastRow();
         const startedAt = (registro && registro.envio_started_at) || "";
-        actualizarUrlLog(filaAfectada, "ERROR: " + cleanErrorText_(error), startedAt);
+        actualizarUrlLog(
+          filaAfectada,
+          "ERROR: " + cleanErrorText_(error),
+          startedAt,
+          pestanaLog
+        );
       } catch (e) {
           console.error("No se pudo actualizar el log de error: " + e.toString());
         }
@@ -320,7 +354,8 @@ function doPost(e) {
           id_registro: ctx.id_registro || (registro && registro.id) || "",
           usuario: ctx.usuario,
           mensaje_usuario: result.message,
-          detalle: error.toString() + (error.stack ? "\n" + error.stack : "")
+          detalle: error.toString() + (error.stack ? "\n" + error.stack : ""),
+          is_test: !!ctx.is_test
         });
         if (!wrote) {
           console.error(
@@ -350,12 +385,15 @@ function doPost(e) {
 function logToSheet(info) {
   if (!ID_HOJA_LOGS || ID_HOJA_LOGS.includes("PEGAR_AQUI")) return {id: "N/A", fila: 0}; 
 
+  const esPrueba = esEnvioPrueba_(info);
+  const pestana = pestanaEnvios_(esPrueba);
+
   const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
-  let sheet = ss.getSheetByName(NOMBRE_PESTANA_LOGS);
+  let sheet = ss.getSheetByName(pestana);
 
   // Si la pestaña no existe, la creamos con sus encabezados 
   if (!sheet) {
-    sheet = ss.insertSheet(NOMBRE_PESTANA_LOGS); 
+    sheet = ss.insertSheet(pestana); 
     const encabezados = [
       "ID",
       "Fecha Envío",
@@ -380,16 +418,14 @@ function logToSheet(info) {
   const filaNueva = sheet.getLastRow() + 1; 
   const anioActual = new Date().getFullYear();
 
-  // --- LÓGICA DE REINICIO ANUAL Y CONTEO ---
+  // Correlativo anual solo dentro de esta pestaña (prod y pruebas independientes)
   let contadorAnual = 0; 
   if (sheet.getLastRow() > 1) {
-    // Obtenemos todos los IDs para contar cuántos hay en el año actual (incluyendo los de test)
     const registros = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues(); 
     
     contadorAnual = registros.filter(fila => {
       const idStr = fila[0] ? fila[0].toString() : "";
-      // Contamos tanto IDs normales como IDs de prueba para mantener el correlativo
-      return idStr.startsWith(anioActual + "-") || idStr.startsWith("TEST-" + anioActual + "-");
+      return idStr.indexOf(String(anioActual) + "-") !== -1;
     }).length;
   }
 
@@ -410,13 +446,10 @@ function logToSheet(info) {
   // El nuevo número es el conteo actual del año + 1, con 5 cifras 
   const numeroCorrelativo = (contadorAnual + 1).toString().padStart(5, '0'); 
   
-  // --- DETECCIÓN DE MODO PRUEBAS ---
-  const esPrueba = info.is_test === true || info.muni.includes("PRUEBAS");
-
   // Generamos el ID base (Ejem: 2026-027-AG-00001)
   let idUnico = `${anioActual}-${info.codigo}-${prefijoForm}-${numeroCorrelativo}`; 
 
-  // Si detectamos que es una prueba, añadimos el prefijo "TEST-" para que resalte visualmente
+  // Prefijo TEST- en pruebas (también van a pestaña aparte)
   if (esPrueba) {
     idUnico = "TEST-" + idUnico;
   }
@@ -437,7 +470,13 @@ function logToSheet(info) {
     ""                  // L: Duración (s) — se completa al terminar
   ]); 
 
-  return { id: idUnico, fila: filaNueva, envio_started_at: info.envio_started_at || "" }; 
+  return {
+    id: idUnico,
+    fila: filaNueva,
+    envio_started_at: info.envio_started_at || "",
+    is_test: esPrueba,
+    pestana: pestana
+  }; 
 }
 
 /**
@@ -463,11 +502,16 @@ function ensureDuracionHeader_(sheet) {
 
 /**
  * Actualiza el enlace PDF y, si hay marca de inicio, la duración del envío.
+ * @param {number} fila
+ * @param {string} url
+ * @param {string} [envioStartedAt]
+ * @param {string} [pestana] - logs_envios | logs_envios_pruebas
  */
-function actualizarUrlLog(fila, url, envioStartedAt) {
+function actualizarUrlLog(fila, url, envioStartedAt, pestana) {
+  var nombrePestana = pestana || NOMBRE_PESTANA_LOGS;
   try {
     const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
-    const sheet = ss.getSheetByName(NOMBRE_PESTANA_LOGS);
+    const sheet = ss.getSheetByName(nombrePestana);
     
     if (sheet && fila > 0) {
       sheet.getRange(fila, 10).setValue(url);
@@ -478,7 +522,7 @@ function actualizarUrlLog(fila, url, envioStartedAt) {
     
     try {
       const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
-      const sheet = ss.getSheetByName(NOMBRE_PESTANA_LOGS);
+      const sheet = ss.getSheetByName(nombrePestana);
       sheet.getRange(fila, 10).setValue("ERROR EN actualizarUrlLog: " + e.toString());
       escribirDuracionLog_(sheet, fila, envioStartedAt);
     } catch (errorInterno) {

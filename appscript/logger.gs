@@ -1,5 +1,5 @@
 // ====================================================================
-// SCRIPT LOGGER DE ACCESOS (logs_acceso)
+// SCRIPT LOGGER DE ACCESOS (logs_acceso / logs_acceso_pruebas)
 // ====================================================================
 // Pegar en el proyecto Apps Script de URL_LOGGER y redesplegar
 // una NUEVA VERSIÓN (Yo + Cualquiera).
@@ -7,16 +7,29 @@
 // Contrato: { status: "success"|"error", message: string }
 // El front solo hace console.warn si falla; no bloquea al usuario.
 //
+// Si is_test (o municipio con «PRUEBAS») → pestaña logs_acceso_pruebas.
 // Si tu hoja usa otro ID o nombre de pestaña, cámbialos abajo.
 // ====================================================================
 
 const ID_HOJA_LOGS = "1ZObP1RYX0aG_4wPHdREiYMAzdaRHbr5o9h0HYAp92wM";
 const NOMBRE_PESTANA_ACCESOS = "logs_acceso";
+const NOMBRE_PESTANA_ACCESOS_PRUEBAS = "logs_acceso_pruebas";
 
 function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(
     ContentService.MimeType.JSON
   );
+}
+
+/** Acceso de prueba: flag del portal o prefijo (PRUEBAS) en municipio. */
+function esAccesoPrueba_(data) {
+  data = data || {};
+  if (data.is_test === true || data.is_test === "true") return true;
+  return String(data.municipio || "").indexOf("PRUEBAS") !== -1;
+}
+
+function pestanaAccesos_(esPrueba) {
+  return esPrueba ? NOMBRE_PESTANA_ACCESOS_PRUEBAS : NOMBRE_PESTANA_ACCESOS;
 }
 
 function doPost(e) {
@@ -68,11 +81,14 @@ function handleLoggerPost_(e) {
       data.ua || ""
     ];
 
+    const esPrueba = esAccesoPrueba_(data);
+    const pestana = pestanaAccesos_(esPrueba);
+
     const ss = SpreadsheetApp.openById(ID_HOJA_LOGS);
-    let sheet = ss.getSheetByName(NOMBRE_PESTANA_ACCESOS);
+    let sheet = ss.getSheetByName(pestana);
 
     if (!sheet) {
-      sheet = ss.insertSheet(NOMBRE_PESTANA_ACCESOS);
+      sheet = ss.insertSheet(pestana);
       sheet.appendRow([
         "Fecha",
         "Municipio",
@@ -91,7 +107,9 @@ function handleLoggerPost_(e) {
     sheet.appendRow(fila);
 
     result.status = "success";
-    result.message = "Acceso registrado.";
+    result.message = esPrueba
+      ? "Acceso de prueba registrado."
+      : "Acceso registrado.";
   } catch (error) {
     result.status = "error";
     result.message = error.toString();
