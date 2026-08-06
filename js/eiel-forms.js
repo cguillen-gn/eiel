@@ -48,6 +48,16 @@
         return false;
     }
 
+    var EIEL_CONTACTO_AYUDA_JS = "eiel@geonet.es";
+    var MSG_USUARIO_SESION =
+        "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo. Si necesita ayuda, escriba a " +
+        EIEL_CONTACTO_AYUDA_JS +
+        ".";
+    var MSG_USUARIO_ENVIO =
+        "Ha ocurrido un problema al completar el envío. Espere unos segundos e inténtelo de nuevo. Si el problema continúa, escriba a " +
+        EIEL_CONTACTO_AYUDA_JS +
+        " indicando municipio y formulario.";
+
     /** Prefiere un error con mensaje de negocio frente a fallo opaco de red/HTML. */
     function isOpaqueUploadError(err) {
         const s = cleanErrorText(err && err.message != null ? err.message : err).toLowerCase();
@@ -62,10 +72,28 @@
         );
     }
 
-    /** Texto para mostrar al técnico tras un fallo de envío/subida. */
+    /**
+     * Texto para el técnico tras fallo de subida/PDF.
+     * Detalle técnico → console; al usuario solo genérico (o sesión).
+     */
     function formatUserError(err) {
-        const msg = cleanErrorText(err && err.message != null ? err.message : err);
-        return "❌ " + msg;
+        const raw = cleanErrorText(err && err.message != null ? err.message : err);
+        console.error("[EIEL] Error de envío (detalle):", raw);
+        const lower = raw.toLowerCase();
+        if (lower.indexOf("sesión") !== -1) {
+            return "❌ " + MSG_USUARIO_SESION;
+        }
+        return "❌ " + MSG_USUARIO_ENVIO;
+    }
+
+    /** Error lanzable en subida/PDF: sesión o genérico (detalle ya en console). */
+    function userFacingSendError(err) {
+        const raw = cleanErrorText(err && err.message != null ? err.message : err);
+        console.error("[EIEL] Fallo técnico:", raw);
+        if (raw.toLowerCase().indexOf("sesión") !== -1) {
+            return new Error(MSG_USUARIO_SESION);
+        }
+        return new Error(MSG_USUARIO_ENVIO);
     }
 
     /**
@@ -520,10 +548,17 @@
             try {
                 result = JSON.parse(raw);
             } catch (parseErr) {
-                throw new Error(
-                    'Respuesta no válida del servidor al subir "' +
-                        file.name +
-                        '". Compruebe el despliegue de Apps Script.'
+                console.error(
+                    "[EIEL] Respuesta no JSON al subir:",
+                    file.name,
+                    (raw || "").slice(0, 200)
+                );
+                throw userFacingSendError(
+                    new Error(
+                        'Respuesta no válida del servidor al subir "' +
+                            file.name +
+                            '". Compruebe el despliegue de Apps Script.'
+                    )
                 );
             }
 
@@ -533,8 +568,8 @@
                         "HTTP " + response.status ||
                         "Error desconocido"
                 );
-                throw new Error(
-                    'No se pudo subir "' + file.name + '": ' + detalle
+                throw userFacingSendError(
+                    new Error('No se pudo subir "' + file.name + '": ' + detalle)
                 );
             }
 
@@ -1057,7 +1092,7 @@
                 console.error("[EIEL]", msg);
                 if (throwOnFail) {
                     UIProgress.hide();
-                    throw new Error(msg);
+                    throw userFacingSendError(new Error(msg));
                 }
             }
         }
@@ -1162,7 +1197,7 @@
                 }
                 if (throwOnFail) {
                     abortAll = true;
-                    fatalError = new Error(msg);
+                    fatalError = userFacingSendError(new Error(msg));
                     return;
                 }
                 console.error(options.logPrefix || "Fallo en subida individual:", errFinal);
@@ -1304,7 +1339,7 @@
                         "HTTP " + response.status ||
                         "Error desconocido"
                 );
-                throw new Error(detalle);
+                throw userFacingSendError(new Error(detalle));
             }
 
             return true;

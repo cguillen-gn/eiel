@@ -463,8 +463,8 @@ function cleanErrorTextAdjuntos_(err) {
 }
 
 /**
- * Mensaje para el técnico: qué ha pasado + qué hacer + contacto.
- * Sin detalles internos del sistema de almacenamiento.
+ * Mensaje para el técnico: genérico (detalle técnico → logs_errores / Logger).
+ * Excepción: sesión caducada (el técnico puede actuar).
  */
 function friendlyUserMessageAdjuntos_(err) {
   var raw = cleanErrorTextAdjuntos_(err);
@@ -475,35 +475,8 @@ function friendlyUserMessageAdjuntos_(err) {
       "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
     );
   }
-  if (lower.indexOf("supera el límite") !== -1 || lower.indexOf("35 mb") !== -1) {
-    return withAyudaAdjuntos_(
-      "El archivo supera el tamaño máximo permitido (35 MB). Reduzca el tamaño o divídalo e inténtelo de nuevo."
-    );
-  }
-  if (
-    lower.indexOf("falta ") === 0 ||
-    lower.indexOf("no hay datos") !== -1 ||
-    lower.indexOf("auth-token") !== -1
-  ) {
-    return withAyudaAdjuntos_(
-      "Faltan datos necesarios para la subida. Recargue la página, vuelva a iniciar sesión e inténtelo de nuevo."
-    );
-  }
-  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
-    return withAyudaAdjuntos_(
-      "No se ha podido guardar el archivo por un problema del sistema. Inténtelo de nuevo más tarde."
-    );
-  }
-  if (
-    lower.indexOf("quota") !== -1 ||
-    (lower.indexOf("limit") !== -1 && lower.indexOf("archivo") === -1)
-  ) {
-    return withAyudaAdjuntos_(
-      "El sistema está saturado temporalmente. Espere unos minutos e inténtelo de nuevo."
-    );
-  }
   return withAyudaAdjuntos_(
-    "No se ha podido subir el archivo. Inténtelo de nuevo en unos minutos."
+    "Ha ocurrido un problema al completar el envío. Espere unos segundos e inténtelo de nuevo. Si el problema continúa, escriba a eiel@geonet.es indicando municipio y formulario."
   );
 }
 
