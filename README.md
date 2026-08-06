@@ -27,6 +27,8 @@ La separación entre **Código Fuente** (Raíz) y **Distribución** (`docs/`) ga
 
 ```text
 📦 raiz-del-proyecto
+ ┣ 📂 appscript          # Scripts Google (adjuntos, PDF, login legacy, logger)
+ ┣ 📂 workers            # Cloudflare Workers (login rápido — ver workers/login/README.md)
  ┣ 📂 assets             # Recursos visuales originales
  ┣ 📂 css                # Estilos originales (style.css fuente)
  ┣ 📂 data               # Base de datos local (municipios.tsv)

@@ -1,6 +1,10 @@
 // ====================================================================
-// SCRIPT DE LOGIN
+// SCRIPT DE LOGIN (Apps Script) — LEGACY
 // ====================================================================
+// Preferir el Cloudflare Worker en workers/login/ (primer acceso rápido).
+// Este script se mantiene como rollback: si URL_LOGIN_SCRIPT apunta aquí,
+// el portal sigue funcionando como hasta ahora.
+//
 // Restaurado tal como funcionaba antes de los tokens.
 // Tras pegar: Implementar → Nueva versión (misma app web, no crear otra).
 // ====================================================================
