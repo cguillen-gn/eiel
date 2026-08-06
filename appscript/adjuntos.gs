@@ -159,13 +159,42 @@ function handleAdjuntosPost_(e) {
     }
 
     if (!idEnvio) throw new Error("Falta id_envio.");
-    if (!fileName) throw new Error("Falta el nombre del archivo.");
 
     // Comprobación ligera (sin base64): ¿el fichero ya está tras un 404 opaco?
     if (String(data.action || "").toLowerCase() === "check") {
+      if (!fileName) throw new Error("Falta el nombre del archivo.");
       return jsonOut_(checkAdjuntoExists_(munCode, idEnvio, seccion, fileName));
     }
 
+    // El cliente reporta un fallo definitivo (p. ej. tras GET opaco + check fallido).
+    // doGet «GET inesperado» no escribe logs_errores a propósito (es reintentable).
+    if (String(data.action || "").toLowerCase() === "client_log") {
+      var clientMsg = friendlyUserMessageAdjuntos_(
+        data.mensaje_usuario || data.message || "Error de subida (cliente)"
+      );
+      var wroteClient = false;
+      if (typeof logErrorToSheet_ === "function") {
+        wroteClient = logErrorToSheet_({
+          origen: "adjuntos",
+          codigo: munCode,
+          tipo: tipo,
+          id_envio: idEnvio,
+          usuario: usuario,
+          archivo: fileName || "(sin nombre)",
+          mensaje_usuario: clientMsg,
+          detalle: String(data.detalle || data.detail || "").substring(0, 1500),
+          is_test: isTest
+        });
+      }
+      return jsonOut_({
+        status: wroteClient ? "success" : "error",
+        message: wroteClient
+          ? "Error registrado en logs_errores."
+          : "No se pudo escribir en logs_errores."
+      });
+    }
+
+    if (!fileName) throw new Error("Falta el nombre del archivo.");
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
