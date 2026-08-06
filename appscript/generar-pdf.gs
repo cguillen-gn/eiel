@@ -39,7 +39,7 @@ function doPost(e) {
       status: "error",
       success: false, 
       message:
-        "El servidor está ocupado en este momento. Espere unos segundos e inténtelo de nuevo. Si necesita ayuda, escriba a eiel@geonet.es."
+        "Ha ocurrido un problema al completar el envío. Espere unos segundos e inténtelo de nuevo. Si el problema continúa, escriba a eiel@geonet.es indicando municipio y formulario."
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -796,76 +796,20 @@ function withAyuda_(msg) {
 }
 
 /**
- * Mensaje para el técnico: qué ha pasado + qué hacer + contacto.
- * Sin detalles internos (Drive, hojas, etc.). El detalle crudo va a Logger.
+ * Mensaje para el técnico: genérico (detalle → Logger / logs_errores).
+ * Excepción: sesión caducada (el técnico puede actuar).
  */
 function friendlyUserMessage_(err) {
   var raw = cleanErrorText_(err);
   var lower = raw.toLowerCase();
 
-  if (
-    lower.indexOf("faltan archivos adjuntos") !== -1 ||
-    lower.indexOf("no se han encontrado los archivos adjuntos") !== -1
-  ) {
-    return withAyuda_(
-      "No se han podido comprobar todos los archivos adjuntos del envío. Vuelva a subirlos e inténtelo de nuevo."
-    );
-  }
   if (lower.indexOf("sesión") !== -1) {
     return withAyuda_(
       "Su sesión no es válida o ha caducado. Cierre sesión, vuelva a entrar e inténtelo de nuevo."
     );
   }
-  if (lower.indexOf("servidor temporalmente") !== -1) {
-    return withAyuda_(
-      "El servidor está ocupado en este momento. Espere unos segundos e inténtelo de nuevo."
-    );
-  }
-  if (lower.indexOf("falta ") === 0 || lower.indexOf("no se recibieron") !== -1) {
-    return withAyuda_(
-      "Faltan datos necesarios para el envío. Revise el formulario e inténtelo de nuevo."
-    );
-  }
-  if (lower.indexOf("access denied") !== -1 || lower.indexOf("acceso denegado") !== -1) {
-    return withAyuda_(
-      "No se ha podido completar el envío por un problema de permisos del sistema. Inténtelo de nuevo más tarde."
-    );
-  }
-  if (
-    lower.indexOf("gmail") !== -1 ||
-    lower.indexOf("mail service") !== -1 ||
-    lower.indexOf("sendemail") !== -1
-  ) {
-    return withAyuda_(
-      "No se ha podido enviar el justificante por correo. Compruebe que el email de contacto es correcto e inténtelo de nuevo."
-    );
-  }
-  if (lower.indexOf("spreadsheet") !== -1 || lower.indexOf("hoja de cálculo") !== -1) {
-    return withAyuda_(
-      "No se ha podido registrar el envío. Inténtelo de nuevo en unos minutos."
-    );
-  }
-  if (
-    lower.indexOf("quota") !== -1 ||
-    lower.indexOf("rate limit") !== -1 ||
-    lower.indexOf("limite de") !== -1 ||
-    lower.indexOf("límite de") !== -1
-  ) {
-    return withAyuda_(
-      "El sistema está saturado temporalmente. Espere unos minutos e inténtelo de nuevo."
-    );
-  }
-  if (
-    lower.indexOf("timeout") !== -1 ||
-    lower.indexOf("timed out") !== -1 ||
-    lower.indexOf("excedido el tiempo") !== -1
-  ) {
-    return withAyuda_(
-      "La operación ha tardado demasiado. Inténtelo de nuevo; si el envío incluye muchos adjuntos, repártalo en dos envíos (dos tandas) e indique en observaciones que es continuación del anterior."
-    );
-  }
   return withAyuda_(
-    "No se ha podido completar el justificante. Inténtelo de nuevo en unos minutos."
+    "Ha ocurrido un problema al completar el envío. Espere unos segundos e inténtelo de nuevo. Si el problema continúa, escriba a eiel@geonet.es indicando municipio y formulario."
   );
 }
 

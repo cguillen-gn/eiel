@@ -45,13 +45,15 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 
 - Validación, límite 35 MB, JSON legible
 - `setSharing` no bloqueante
-- Mensajes de error en español para el técnico
+- Mensajes al técnico: **genéricos** (reintentar / contactar); detalle en
+  `logs_errores` / Logger. Excepción: sesión caducada.
 - Front sin `no-cors`; exige `status === "success"`
 
 ## C — PDF (`generar-pdf.gs`)
 
 - JSON `{ status, success, message }`
-- Mensajes de error amigables (Gmail, cuota, sesión, adjuntos…)
+- Mensajes al técnico: **genéricos** (reintentar / contactar `eiel@geonet.es`);
+  detalle técnico en Logger / `logs_errores`. Excepción: sesión caducada.
 - Front sin `no-cors`; interpreta `status` o `success`
 - **Verificación de adjuntos en Drive** antes de generar PDF/email:
   si hay nombres declarados (`lista_archivos` array o `archivos_adjuntos`
@@ -71,8 +73,8 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 2. Publicar también `docs/js/eiel-forms.js` (envía `lista_archivos` como
    array JSON).
 3. Probar envío con adjunto (idealmente nombre con coma) → OK.
-4. Prueba negativa (opcional): carpeta de adjuntos vacía → mensaje de
-   adjuntos faltantes.
+4. Prueba negativa (opcional): carpeta de adjuntos vacía → mensaje genérico
+   de error de envío (detalle en `logs_errores`).
 
 ## E — Logger de accesos (`logger.gs`)
 
