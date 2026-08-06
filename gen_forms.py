@@ -458,7 +458,8 @@ def main():
                 municipios_lista=json.dumps(MUNICIPIOS_LISTA_UI, ensure_ascii=False),
                 # Pasamos el mapa de flags al JavaScript del Index
                 config_flags_json=json.dumps(config_municipios_js, ensure_ascii=False), 
-                url_login_api=URL_LOGIN_SCRIPT
+                url_login_api=URL_LOGIN_SCRIPT,
+                url_logger=URL_LOGGER
             ))
             
         print("\n Proceso finalizado.")

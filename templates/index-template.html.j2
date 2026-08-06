@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
     <title>EIEL {{ fase_actual }} - Acceso</title>
-    <link rel="stylesheet" href="css/style.css"> 
+    <link rel="stylesheet" href="css/style.css?v=20260806a"> 
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
@@ -36,28 +36,36 @@
     <div id="viewMenu" class="form-section hidden">
         <div class="btn-grid">
             <a id="lnkObras" href="#" class="btn-menu b-obras">
-                <i data-lucide="construction" class="btn-icon"></i> Obras
+                <i data-lucide="construction" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Obras</span></span>
             </a>
             <a id="lnkEquipamientos" href="#" class="btn-menu b-equipamientos">
-                <i data-lucide="building-2" class="btn-icon"></i> Equipamientos
+                <i data-lucide="building-2" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Equipamientos</span></span>
             </a>
             <a id="lnkCementerios" href="#" class="btn-menu b-cementerios hidden">
-                <i data-lucide="rose" class="btn-icon"></i> Cementerios
+                <i data-lucide="rose" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Cementerios</span></span>
             </a>
             <a id="lnkResiduos" href="#" class="btn-menu b-residuos">
-                <i data-lucide="recycle" class="btn-icon"></i> Residuos
+                <i data-lucide="recycle" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Residuos</span></span>
             </a>
             <a id="lnkAgua" href="#" class="btn-menu b-agua">
-                <i data-lucide="droplet" class="btn-icon"></i> Abastecimiento de agua
+                <i data-lucide="droplet" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Abastecimiento de agua</span></span>
             </a>
             <a id="lnkSaneamiento" href="#" class="btn-menu b-saneamiento hidden">
-                <i data-lucide="test-tube" class="btn-icon"></i> Saneamiento y depuración
+                <i data-lucide="test-tube" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Saneamiento y depuración</span></span>
             </a>
             <a id="lnkAlumbrado" href="#" class="btn-menu b-alumbrado hidden">
-                <i data-lucide="lightbulb" class="btn-icon"></i> Alumbrado Público
+                <i data-lucide="lightbulb" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Alumbrado Público</span></span>
             </a>
             <a id="lnkViario" href="#" class="btn-menu b-viario hidden">
-                <i data-lucide="milestone" class="btn-icon"></i> Viario
+                <i data-lucide="milestone" class="btn-icon"></i>
+                <span class="btn-menu-body"><span class="btn-menu-label">Viario</span></span>
             </a>
         </div>
 
@@ -85,7 +93,11 @@
      */
     const MUNICIPIOS = {{ municipios_lista | safe }}; 
     const URL_LOGIN_API = "{{ url_login_api }}";
-    const MUNICIPIOS_FLAGS = {{ config_flags_json | safe }}; 
+    const URL_LOGGER = "{{ url_logger }}";
+    const FASE_ACTUAL = "{{ fase_actual }}";
+    const MUNICIPIOS_FLAGS = {{ config_flags_json | safe }};
+    /** Experimento UX: estados desde logs_envios. Poner false para desactivar. */
+    const MENU_ESTADOS_ENVIO = true;
 
     /**
      * [2] MAPEO DE ELEMENTOS DEL DOM
@@ -243,6 +255,100 @@
         ui.login.classList.add('hidden');
         ui.menu.classList.remove('hidden');
         ui.error.style.display = 'none';
+
+        loadEstadosEnvio(code, isTest);
+    }
+
+    function formatFechaCorta(iso) {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("es-ES", { day: "numeric", month: "short" })
+            .replace(".", "");
+    }
+
+    function clearMenuEstados() {
+        Object.values(ui.links).forEach((link) => {
+            if (!link) return;
+            link.classList.remove("btn-menu--enviado");
+            const body = link.querySelector(".btn-menu-body");
+            if (!body) return;
+            const st = body.querySelector(".btn-menu-status");
+            if (st) st.remove();
+        });
+    }
+
+    function applyMenuEstados(envios) {
+        clearMenuEstados();
+        if (!envios) return;
+        Object.keys(ui.links).forEach((tipo) => {
+            const link = ui.links[tipo];
+            const info = envios[tipo];
+            if (!link || !info || !info.fecha) return;
+            const body = link.querySelector(".btn-menu-body");
+            if (!body) return;
+            const fechaCorta = formatFechaCorta(info.fecha);
+            const texto = fechaCorta
+                ? `Enviado (${fechaCorta}) · pendiente revisar por Geonet`
+                : "Enviado · pendiente revisar por Geonet";
+            let st = body.querySelector(".btn-menu-status");
+            if (!st) {
+                st = document.createElement("span");
+                st.className = "btn-menu-status";
+                body.appendChild(st);
+            }
+            st.textContent = texto;
+            link.classList.add("btn-menu--enviado");
+        });
+    }
+
+    /**
+     * Consulta logs_envios vía Logger (sin regenerar HTML).
+     * Si falla (cold start, script antiguo…), el menú queda como siempre.
+     */
+    async function loadEstadosEnvio(code, isTest) {
+        if (!MENU_ESTADOS_ENVIO || !URL_LOGGER || URL_LOGGER.indexOf("http") !== 0) {
+            return;
+        }
+        clearMenuEstados();
+        const cacheKey = `eiel_estados_${FASE_ACTUAL}_${code}_${isTest ? "t" : "r"}`;
+        try {
+            const cached = sessionStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && parsed.ts && Date.now() - parsed.ts < 120000 && parsed.envios) {
+                    applyMenuEstados(parsed.envios);
+                }
+            }
+        } catch (e) { /* ignore */ }
+
+        const qs = new URLSearchParams({
+            action: "estados_envio",
+            codigo: code,
+            fase: String(FASE_ACTUAL),
+            incluir_test: isTest ? "1" : "0"
+        });
+        try {
+            const res = await fetch(`${URL_LOGGER}?${qs.toString()}`);
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (parseErr) {
+                console.warn("Estados envío: respuesta no JSON (¿Logger sin redesplegar?)", text.slice(0, 120));
+                return;
+            }
+            if (!data || data.status !== "success" || !data.envios) {
+                console.warn("Estados envío:", data && data.message ? data.message : data);
+                return;
+            }
+            applyMenuEstados(data.envios);
+            try {
+                sessionStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), envios: data.envios }));
+            } catch (e2) { /* ignore */ }
+        } catch (err) {
+            console.warn("Estados envío: no disponibles", err);
+        }
     }
 
     function showError(msg) {
