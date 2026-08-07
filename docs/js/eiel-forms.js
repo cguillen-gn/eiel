@@ -694,7 +694,7 @@
 
         /**
          * Ruta rápida: Worker recibe bytes y los guarda en Drive (Drive API).
-         * Sin R2 ni import_url de Apps Script.
+         * Tras el PUT exige fileId y confirma con action=check (Apps Script).
          */
         async uploadFileViaWorker(
             ready,
@@ -759,7 +759,12 @@
             } catch (e) {
                 putResult = null;
             }
-            if (!putResp.ok || !putResult || putResult.status !== "success") {
+            if (
+                !putResp.ok ||
+                !putResult ||
+                putResult.status !== "success" ||
+                !putResult.fileId
+            ) {
                 throw makeUploadError(
                     'No se pudo subir "' +
                         fileName +
@@ -771,8 +776,27 @@
                     {
                         retryable: true,
                         technicalMessage:
-                            (putResult && putResult.message) || putRaw.slice(0, 200)
+                            (putResult && putResult.message) ||
+                            putRaw.slice(0, 200)
                     }
+                );
+            }
+
+            // No confiar solo en el JSON del Worker: confirmar en Drive.
+            const confirmado = await this.pollCheckExists(
+                fileName,
+                tipoFicha,
+                muniCode,
+                sec,
+                idEnvio,
+                { attempts: 4, firstDelayMs: 600, gapMs: 1200 }
+            );
+            if (!confirmado) {
+                throw makeUploadError(
+                    'Worker dijo OK pero "' +
+                        fileName +
+                        '" no aparece aún en Drive. Reintento por Apps Script.',
+                    { retryable: true, technicalMessage: "missing_after_worker" }
                 );
             }
 
@@ -1266,6 +1290,26 @@
             const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
             return ai - bi;
         });
+        // Worker→Drive: PDF grandes en paralelo saturan el Worker (timeouts /
+        // 2 de N en Drive). Con ficheros ≥5 MB bajamos la cola.
+        if (getAdjuntosWorkerUrl() && options.concurrency == null) {
+            let maxBytes = 0;
+            ordered.forEach(function (t) {
+                const sz = (t.file && t.file.size) || 0;
+                if (sz > maxBytes) maxBytes = sz;
+            });
+            if (maxBytes >= 8 * 1024 * 1024) {
+                concurrency = 1;
+                console.info(
+                    "[EIEL] Cola en serie (Worker + fichero ≥8 MB) para no perder adjuntos."
+                );
+            } else if (maxBytes >= 5 * 1024 * 1024) {
+                concurrency = Math.min(concurrency, 2);
+                console.info(
+                    "[EIEL] Cola limitada a 2 (Worker + fichero ≥5 MB)."
+                );
+            }
+        }
         const totalTareas = ordered.length;
         let completados = 0;
         let abortAll = false;
