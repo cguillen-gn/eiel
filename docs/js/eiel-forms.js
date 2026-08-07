@@ -8,6 +8,12 @@
 
     const LIMITE_BYTES = 35 * 1024 * 1024;
     const REGEX_EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    /**
+     * Apps Script UrlFetch no importa bien PDF grandes desde R2 (fallos
+     * sistemáticos ≥~8 MB → reintentos + fallback = más lento). Por encima
+     * de este umbral se usa la subida clásica base64 → Drive.
+     */
+    const WORKER_IMPORT_MAX_BYTES = 5 * 1024 * 1024;
 
     function getSessionToken() {
         return localStorage.getItem("eiel_session_token") || "";
@@ -596,7 +602,17 @@
             }
 
             const workerBase = getAdjuntosWorkerUrl();
-            if (workerBase) {
+            const useWorker =
+                !!workerBase && (ready.size || 0) < WORKER_IMPORT_MAX_BYTES;
+            if (workerBase && !useWorker) {
+                console.info(
+                    "[EIEL] Fichero ≥" +
+                        Math.round(WORKER_IMPORT_MAX_BYTES / (1024 * 1024)) +
+                        " MB → Apps Script directo (R2+import no acelera PDF grandes):",
+                    file.name
+                );
+            }
+            if (useWorker) {
                 try {
                     return await this.uploadFileViaWorker(
                         ready,
@@ -773,13 +789,13 @@
                 );
             }
 
-            // import_url: Apps Script descarga de R2 → Drive. PDFs grandes en
-            // paralelo fallan a menudo; reintentamos antes del fallback base64.
-            const importAttempts = 3;
+            // import_url: Apps Script descarga de R2 → Drive.
+            // Solo se usa para ficheros < WORKER_IMPORT_MAX_BYTES.
+            const importAttempts = 2;
             let lastImportErr = null;
             for (let ai = 0; ai < importAttempts; ai++) {
                 if (ai > 0) {
-                    const wait = 1500 * ai;
+                    const wait = 1200 * ai;
                     console.warn(
                         "[EIEL] Reintento import_url",
                         ai + 1 + "/" + importAttempts,
@@ -830,17 +846,25 @@
                         return true;
                     }
                     const detalleTech = cleanErrorText(
-                        (imported && (imported.detalle || imported.message)) ||
+                        (imported && imported.detalle) ||
+                            (imported && imported.message) ||
                             "HTTP " + importResp.status
                     );
                     const detalleUser = cleanErrorText(
                         (imported && imported.message) ||
                             "HTTP " + importResp.status
                     );
+                    if (imported && imported.detalle) {
+                        console.warn(
+                            "[EIEL] import_url detalle técnico:",
+                            fileName,
+                            imported.detalle
+                        );
+                    }
                     console.warn(
                         "[EIEL] import_url error:",
                         fileName,
-                        detalleTech
+                        detalleUser
                     );
                     lastImportErr = makeUploadError(
                         'No se pudo guardar "' +
@@ -1375,26 +1399,16 @@
             const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
             return ai - bi;
         });
-        // Con Worker R2: PDFs/ficheros grandes en paralelo saturan UrlFetch de
-        // Apps Script (import_url). Bajamos la cola automáticamente.
+        // Con Worker: solo ficheros <5 MB usan R2+import. La cola alta vale
+        // para el resto (base64). Si hay varios pequeños vía Worker, máx. 4.
         if (getAdjuntosWorkerUrl() && options.concurrency == null) {
-            let maxBytes = 0;
+            let workerish = 0;
             ordered.forEach(function (t) {
                 const sz = (t.file && t.file.size) || 0;
-                if (sz > maxBytes) maxBytes = sz;
+                if (sz > 0 && sz < WORKER_IMPORT_MAX_BYTES) workerish += 1;
             });
-            if (maxBytes >= 15 * 1024 * 1024) {
-                concurrency = 1;
-                console.info(
-                    "[EIEL] Cola de subida en serie (fichero ≥15 MB + Worker)."
-                );
-            } else if (maxBytes >= 8 * 1024 * 1024) {
-                concurrency = Math.min(concurrency, 2);
-                console.info(
-                    "[EIEL] Cola de subida limitada a 2 (fichero ≥8 MB + Worker)."
-                );
-            } else {
-                concurrency = Math.min(concurrency, 3);
+            if (workerish >= 2) {
+                concurrency = Math.min(concurrency, 4);
             }
         }
         const totalTareas = ordered.length;

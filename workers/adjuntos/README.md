@@ -80,11 +80,19 @@ localStorage.removeItem("eiel_adjuntos_worker");
 
 - Tokens firmados (30 min) para PUT/GET
 - Límite 35 MB (igual que antes)
-- Tras PUT, Apps Script importa a Drive (idempotente por nombre)
-- `import_url` reintenta UrlFetch; el cliente reintenta 3 veces y, si hay
-  PDF ≥8–15 MB, baja la cola (2 o serie) para no saturar Apps Script
+- **Ficheros ≥ 5 MB** van por Apps Script directo (base64): `UrlFetch` de
+  Apps Script no importa bien PDF grandes desde R2 y los reintentos
+  hacían el envío *más lento* que sin Worker
+- Ficheros pequeños: PUT a R2 + `import_url` (con reintento)
 - Si falla el import, fallback a subida clásica base64
 - Prefijos R2: `prod/…` y `pruebas/…`
+
+### Desactivar Worker (volver al modo Apps Script puro)
+
+```js
+localStorage.removeItem("eiel_adjuntos_worker");
+location.reload();
+```
 
 ## 5. Limpieza R2
 
