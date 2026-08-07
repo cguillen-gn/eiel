@@ -25,20 +25,66 @@ Apps Script Adjuntos queda como **fallback** si el Worker falla o no está confi
 6. **Compartir** con el email de la cuenta de servicio  
    (`…@….iam.gserviceaccount.com`) como **Editor**.
 
+### Obligatorio: cuota de Drive (error 403)
+
+Las cuentas de servicio **no tienen cuota** en «Mi unidad». Si ves:
+
+`Service Accounts do not have storage quota`
+
+**Si no eres admin de Workspace** (caso habitual): usa la **opción OAuth de usuario** más abajo.  
+No hace falta Shared Drive ni delegación de dominio.
+
+#### Opción OAuth de usuario (recomendada sin admin)
+
+El Worker sube **como tu usuario de Google** (el dueño/editor de la carpeta EIEL).
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → el mismo proyecto → **APIs y servicios → Credenciales**.
+2. **Crear credenciales → ID de cliente de OAuth**:
+   - Tipo: **Aplicación de escritorio** (Desktop).
+   - Nombre: `eiel-adjuntos-oauth`.
+   - Crear → anota **ID de cliente** y **Secreto del cliente**.
+3. Si pide pantalla de consentimiento OAuth:
+   - Tipo de usuario: **Interno** (si el proyecto es de Workspace) o Externo en modo prueba.
+   - Añade tu email como usuario de prueba si es Externo.
+   - Ámbitos: no hace falta listarlos aquí; se piden en el paso 4.
+4. Abre [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/):
+   - Click en el engranaje ⚙️ (arriba a la derecha).
+   - Marca **Use your own OAuth credentials**.
+   - Pega el **Client ID** y **Client secret** del paso 2.
+   - Cerrar.
+5. En la lista de la izquierda, busca **Drive API v3** → marca  
+   `https://www.googleapis.com/auth/drive`  
+   → **Authorize APIs**.
+6. Inicia sesión con la cuenta que **tiene la carpeta de adjuntos** (Editor/dueño).
+7. Acepta permisos → **Exchange authorization code for tokens**.
+8. Copia el **Refresh token** (no caduca mientras no lo revoques).
+9. En Cloudflare Worker → Secrets (tres secrets):
+   - `GOOGLE_OAUTH_CLIENT_ID` = el ID de cliente  
+   - `GOOGLE_OAUTH_CLIENT_SECRET` = el secreto  
+   - `GOOGLE_OAUTH_REFRESH_TOKEN` = el refresh token  
+10. Deploy. Ping debe mostrar `"auth_mode":"oauth_user"` y `"has_oauth_user":true`.
+
+La cuenta de servicio JSON **ya no es necesaria** si usáis OAuth de usuario (podéis dejarla o quitarla).
+
+#### Otras opciones (sí requieren admin / Workspace)
+
+- **Impersonación** (`GOOGLE_IMPERSONATE_USER` + delegación de dominio): hace falta admin.
+- **Shared Drive**: unidad compartida + SA como miembro; a menudo también hace falta permiso de org.
+
 ---
 
 ## 2. Desplegar el Worker
 
 ### Dashboard
-1. Workers → `eiel-adjuntos` (el que ya tengáis) → Edit code → pegar `src/index.js`.
+1. Workers → `eiel-adjuntos` → Edit code → pegar `src/index.js`.
 2. Settings → Variables:
    - `DRIVE_ROOT_FOLDER_ID` = `1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV`
-3. Secrets:
-   - `UPLOAD_SECRET` = cadena larga aleatoria
-   - `GOOGLE_SERVICE_ACCOUNT_JSON` = **contenido completo** del JSON de la clave  
-     (todo el fichero en una sola secret; las `\n` del private_key se conservan).
-4. Si teníais binding R2, podéis dejarlo; **ya no se usa**.
-5. Deploy.
+3. Secrets (camino OAuth, sin admin):
+   - `UPLOAD_SECRET`
+   - `GOOGLE_OAUTH_CLIENT_ID`
+   - `GOOGLE_OAUTH_CLIENT_SECRET`
+   - `GOOGLE_OAUTH_REFRESH_TOKEN`
+4. Deploy.
 
 ### CLI
 ```bash
@@ -59,8 +105,8 @@ Debe devolver:
 
 - `"mode":"drive_direct"`
 - `"has_secret":true`
-- `"has_service_account":true`
 - `"has_root_folder":true`
+- `"auth_mode":"oauth_user"` y `"has_oauth_user":true` (camino sin admin)
 
 ---
 

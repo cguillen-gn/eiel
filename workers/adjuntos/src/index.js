@@ -16,10 +16,13 @@
  *   DRIVE_ROOT_FOLDER_ID       — id carpeta raíz (mismo que CARPETA_RAIZ_ID)
  */
 
-const VERSION = "eiel-adjuntos-worker-drive-20260807a";
+const VERSION = "eiel-adjuntos-worker-drive-20260807c";
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 35 * 1024 * 1024;
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+/** Query común: Shared Drives + My Drive. */
+const DRIVE_SUPPORTS =
+  "supportsAllDrives=true&includeItemsFromAllDrives=true";
 
 const DEFAULT_ORIGINS = [
   "https://cguillen-gn.github.io",
@@ -31,6 +34,7 @@ const DEFAULT_ORIGINS = [
 /** Cache en memoria del isolate (access token Google). */
 let cachedToken = null;
 let cachedTokenExp = 0;
+let cachedTokenKey = "";
 
 export default {
   async fetch(request, env) {
@@ -87,6 +91,11 @@ function handlePing(url, env, cors) {
       cors
     );
   }
+  const hasOauth = Boolean(
+    env.GOOGLE_OAUTH_CLIENT_ID &&
+      env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      env.GOOGLE_OAUTH_REFRESH_TOKEN
+  );
   return json(
     {
       status: "success",
@@ -95,7 +104,17 @@ function handlePing(url, env, cors) {
       version: VERSION,
       has_secret: Boolean(env.UPLOAD_SECRET),
       has_service_account: Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON),
+      has_oauth_user: hasOauth,
       has_root_folder: Boolean(env.DRIVE_ROOT_FOLDER_ID),
+      has_impersonate: Boolean(
+        String(env.GOOGLE_IMPERSONATE_USER || "").trim()
+      ),
+      impersonate: String(env.GOOGLE_IMPERSONATE_USER || "").trim() || null,
+      auth_mode: hasOauth
+        ? "oauth_user"
+        : env.GOOGLE_SERVICE_ACCOUNT_JSON
+          ? "service_account"
+          : "none",
       max_bytes: MAX_BYTES
     },
     200,
@@ -104,12 +123,18 @@ function handlePing(url, env, cors) {
 }
 
 async function handlePresign(request, env, cors) {
-  if (!env.UPLOAD_SECRET || !env.GOOGLE_SERVICE_ACCOUNT_JSON || !env.DRIVE_ROOT_FOLDER_ID) {
+  const hasOauth = Boolean(
+    env.GOOGLE_OAUTH_CLIENT_ID &&
+      env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      env.GOOGLE_OAUTH_REFRESH_TOKEN
+  );
+  const hasSa = Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  if (!env.UPLOAD_SECRET || !env.DRIVE_ROOT_FOLDER_ID || (!hasOauth && !hasSa)) {
     return json(
       {
         status: "error",
         message:
-          "Worker mal configurado (faltan UPLOAD_SECRET, GOOGLE_SERVICE_ACCOUNT_JSON o DRIVE_ROOT_FOLDER_ID)."
+          "Worker mal configurado (faltan UPLOAD_SECRET, DRIVE_ROOT_FOLDER_ID y OAuth de usuario o cuenta de servicio)."
       },
       500,
       cors
@@ -190,7 +215,13 @@ async function handlePresign(request, env, cors) {
 }
 
 async function handlePutToDrive(request, env, cors, tokenPath) {
-  if (!env.UPLOAD_SECRET || !env.GOOGLE_SERVICE_ACCOUNT_JSON || !env.DRIVE_ROOT_FOLDER_ID) {
+  const hasOauth = Boolean(
+    env.GOOGLE_OAUTH_CLIENT_ID &&
+      env.GOOGLE_OAUTH_CLIENT_SECRET &&
+      env.GOOGLE_OAUTH_REFRESH_TOKEN
+  );
+  const hasSa = Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  if (!env.UPLOAD_SECRET || !env.DRIVE_ROOT_FOLDER_ID || (!hasOauth && !hasSa)) {
     return json({ status: "error", message: "Worker mal configurado." }, 500, cors);
   }
 
@@ -279,12 +310,16 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
       cors
     );
   } catch (driveErr) {
+    const raw = String(driveErr && driveErr.message ? driveErr.message : driveErr);
+    let hint = "";
+    if (/storage quota|Service Accounts do not have storage/i.test(raw)) {
+      hint =
+        " | Sin admin Workspace: configure OAuth de usuario (GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN). Ver workers/adjuntos/README.md";
+    }
     return json(
       {
         status: "error",
-        message:
-          "No se pudo guardar en Drive: " +
-          String(driveErr && driveErr.message ? driveErr.message : driveErr),
+        message: "No se pudo guardar en Drive: " + raw + hint,
         retryable: true
       },
       502,
@@ -314,18 +349,21 @@ async function getOrCreateFolder_(accessToken, parentId, name) {
   const found = await findChildFolder_(accessToken, parentId, name);
   if (found) return found.id;
 
-  const res = await fetch("https://www.googleapis.com/drive/v3/files", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      name: name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [parentId]
-    })
-  });
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?" + DRIVE_SUPPORTS,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [parentId]
+      })
+    }
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     // Carrera: otro request pudo crearla.
@@ -349,7 +387,9 @@ async function findChildFolder_(accessToken, parentId, name) {
     escapeDriveQuery_(name) +
     "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
   const url =
-    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&q=" +
+    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&" +
+    DRIVE_SUPPORTS +
+    "&q=" +
     encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { Authorization: "Bearer " + accessToken }
@@ -375,7 +415,9 @@ async function findChildByName_(accessToken, parentId, name) {
     escapeDriveQuery_(name) +
     "' and trashed = false";
   const url =
-    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&q=" +
+    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&" +
+    DRIVE_SUPPORTS +
+    "&q=" +
     encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { Authorization: "Bearer " + accessToken }
@@ -399,7 +441,8 @@ function escapeDriveQuery_(s) {
 
 async function uploadResumable_(accessToken, parentId, fileName, mimeType, buf) {
   const initRes = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name&" +
+      DRIVE_SUPPORTS,
     {
       method: "POST",
       headers: {
@@ -450,12 +493,69 @@ async function uploadResumable_(accessToken, parentId, fileName, mimeType, buf) 
   return putData;
 }
 
-/* -------------------- Google auth (service account) -------------------- */
+/* -------------------- Google auth -------------------- */
 
 async function getGoogleAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedTokenExp > now + 60) {
+
+  // Preferido sin admin: OAuth de un usuario real (usa su cuota de Drive).
+  if (
+    env.GOOGLE_OAUTH_CLIENT_ID &&
+    env.GOOGLE_OAUTH_CLIENT_SECRET &&
+    env.GOOGLE_OAUTH_REFRESH_TOKEN
+  ) {
+    const cacheKey = "oauth:" + String(env.GOOGLE_OAUTH_CLIENT_ID);
+    if (
+      cachedToken &&
+      cachedTokenExp > now + 60 &&
+      cachedTokenKey === cacheKey
+    ) {
+      return cachedToken;
+    }
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:
+        "client_id=" +
+        encodeURIComponent(env.GOOGLE_OAUTH_CLIENT_ID) +
+        "&client_secret=" +
+        encodeURIComponent(env.GOOGLE_OAUTH_CLIENT_SECRET) +
+        "&refresh_token=" +
+        encodeURIComponent(env.GOOGLE_OAUTH_REFRESH_TOKEN) +
+        "&grant_type=refresh_token"
+    });
+    const tokenJson = await tokenRes.json().catch(() => ({}));
+    if (!tokenRes.ok || !tokenJson.access_token) {
+      throw new Error(
+        "OAuth refresh falló (" +
+          tokenRes.status +
+          "): " +
+          (tokenJson.error_description ||
+            tokenJson.error ||
+            JSON.stringify(tokenJson).slice(0, 200))
+      );
+    }
+    cachedToken = tokenJson.access_token;
+    cachedTokenExp = now + (Number(tokenJson.expires_in) || 3600);
+    cachedTokenKey = cacheKey;
     return cachedToken;
+  }
+
+  // Alternativa: cuenta de servicio (+ impersonación si hay admin Workspace).
+  const impersonate = String(env.GOOGLE_IMPERSONATE_USER || "").trim();
+  const cacheKey = "sa:" + (impersonate || "(sa)");
+  if (
+    cachedToken &&
+    cachedTokenExp > now + 60 &&
+    cachedTokenKey === cacheKey
+  ) {
+    return cachedToken;
+  }
+
+  if (!env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+    throw new Error(
+      "Falta auth Google: configure OAuth de usuario o cuenta de servicio."
+    );
   }
 
   let sa;
@@ -476,6 +576,9 @@ async function getGoogleAccessToken(env) {
     iat: now,
     exp: now + 3600
   };
+  if (impersonate) {
+    claim.sub = impersonate;
+  }
   const unsigned =
     base64UrlEncode(JSON.stringify(header)) +
     "." +
@@ -500,15 +603,18 @@ async function getGoogleAccessToken(env) {
   const tokenJson = await tokenRes.json().catch(() => ({}));
   if (!tokenRes.ok || !tokenJson.access_token) {
     throw new Error(
-      "OAuth token falló (" +
+      "OAuth token SA falló (" +
         tokenRes.status +
         "): " +
-        (tokenJson.error_description || tokenJson.error || JSON.stringify(tokenJson).slice(0, 200))
+        (tokenJson.error_description ||
+          tokenJson.error ||
+          JSON.stringify(tokenJson).slice(0, 200))
     );
   }
 
   cachedToken = tokenJson.access_token;
   cachedTokenExp = now + (Number(tokenJson.expires_in) || 3600);
+  cachedTokenKey = cacheKey;
   return cachedToken;
 }
 
