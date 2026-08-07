@@ -81,7 +81,9 @@ localStorage.removeItem("eiel_adjuntos_worker");
 - Tokens firmados (30 min) para PUT/GET
 - Límite 35 MB (igual que antes)
 - Tras PUT, Apps Script importa a Drive (idempotente por nombre)
-- Si falla el import, el fichero sigue en R2 un tiempo (podéis reintentar)
+- `import_url` reintenta UrlFetch; el cliente reintenta 3 veces y, si hay
+  PDF ≥8–15 MB, baja la cola (2 o serie) para no saturar Apps Script
+- Si falla el import, fallback a subida clásica base64
 - Prefijos R2: `prod/…` y `pruebas/…`
 
 ## 5. Limpieza R2
