@@ -773,49 +773,102 @@
                 );
             }
 
-            const importResp = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
-                method: "POST",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({
-                    action: "import_url",
-                    download_url: presign.get_url,
-                    filename: fileName,
-                    mimeType: mimeType,
-                    municipio: muniCode,
-                    usuario: userEmail,
-                    tipo: tipoFicha,
-                    seccion: sec,
-                    id_envio: idEnvio,
-                    session_token: requireSessionToken(),
-                    is_test: getIsTest()
-                }),
-                redirect: "follow"
-            });
-            const importRaw = await importResp.text();
-            let imported = null;
-            try {
-                imported = JSON.parse(importRaw);
-            } catch (e) {
-                throw makeUploadError(
-                    'Respuesta no válida al guardar "' +
-                        fileName +
-                        '" en Drive. Reintente.',
-                    { opaque: true, retryable: true }
-                );
-            }
-            if (!importResp.ok || !imported || imported.status !== "success") {
-                const detalle = cleanErrorText(
-                    (imported && imported.message) ||
-                        "HTTP " + importResp.status
-                );
-                // Si el import falla pero el check encuentra el fichero, OK.
+            // import_url: Apps Script descarga de R2 → Drive. PDFs grandes en
+            // paralelo fallan a menudo; reintentamos antes del fallback base64.
+            const importAttempts = 3;
+            let lastImportErr = null;
+            for (let ai = 0; ai < importAttempts; ai++) {
+                if (ai > 0) {
+                    const wait = 1500 * ai;
+                    console.warn(
+                        "[EIEL] Reintento import_url",
+                        ai + 1 + "/" + importAttempts,
+                        fileName,
+                        "(" + wait + " ms)"
+                    );
+                    await new Promise(function (r) {
+                        setTimeout(r, wait);
+                    });
+                }
+                try {
+                    const importResp = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
+                        method: "POST",
+                        headers: { "Content-Type": "text/plain;charset=utf-8" },
+                        body: JSON.stringify({
+                            action: "import_url",
+                            download_url: presign.get_url,
+                            filename: fileName,
+                            mimeType: mimeType,
+                            municipio: muniCode,
+                            usuario: userEmail,
+                            tipo: tipoFicha,
+                            seccion: sec,
+                            id_envio: idEnvio,
+                            session_token: requireSessionToken(),
+                            is_test: getIsTest()
+                        }),
+                        redirect: "follow"
+                    });
+                    const importRaw = await importResp.text();
+                    let imported = null;
+                    try {
+                        imported = JSON.parse(importRaw);
+                    } catch (e) {
+                        lastImportErr = makeUploadError(
+                            'Respuesta no válida al guardar "' +
+                                fileName +
+                                '" en Drive. Reintente.',
+                            { opaque: true, retryable: true }
+                        );
+                        continue;
+                    }
+                    if (
+                        importResp.ok &&
+                        imported &&
+                        imported.status === "success"
+                    ) {
+                        return true;
+                    }
+                    const detalleTech = cleanErrorText(
+                        (imported && (imported.detalle || imported.message)) ||
+                            "HTTP " + importResp.status
+                    );
+                    const detalleUser = cleanErrorText(
+                        (imported && imported.message) ||
+                            "HTTP " + importResp.status
+                    );
+                    console.warn(
+                        "[EIEL] import_url error:",
+                        fileName,
+                        detalleTech
+                    );
+                    lastImportErr = makeUploadError(
+                        'No se pudo guardar "' +
+                            fileName +
+                            '" en Drive: ' +
+                            detalleUser,
+                        {
+                            retryable: true,
+                            technicalMessage: detalleTech
+                        }
+                    );
+                } catch (netErr) {
+                    lastImportErr = makeUploadError(
+                        'No se pudo guardar "' +
+                            fileName +
+                            '" en Drive: ' +
+                            cleanErrorText(netErr && netErr.message),
+                        { opaque: true, retryable: true }
+                    );
+                }
+
                 const ya = await this.pollCheckExists(
                     fileName,
                     tipoFicha,
                     muniCode,
                     sec,
                     idEnvio,
-                    { attempts: 2, firstDelayMs: 400, gapMs: 800 }
+                    { attempts: 2, firstDelayMs: 500, gapMs: 900 }
                 );
                 if (ya) {
                     console.warn(
@@ -824,13 +877,15 @@
                     );
                     return true;
                 }
-                throw makeUploadError(
-                    'No se pudo guardar "' + fileName + '" en Drive: ' + detalle,
-                    { retryable: true, technicalMessage: detalle }
-                );
             }
 
-            return true;
+            throw (
+                lastImportErr ||
+                makeUploadError(
+                    'No se pudo guardar "' + fileName + '" en Drive.',
+                    { retryable: true }
+                )
+            );
         }
     };
 
@@ -1307,10 +1362,11 @@
             options.checkPollAttempts != null ? options.checkPollAttempts : 3;
         const checkPollGapMs =
             options.checkPollGapMs != null ? options.checkPollGapMs : 1000;
-        const concurrency = Math.max(
+        const concurrencyRequested = Math.max(
             1,
             options.concurrency != null ? options.concurrency : 5
         );
+        let concurrency = concurrencyRequested;
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
         // No-imágenes primero (calientan Apps Script); fotos después.
@@ -1319,6 +1375,28 @@
             const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
             return ai - bi;
         });
+        // Con Worker R2: PDFs/ficheros grandes en paralelo saturan UrlFetch de
+        // Apps Script (import_url). Bajamos la cola automáticamente.
+        if (getAdjuntosWorkerUrl() && options.concurrency == null) {
+            let maxBytes = 0;
+            ordered.forEach(function (t) {
+                const sz = (t.file && t.file.size) || 0;
+                if (sz > maxBytes) maxBytes = sz;
+            });
+            if (maxBytes >= 15 * 1024 * 1024) {
+                concurrency = 1;
+                console.info(
+                    "[EIEL] Cola de subida en serie (fichero ≥15 MB + Worker)."
+                );
+            } else if (maxBytes >= 8 * 1024 * 1024) {
+                concurrency = Math.min(concurrency, 2);
+                console.info(
+                    "[EIEL] Cola de subida limitada a 2 (fichero ≥8 MB + Worker)."
+                );
+            } else {
+                concurrency = Math.min(concurrency, 3);
+            }
+        }
         const totalTareas = ordered.length;
         let completados = 0;
         let abortAll = false;

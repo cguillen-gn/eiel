@@ -24,7 +24,7 @@ function doGet(e) {
         status: "success",
         message: "adjuntos ok",
         supports_check: true,
-        version: "adjuntos-20260805c"
+        version: "adjuntos-20260807c"
       });
     }
     if (action === "check") {
@@ -338,6 +338,9 @@ function handleAdjuntosPost_(e) {
   } catch (error) {
     result.status = "error";
     result.message = friendlyUserMessageAdjuntos_(error);
+    result.retryable = true;
+    // Detalle técnico para consola / recuperación; el técnico ve message genérico.
+    result.detalle = cleanErrorTextAdjuntos_(error);
     Logger.log("ERROR SUBIDA: " + error.toString());
     try {
       Logger.log("ERROR stack: " + (error.stack || "(sin stack)"));
@@ -416,22 +419,54 @@ function importAdjuntoFromUrl_(result, opts) {
       return successIdempotent_(result, ya, fileName, "drive");
     }
 
-    var resp = UrlFetchApp.fetch(downloadUrl, {
-      method: "get",
-      muteHttpExceptions: true,
-      followRedirects: true
-    });
-    var code = resp.getResponseCode();
-    if (code < 200 || code >= 300) {
-      throw new Error(
-        "No se pudo descargar el adjunto desde el Worker (HTTP " +
-          code +
-          "). Reintente la subida."
-      );
+    // UrlFetch con reintentos: descargas grandes en paralelo suelen fallar
+    // (timeout / throttling). El cliente también reintenta import_url.
+    var bytes = null;
+    var lastFetchErr = null;
+    var fetchAttempts = 3;
+    for (var fi = 0; fi < fetchAttempts; fi++) {
+      if (fi > 0) {
+        Utilities.sleep(1500 * fi);
+        Logger.log(
+          "[ADJUNTOS import_url] reintento UrlFetch " +
+            (fi + 1) +
+            "/" +
+            fetchAttempts +
+            " file=" +
+            fileName
+        );
+      }
+      try {
+        var resp = UrlFetchApp.fetch(downloadUrl, {
+          method: "get",
+          muteHttpExceptions: true,
+          followRedirects: true
+        });
+        var code = resp.getResponseCode();
+        if (code < 200 || code >= 300) {
+          lastFetchErr = new Error(
+            "No se pudo descargar el adjunto desde el Worker (HTTP " +
+              code +
+              ")."
+          );
+          continue;
+        }
+        bytes = resp.getBlob().getBytes();
+        if (!bytes || !bytes.length) {
+          lastFetchErr = new Error("El Worker devolvió un archivo vacío.");
+          bytes = null;
+          continue;
+        }
+        lastFetchErr = null;
+        break;
+      } catch (fetchEx) {
+        lastFetchErr = fetchEx;
+        bytes = null;
+      }
     }
-    var bytes = resp.getBlob().getBytes();
     if (!bytes || !bytes.length) {
-      throw new Error("El Worker devolvió un archivo vacío.");
+      throw lastFetchErr ||
+        new Error("No se pudo descargar el adjunto desde el Worker.");
     }
     if (bytes.length > LIMITE_BYTES) {
       throw new Error(
