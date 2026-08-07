@@ -46,8 +46,8 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 Subida binaria al Cloudflare Worker, que escribe **directo en Drive**
 (mismas carpetas). Guía: `workers/adjuntos/README.md`.
 
-- Activar con `localStorage.eiel_adjuntos_worker` o `urlAdjuntosWorker`.
-- Sin Worker configurado, el portal sigue con base64 → Apps Script.
+- URL fija en HTML: `urlAdjuntosWorker` → `https://eiel-adjuntos.cguillen-4b9.workers.dev`.
+- Sin Worker en config, el portal sigue con base64 → Apps Script.
 - Apps Script Adjuntos sigue como fallback / `action=check`.
 - Concurrencia de subidas por defecto: **5**.
 
