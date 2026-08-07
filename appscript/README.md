@@ -41,15 +41,14 @@ reactivar el token más adelante o mover el login a un Worker gratuito.
 
 ---
 
-## Adjuntos rápidos (opcional) — Worker R2
+## Adjuntos rápidos (opcional) — Worker → Drive
 
-Subida binaria a Cloudflare R2 y luego `action=import_url` en `adjuntos.gs`
-hacia las **mismas carpetas de Drive**. Guía: `workers/adjuntos/README.md`.
+Subida binaria al Cloudflare Worker, que escribe **directo en Drive**
+(mismas carpetas). Guía: `workers/adjuntos/README.md`.
 
-- Pegar `adjuntos.gs` (incluye `import_url`) → **Nueva versión**.
-- Desplegar Worker + bucket R2; activar con
-  `localStorage.eiel_adjuntos_worker` o `urlAdjuntosWorker` en el HTML.
+- Activar con `localStorage.eiel_adjuntos_worker` o `urlAdjuntosWorker`.
 - Sin Worker configurado, el portal sigue con base64 → Apps Script.
+- Apps Script Adjuntos sigue como fallback / `action=check`.
 - Concurrencia de subidas por defecto: **5**.
 
 ---
@@ -57,7 +56,7 @@ hacia las **mismas carpetas de Drive**. Guía: `workers/adjuntos/README.md`.
 ## A + B — Adjuntos (`adjuntos.gs`)
 
 - Validación, límite 35 MB, JSON legible
-- `setSharing` no bloqueante; también `import_url` (R2 → Drive)
+- `setSharing` no bloqueante; `import_url` legado (R2; ya no es el camino recomendado)
 - Mensajes al técnico: **genéricos** (reintentar / contactar); detalle en
   `logs_errores` / Logger. Excepción: sesión caducada.
 - Front sin `no-cors`; exige `status === "success"`
