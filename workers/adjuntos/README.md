@@ -112,21 +112,20 @@ Debe devolver:
 
 ## 3. Activar en el portal
 
-Consola del navegador (logueado):
+La URL del Worker va **fija** en los HTML (`urlAdjuntosWorker` en `EIEL_CONFIG`):
+
+`https://eiel-adjuntos.cguillen-4b9.workers.dev`
+
+Tras publicar Pages, un hard refresh basta. Ya no hace falta `localStorage`.
+
+Override puntual (pruebas):
 
 ```js
-localStorage.setItem("eiel_adjuntos_worker", "https://eiel-adjuntos.cguillen-4b9.workers.dev");
+localStorage.setItem("eiel_adjuntos_worker", "https://otro-worker.workers.dev");
 location.reload();
 ```
 
-**Incluid `https://`.**
-
-Desactivar (volver solo a Apps Script):
-
-```js
-localStorage.removeItem("eiel_adjuntos_worker");
-location.reload();
-```
+(`urlAdjuntosWorker` en el HTML tiene prioridad sobre `localStorage`.)
 
 ---
 

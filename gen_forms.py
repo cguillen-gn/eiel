@@ -66,6 +66,10 @@ DB = {
 
 # --- URLs APPS SCRIPT ---
 URL_ADJUNTOS = os.getenv("URL_ADJUNTOS")
+URL_ADJUNTOS_WORKER = os.getenv(
+    "URL_ADJUNTOS_WORKER",
+    "https://eiel-adjuntos.cguillen-4b9.workers.dev",
+)
 URL_GENERAR_PDF = os.getenv("URL_GENERAR_PDF")
 URL_LOGIN_SCRIPT = os.getenv("URL_LOGIN_SCRIPT")
 URL_LOGGER = os.getenv("URL_LOGGER")
@@ -337,7 +341,8 @@ def main():
             common_ctx = {
                 "muni_code": code, 
                 "muni_display": name_display,
-                "url_adjuntos": URL_ADJUNTOS, 
+                "url_adjuntos": URL_ADJUNTOS,
+                "url_adjuntos_worker": URL_ADJUNTOS_WORKER,
                 "url_generar_pdf": URL_GENERAR_PDF,
                 "url_logger": URL_LOGGER,
                 "fase_anterior": fase_anterior,
