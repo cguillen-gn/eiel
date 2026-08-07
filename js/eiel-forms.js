@@ -569,8 +569,8 @@
 
         /**
          * Sube un adjunto y exige respuesta JSON legible (status === "success").
-         * Si hay urlAdjuntosWorker: PUT binario al Worker → Drive directo.
-         * Si no (o falla): ruta clásica base64 → Apps Script.
+         * Si hay urlAdjuntosWorker: PUT binario al Worker → Drive (hasta 2
+         * reintentos ante fallos temporales). Si sigue fallando: base64 → Apps Script.
          * options.compress: ajustes de maybeCompressImage
          */
         async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio, options) {
@@ -592,35 +592,75 @@
 
             const mime =
                 ready.type || file.type || "application/octet-stream";
+            const sec = seccion == null ? "DOCUMENTACION" : seccion;
 
             const workerBase = getAdjuntosWorkerUrl();
             if (workerBase) {
-                try {
-                    return await this.uploadFileViaWorker(
-                        ready,
-                        file.name,
-                        mime,
-                        tipoFicha,
-                        muniCode,
-                        seccion,
-                        idEnvio
-                    );
-                } catch (workerErr) {
-                    console.warn(
-                        "[EIEL] Worker adjuntos falló; compruebo Drive / fallback Apps Script:",
-                        workerErr && workerErr.message
-                    );
-                    const ya = await this.pollCheckExists(
-                        file.name,
-                        tipoFicha,
-                        muniCode,
-                        seccion == null ? "DOCUMENTACION" : seccion,
-                        idEnvio,
-                        { attempts: 2, firstDelayMs: 400, gapMs: 700 }
-                    );
-                    if (ya) return true;
-                    // Worker caído o mal configurado: misma ruta clásica.
+                // Intento inicial + 2 reintentos Worker antes del fallback Apps Script.
+                const workerTries = 3;
+                let lastWorkerErr = null;
+                for (let w = 1; w <= workerTries; w++) {
+                    try {
+                        return await this.uploadFileViaWorker(
+                            ready,
+                            file.name,
+                            mime,
+                            tipoFicha,
+                            muniCode,
+                            seccion,
+                            idEnvio
+                        );
+                    } catch (workerErr) {
+                        lastWorkerErr = workerErr;
+                        if (isNonRetryableUploadError(workerErr)) {
+                            break;
+                        }
+                        const ya = await this.pollCheckExists(
+                            file.name,
+                            tipoFicha,
+                            muniCode,
+                            sec,
+                            idEnvio,
+                            { attempts: 2, firstDelayMs: 400, gapMs: 700 }
+                        );
+                        if (ya) return true;
+                        if (w < workerTries) {
+                            if (getIsTest()) {
+                                console.info(
+                                    "[EIEL] Worker falló (" +
+                                        w +
+                                        "/" +
+                                        workerTries +
+                                        "); reintento Worker antes de Apps Script:",
+                                    file.name,
+                                    workerErr && workerErr.message
+                                );
+                            }
+                            await new Promise(function (r) {
+                                setTimeout(r, 800 * w);
+                            });
+                            continue;
+                        }
+                        console.warn(
+                            "[EIEL] Worker adjuntos agotó reintentos; fallback Apps Script:",
+                            file.name,
+                            workerErr && workerErr.message
+                        );
+                    }
                 }
+                if (lastWorkerErr && isNonRetryableUploadError(lastWorkerErr)) {
+                    // Sesión / tamaño / etc.: no tiene sentido Apps Script.
+                    throw lastWorkerErr;
+                }
+                const yaFinal = await this.pollCheckExists(
+                    file.name,
+                    tipoFicha,
+                    muniCode,
+                    sec,
+                    idEnvio,
+                    { attempts: 2, firstDelayMs: 400, gapMs: 700 }
+                );
+                if (yaFinal) return true;
             }
 
             const base64 = await this.toBase64(ready);
@@ -793,7 +833,7 @@
                 throw makeUploadError(
                     'Worker dijo OK pero "' +
                         fileName +
-                        '" no aparece aún en Drive. Reintento por Apps Script.',
+                        '" no aparece aún en Drive.',
                     { retryable: true, technicalMessage: "missing_after_worker" }
                 );
             }
