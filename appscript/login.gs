@@ -75,7 +75,7 @@ function doPost(e) {
       })
     );
   } catch (error) {
-    // Si algo falla, enviamos el error real para que lo veas en el index
+    // Detalle técnico en JSON (el front muestra mensaje genérico al usuario).
     return output.setContent(
       JSON.stringify({
         success: false,

@@ -1,8 +1,14 @@
 // --------------------------------------------------------------------
-// SCRIPT DE ADJUNTOS (DRIVE) — validación, token de sesión, JSON legible
-// Pegar en URL_ADJUNTOS + auth-token.gs + log-errores.gs en el MISMO proyecto.
-// Tras pegar: Implementar → Nueva versión.
+// SCRIPT DE ADJUNTOS (DRIVE) — fallback, action=check, import_url legado
+// Pegar en URL_ADJUNTOS + log-errores.gs (+ auth-token.gs opcional) en el
+// MISMO proyecto. Tras pegar: Implementar → Nueva versión.
 //
+// Camino principal del portal: Cloudflare Worker → Drive directo
+// (workers/adjuntos/). Este script queda como:
+//   - fallback base64 si el Worker falla
+//   - action=check / client_log
+//   - action=import_url (LEGADO; era el puente R2, el portal ya no lo usa)
+// Tokens de sesión: desactivados a propósito; solo se validan si llegan.
 // --------------------------------------------------------------------
 
 const CARPETA_RAIZ_ID = "1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV";
@@ -153,7 +159,7 @@ function handleAdjuntosPost_(e) {
 
     if (!munCode) throw new Error("Falta el código de municipio.");
 
-    // Tokens desactivados temporalmente: solo valida si llega token.
+    // Tokens desactivados a propósito: solo valida si el cliente envía token.
     if (sessionToken && typeof assertValidSessionToken_ === "function") {
       assertValidSessionToken_(sessionToken, munCode);
     }
@@ -196,7 +202,7 @@ function handleAdjuntosPost_(e) {
 
     if (!fileName) throw new Error("Falta el nombre del archivo.");
 
-    // Importar desde URL firmada del Worker R2 (sin base64).
+    // LEGADO: importar desde URL (puente R2 antiguo). El portal actual no lo llama.
     if (String(data.action || "").toLowerCase() === "import_url") {
       var downloadUrl = String(data.download_url || data.get_url || data.url || "").trim();
       if (!downloadUrl) throw new Error("Falta download_url para import_url.");
@@ -251,6 +257,8 @@ function handleAdjuntosPost_(e) {
       const carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
       const carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
 
+      // Equipamientos (id con -E- / _E_ / EXP_E): ficheros directos en id_envio,
+      // sin subcarpeta de sección. El resto: mun / id_envio / sección.
       let carpetaDestino;
       if (
         idEnvio.indexOf("-E-") !== -1 ||
@@ -373,8 +381,9 @@ function handleAdjuntosPost_(e) {
 }
 
 /**
- * Descarga el fichero desde el Worker (R2) y lo guarda en Drive
- * con la misma jerarquía de carpetas que la subida clásica.
+ * LEGADO — Descarga desde una URL y guarda en Drive (misma jerarquía).
+ * Quedó del puente Worker R2 + import_url; el portal ya sube con Worker→Drive.
+ * Se mantiene por compatibilidad si alguien llama action=import_url a mano.
  */
 function importAdjuntoFromUrl_(result, opts) {
   opts = opts || {};
@@ -401,6 +410,7 @@ function importAdjuntoFromUrl_(result, opts) {
     var carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
     var carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
     var carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
+    // Misma regla que la subida base64: equipamientos sin subcarpeta sección.
     var carpetaDestino;
     if (
       idEnvio.indexOf("-E-") !== -1 ||
@@ -420,7 +430,7 @@ function importAdjuntoFromUrl_(result, opts) {
     }
 
     // UrlFetch con reintentos: descargas grandes en paralelo suelen fallar
-    // (timeout / throttling). El cliente también reintenta import_url.
+    // (timeout / throttling). Solo aplica a este camino legado import_url.
     var bytes = null;
     var lastFetchErr = null;
     var fetchAttempts = 3;
@@ -490,10 +500,11 @@ function importAdjuntoFromUrl_(result, opts) {
     result.fileId = file.getId();
     result.url = file.getUrl();
     result.message = sharingOk
-      ? "Archivo importado a Drive desde R2."
-      : "Archivo importado a Drive desde R2 (sin enlace público).";
+      ? "Archivo importado a Drive desde URL (legado)."
+      : "Archivo importado a Drive desde URL (legado, sin enlace público).";
     result.filename = fileName;
     result.bytes = bytes.length;
+    // via histórico; no indica que el portal use R2 hoy.
     result.via = "r2_import";
     Logger.log(
       "[ADJUNTOS import_url OK] mun=" +

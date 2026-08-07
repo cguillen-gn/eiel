@@ -7,37 +7,28 @@ en `workers/login/` (misma API). `login.gs` queda como rollback.
 
 ---
 
-## D — Token de sesión (**DESACTIVADO** temporalmente)
+## D — Token de sesión (**DESACTIVADO** a propósito)
 
-Los tokens HMAC se desactivaron para recuperar un login **rápido y gratis**
-en Apps Script (como antes). El portal ya no emite ni exige
-`eiel_session_token`; Adjuntos/PDF solo validan token **si llega** (opcional).
+Decisión estable: login rápido vía **Cloudflare Worker** (`workers/login/`),
+sin HMAC. El portal no emite ni exige `eiel_session_token`; Adjuntos/PDF
+solo validan token **si llega** (opcional). `auth-token.gs` queda por si
+se reactivan en el futuro.
 
 | Pieza | Archivo |
 |-------|---------|
-| Login (simple) | `login.gs` |
+| Login (Worker, recomendado) | `workers/login/` |
+| Login (rollback Apps Script) | `login.gs` |
 | Adjuntos | `adjuntos.gs` + `log-errores.gs` |
 | PDF | `generar-pdf.gs` + `log-errores.gs` |
 | Front | `js/eiel-forms.js` + `docs/index.html` |
 | HMAC (opcional / futuro) | `auth-token.gs` |
 
-### Despliegue para quitar tokens
-
-1. **Login:** pegar `login.gs` → **Nueva versión** (no hace falta `auth-token`).
-2. **Adjuntos** y **PDF:** pegar `adjuntos.gs` / `generar-pdf.gs` → **Nueva versión**.
-3. **Front:** merge + Pages (`index.html` + `js/eiel-forms.js?v=20260803b`).
-4. Hard refresh; cerrar sesión y entrar.
-
-### Login
-
-Flujo simple otra vez: un POST, sin warmup ni timeouts raros.
-Sigue la caché 2 min de credenciales y, con `MASTER_PASS`, no abre la hoja.
-
 ### Nota de seguridad
 
 Sin token, cualquiera que conozca las URLs de Adjuntos/PDF podría
-invocarlas. Es un trade-off consciente (gratis + rápido). Se puede
-reactivar el token más adelante o mover el login a un Worker gratuito.
+invocarlas. Es un trade-off consciente (gratis + rápido). Para reactivar
+tokens: emitir en el Worker de login (o `login.gs`), pegar `auth-token.gs`
+en Adjuntos/PDF con el mismo secreto, y volver a exigir token en el front.
 
 ---
 

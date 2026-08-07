@@ -64,7 +64,7 @@ DB = {
     "password": os.getenv("DB_PASSWORD")
 }
 
-# --- URLs APPS SCRIPT ---
+# --- URLs (Apps Script + Worker de adjuntos) ---
 URL_ADJUNTOS = os.getenv("URL_ADJUNTOS")
 URL_ADJUNTOS_WORKER = os.getenv(
     "URL_ADJUNTOS_WORKER",
@@ -255,6 +255,8 @@ def obtener_cementerios(conn, mun):
         return [{"nombre": r["nombre"] or "Sin nombre"} for r in cur.fetchall()]
 
 def copiar_assets():
+    # docs/ es el artefacto de GitHub Pages: css/assets/js se copian desde el repo.
+    # Editar js/eiel-forms.js (fuente); docs/js/ se regenera aquí.
     if os.path.exists(ASSETS_CSS_DIR):
         shutil.copytree(ASSETS_CSS_DIR, os.path.join(OUTPUT_DIR, 'css'), dirs_exist_ok=True)
     if os.path.exists(ASSETS_DIR):
@@ -332,10 +334,9 @@ def main():
         print(f"Generando formularios para Fase {fase_actual}...")
         
         for m in MUNICIPIOS_LISTA_UI:
-            code = m["code"]       # El código tal cual viene del TSV
+            code = m["code"]       # Código del TSV (= código en BD)
             name_display = m["name_bonito"] 
             
-            # EL CAMBIO: Usamos 'code' directamente para la BD, asumiendo que coincide
             code_bd = code 
             
             common_ctx = {

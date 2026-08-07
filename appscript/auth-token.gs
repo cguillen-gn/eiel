@@ -1,10 +1,13 @@
 // ====================================================================
-// EIEL — Token de sesión firmado (HMAC)
+// EIEL — Token de sesión firmado (HMAC) — OPCIONAL / FUTURO
 // ====================================================================
-// Pegar este archivo COMO SEGUNDO FICHERO en los 3 proyectos Apps Script:
-//   1) Login   2) Adjuntos   3) Generar PDF
-// El secreto DEBE ser idéntico en los tres (o configurar la misma
-// propiedad de script EIEL_TOKEN_SECRET en cada proyecto).
+// Hoy el portal NO exige tokens (login por Worker; Adjuntos/PDF solo
+// validan si llega session_token). Este fichero se mantiene por si se
+// reactivan.
+//
+// Si se reactivan: pegar en Adjuntos y Generar PDF (mismo EIEL_TOKEN_SECRET).
+// El login actual (Worker KV) no usa este HMAC; habría que emitir token
+// en el Worker o volver a emitir desde login.gs.
 // ====================================================================
 
 /** TTL del token (12 horas). */
