@@ -22,13 +22,22 @@
         return localStorage.getItem("eiel_is_test") === "true";
     }
 
-    /** URL del Worker R2 de adjuntos (opcional). localStorage para pruebas. */
+    /**
+     * URL del Worker R2 de adjuntos (opcional). localStorage para pruebas.
+     * Si falta el esquema (p. ej. "eiel-adjuntos….workers.dev"), antepone https://
+     * para no resolver como ruta relativa de GitHub Pages.
+     */
     function getAdjuntosWorkerUrl() {
         const cfg = global.EIEL_CONFIG || {};
-        const fromCfg = (cfg.urlAdjuntosWorker || "").toString().trim();
-        if (fromCfg) return fromCfg.replace(/\/+$/, "");
-        const fromLs = (localStorage.getItem("eiel_adjuntos_worker") || "").toString().trim();
-        return fromLs ? fromLs.replace(/\/+$/, "") : "";
+        const raw =
+            (cfg.urlAdjuntosWorker || "").toString().trim() ||
+            (localStorage.getItem("eiel_adjuntos_worker") || "").toString().trim();
+        if (!raw) return "";
+        let url = raw.replace(/\/+$/, "");
+        if (!/^https?:\/\//i.test(url)) {
+            url = "https://" + url.replace(/^\/+/, "");
+        }
+        return url;
     }
 
     /** Quita prefijos repetidos "Error:" de mensajes de Apps Script / Exceptions. */

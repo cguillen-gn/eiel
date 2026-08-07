@@ -55,6 +55,9 @@ Opción A (prueba rápida, sin regenerar HTML): en la consola del navegador, log
 localStorage.setItem("eiel_adjuntos_worker", "https://eiel-adjuntos.<subdominio>.workers.dev");
 ```
 
+**Importante:** incluye `https://`. Sin esquema, el navegador lo trata como ruta
+de GitHub Pages (`…/eiel/eiel-adjuntos…`) y falla con 405.
+
 Recargar el formulario. Las subidas usarán el Worker.
 
 Opción B (permanente): en `templates/base.html.j2` / `EIEL_CONFIG`:
