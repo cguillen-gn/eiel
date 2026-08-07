@@ -16,10 +16,13 @@
  *   DRIVE_ROOT_FOLDER_ID       — id carpeta raíz (mismo que CARPETA_RAIZ_ID)
  */
 
-const VERSION = "eiel-adjuntos-worker-drive-20260807a";
+const VERSION = "eiel-adjuntos-worker-drive-20260807b";
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 35 * 1024 * 1024;
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
+/** Query común: permite Shared Drives y evita fallos de cuota de SA en Mi unidad. */
+const DRIVE_SUPPORTS =
+  "supportsAllDrives=true&includeItemsFromAllDrives=true";
 
 const DEFAULT_ORIGINS = [
   "https://cguillen-gn.github.io",
@@ -31,6 +34,7 @@ const DEFAULT_ORIGINS = [
 /** Cache en memoria del isolate (access token Google). */
 let cachedToken = null;
 let cachedTokenExp = 0;
+let cachedTokenKey = "";
 
 export default {
   async fetch(request, env) {
@@ -96,6 +100,10 @@ function handlePing(url, env, cors) {
       has_secret: Boolean(env.UPLOAD_SECRET),
       has_service_account: Boolean(env.GOOGLE_SERVICE_ACCOUNT_JSON),
       has_root_folder: Boolean(env.DRIVE_ROOT_FOLDER_ID),
+      has_impersonate: Boolean(
+        String(env.GOOGLE_IMPERSONATE_USER || "").trim()
+      ),
+      impersonate: String(env.GOOGLE_IMPERSONATE_USER || "").trim() || null,
       max_bytes: MAX_BYTES
     },
     200,
@@ -279,12 +287,16 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
       cors
     );
   } catch (driveErr) {
+    const raw = String(driveErr && driveErr.message ? driveErr.message : driveErr);
+    let hint = "";
+    if (/storage quota|Service Accounts do not have storage/i.test(raw)) {
+      hint =
+        " | Solución: 1) Shared Drive + SA como miembro, o 2) domain-wide delegation con GOOGLE_IMPERSONATE_USER (email Workspace). Ver workers/adjuntos/README.md";
+    }
     return json(
       {
         status: "error",
-        message:
-          "No se pudo guardar en Drive: " +
-          String(driveErr && driveErr.message ? driveErr.message : driveErr),
+        message: "No se pudo guardar en Drive: " + raw + hint,
         retryable: true
       },
       502,
@@ -314,18 +326,21 @@ async function getOrCreateFolder_(accessToken, parentId, name) {
   const found = await findChildFolder_(accessToken, parentId, name);
   if (found) return found.id;
 
-  const res = await fetch("https://www.googleapis.com/drive/v3/files", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + accessToken,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      name: name,
-      mimeType: "application/vnd.google-apps.folder",
-      parents: [parentId]
-    })
-  });
+  const res = await fetch(
+    "https://www.googleapis.com/drive/v3/files?" + DRIVE_SUPPORTS,
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + accessToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name: name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: [parentId]
+      })
+    }
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     // Carrera: otro request pudo crearla.
@@ -349,7 +364,9 @@ async function findChildFolder_(accessToken, parentId, name) {
     escapeDriveQuery_(name) +
     "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
   const url =
-    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&q=" +
+    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&" +
+    DRIVE_SUPPORTS +
+    "&q=" +
     encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { Authorization: "Bearer " + accessToken }
@@ -375,7 +392,9 @@ async function findChildByName_(accessToken, parentId, name) {
     escapeDriveQuery_(name) +
     "' and trashed = false";
   const url =
-    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&q=" +
+    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&" +
+    DRIVE_SUPPORTS +
+    "&q=" +
     encodeURIComponent(q);
   const res = await fetch(url, {
     headers: { Authorization: "Bearer " + accessToken }
@@ -399,7 +418,8 @@ function escapeDriveQuery_(s) {
 
 async function uploadResumable_(accessToken, parentId, fileName, mimeType, buf) {
   const initRes = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name",
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name&" +
+      DRIVE_SUPPORTS,
     {
       method: "POST",
       headers: {
@@ -454,7 +474,13 @@ async function uploadResumable_(accessToken, parentId, fileName, mimeType, buf) 
 
 async function getGoogleAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
-  if (cachedToken && cachedTokenExp > now + 60) {
+  const impersonate = String(env.GOOGLE_IMPERSONATE_USER || "").trim();
+  const cacheKey = impersonate || "(sa)";
+  if (
+    cachedToken &&
+    cachedTokenExp > now + 60 &&
+    cachedTokenKey === cacheKey
+  ) {
     return cachedToken;
   }
 
@@ -476,6 +502,10 @@ async function getGoogleAccessToken(env) {
     iat: now,
     exp: now + 3600
   };
+  // Domain-wide delegation: actúa como un usuario Workspace (usa su cuota).
+  if (impersonate) {
+    claim.sub = impersonate;
+  }
   const unsigned =
     base64UrlEncode(JSON.stringify(header)) +
     "." +
@@ -503,12 +533,15 @@ async function getGoogleAccessToken(env) {
       "OAuth token falló (" +
         tokenRes.status +
         "): " +
-        (tokenJson.error_description || tokenJson.error || JSON.stringify(tokenJson).slice(0, 200))
+        (tokenJson.error_description ||
+          tokenJson.error ||
+          JSON.stringify(tokenJson).slice(0, 200))
     );
   }
 
   cachedToken = tokenJson.access_token;
   cachedTokenExp = now + (Number(tokenJson.expires_in) || 3600);
+  cachedTokenKey = cacheKey;
   return cachedToken;
 }
 

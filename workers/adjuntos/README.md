@@ -25,6 +25,44 @@ Apps Script Adjuntos queda como **fallback** si el Worker falla o no está confi
 6. **Compartir** con el email de la cuenta de servicio  
    (`…@….iam.gserviceaccount.com`) como **Editor**.
 
+### Obligatorio: cuota de Drive (error 403)
+
+Las cuentas de servicio **no tienen cuota** en «Mi unidad». Si ves:
+
+`Service Accounts do not have storage quota`
+
+hay que elegir **una** de estas dos opciones (recomendamos la A si tenéis Google Workspace / geonet.es):
+
+#### Opción A — Impersonar un usuario Workspace (recomendada)
+
+El Worker actúa como un usuario real (p. ej. `eiel@geonet.es`) y usa **su** cuota.
+
+1. En Google Cloud → cuenta de servicio → copia el **ID único** (número largo; también está en el JSON como `client_id`, no el email).
+2. Como **administrador de Google Workspace**:
+   - [Admin console](https://admin.google.com/) → **Seguridad** → **Controles de acceso y datos** → **Delegación de todo el dominio**  
+     (o busca “Delegación a nivel de dominio”).
+   - **Añadir nueva**:
+     - ID de cliente: el número del paso 1
+     - Ámbitos OAuth:  
+       `https://www.googleapis.com/auth/drive`
+   - Autorizar.
+3. En Cloudflare Worker → Variables:
+   - Nombre: `GOOGLE_IMPERSONATE_USER`
+   - Valor: el email del usuario a impersonar, p. ej. `eiel@geonet.es`  
+     (debe tener acceso de Editor a la carpeta raíz de adjuntos).
+4. Deploy. Ping debe mostrar `"has_impersonate": true`.
+5. Ese usuario debe poder ver/escribir la carpeta raíz (si la carpeta es de otra cuenta, compartídselo).
+
+#### Opción B — Shared Drive (unidad compartida)
+
+1. Drive → **Unidades compartidas** → Nueva (p. ej. `EIEL Adjuntos`).
+2. Añade la cuenta de servicio como miembro **Administrador de contenido** (o superior).
+3. Crea/mueve ahí la carpeta raíz de adjuntos (o una nueva y actualizáis el id).
+4. En el Worker, `DRIVE_ROOT_FOLDER_ID` = id de esa carpeta **dentro** de la Shared Drive.
+5. El código ya envía `supportsAllDrives=true`.
+
+Sin A ni B, el Worker fallará en el PUT y el portal hará fallback a Apps Script.
+
 ---
 
 ## 2. Desplegar el Worker
@@ -33,6 +71,7 @@ Apps Script Adjuntos queda como **fallback** si el Worker falla o no está confi
 1. Workers → `eiel-adjuntos` (el que ya tengáis) → Edit code → pegar `src/index.js`.
 2. Settings → Variables:
    - `DRIVE_ROOT_FOLDER_ID` = `1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV`
+   - `GOOGLE_IMPERSONATE_USER` = `eiel@geonet.es` (si usáis opción A)
 3. Secrets:
    - `UPLOAD_SECRET` = cadena larga aleatoria
    - `GOOGLE_SERVICE_ACCOUNT_JSON` = **contenido completo** del JSON de la clave  
