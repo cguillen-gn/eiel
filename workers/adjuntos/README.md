@@ -105,9 +105,8 @@ Debe devolver:
 
 - `"mode":"drive_direct"`
 - `"has_secret":true`
-- `"has_service_account":true`
 - `"has_root_folder":true`
-- `"has_impersonate":true` (si usáis opción A)
+- `"auth_mode":"oauth_user"` y `"has_oauth_user":true` (camino sin admin)
 
 ---
 
