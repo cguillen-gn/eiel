@@ -195,6 +195,29 @@ function handleAdjuntosPost_(e) {
     }
 
     if (!fileName) throw new Error("Falta el nombre del archivo.");
+
+    // Importar desde URL firmada del Worker R2 (sin base64).
+    if (String(data.action || "").toLowerCase() === "import_url") {
+      var downloadUrl = String(data.download_url || data.get_url || data.url || "").trim();
+      if (!downloadUrl) throw new Error("Falta download_url para import_url.");
+      return jsonOut_(
+        importAdjuntoFromUrl_(
+          result,
+          {
+            munCode: munCode,
+            idEnvio: idEnvio,
+            seccion: seccion,
+            fileName: fileName,
+            mimeType: mimeType,
+            usuario: usuario,
+            tipo: tipo,
+            isTest: isTest,
+            downloadUrl: downloadUrl
+          }
+        )
+      );
+    }
+
     if (!base64Data) throw new Error("Falta el contenido del archivo (bytesBase64).");
 
     const approxBytes = Math.floor((String(base64Data).length * 3) / 4);
@@ -344,6 +367,109 @@ function handleAdjuntosPost_(e) {
   }
 
   return jsonOut_(result);
+}
+
+/**
+ * Descarga el fichero desde el Worker (R2) y lo guarda en Drive
+ * con la misma jerarquía de carpetas que la subida clásica.
+ */
+function importAdjuntoFromUrl_(result, opts) {
+  opts = opts || {};
+  var munCode = opts.munCode;
+  var idEnvio = opts.idEnvio;
+  var seccion = opts.seccion || "DOCUMENTACION";
+  var fileName = opts.fileName;
+  var mimeType = opts.mimeType || "application/octet-stream";
+  var downloadUrl = opts.downloadUrl;
+
+  var cacheKey = adjuntosIdempotencyKey_(idEnvio, seccion, fileName);
+  return withAdjuntoFileLock_(cacheKey, function () {
+    var cache = CacheService.getScriptCache();
+    var cachedId = cache.get(cacheKey);
+    if (cachedId) {
+      try {
+        var cachedFile = DriveApp.getFileById(cachedId);
+        return successIdempotent_(result, cachedFile, fileName, "cache");
+      } catch (cacheMiss) {
+        cache.remove(cacheKey);
+      }
+    }
+
+    var carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
+    var carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
+    var carpetaExpediente = getOrCreateFolder(carpetaMun, idEnvio);
+    var carpetaDestino;
+    if (
+      idEnvio.indexOf("-E-") !== -1 ||
+      idEnvio.indexOf("_E_") !== -1 ||
+      idEnvio.indexOf("EXP_E") === 0
+    ) {
+      carpetaDestino = carpetaExpediente;
+    } else {
+      carpetaDestino = getOrCreateFolder(carpetaExpediente, seccion);
+    }
+
+    var existentes = carpetaDestino.getFilesByName(fileName);
+    if (existentes.hasNext()) {
+      var ya = existentes.next();
+      cache.put(cacheKey, ya.getId(), 600);
+      return successIdempotent_(result, ya, fileName, "drive");
+    }
+
+    var resp = UrlFetchApp.fetch(downloadUrl, {
+      method: "get",
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    var code = resp.getResponseCode();
+    if (code < 200 || code >= 300) {
+      throw new Error(
+        "No se pudo descargar el adjunto desde el Worker (HTTP " +
+          code +
+          "). Reintente la subida."
+      );
+    }
+    var bytes = resp.getBlob().getBytes();
+    if (!bytes || !bytes.length) {
+      throw new Error("El Worker devolvió un archivo vacío.");
+    }
+    if (bytes.length > LIMITE_BYTES) {
+      throw new Error(
+        'El archivo "' + fileName + '" supera el límite de 35 MB tras descargar.'
+      );
+    }
+
+    var blob = Utilities.newBlob(bytes, mimeType, fileName);
+    var file = carpetaDestino.createFile(blob);
+    cache.put(cacheKey, file.getId(), 600);
+
+    var sharingOk = true;
+    try {
+      // Política Workspace: puede fallar; no bloquea.
+      // file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      sharingOk = false;
+    }
+
+    result.status = "success";
+    result.fileId = file.getId();
+    result.url = file.getUrl();
+    result.message = sharingOk
+      ? "Archivo importado a Drive desde R2."
+      : "Archivo importado a Drive desde R2 (sin enlace público).";
+    result.filename = fileName;
+    result.bytes = bytes.length;
+    result.via = "r2_import";
+    Logger.log(
+      "[ADJUNTOS import_url OK] mun=" +
+        munCode +
+        " file=" +
+        fileName +
+        " bytes=" +
+        bytes.length
+    );
+    return result;
+  });
 }
 
 /**

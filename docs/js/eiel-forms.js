@@ -22,6 +22,15 @@
         return localStorage.getItem("eiel_is_test") === "true";
     }
 
+    /** URL del Worker R2 de adjuntos (opcional). localStorage para pruebas. */
+    function getAdjuntosWorkerUrl() {
+        const cfg = global.EIEL_CONFIG || {};
+        const fromCfg = (cfg.urlAdjuntosWorker || "").toString().trim();
+        if (fromCfg) return fromCfg.replace(/\/+$/, "");
+        const fromLs = (localStorage.getItem("eiel_adjuntos_worker") || "").toString().trim();
+        return fromLs ? fromLs.replace(/\/+$/, "") : "";
+    }
+
     /** Quita prefijos repetidos "Error:" de mensajes de Apps Script / Exceptions. */
     function cleanErrorText(msg) {
         let s = String(msg == null ? "" : msg).trim();
@@ -544,7 +553,8 @@
 
         /**
          * Sube un adjunto y exige respuesta JSON legible (status === "success").
-         * Usa Content-Type text/plain como el login, para evitar preflight CORS.
+         * Si hay urlAdjuntosWorker: PUT binario a R2 + import_url a Drive.
+         * Si no: ruta clásica base64 → Apps Script.
          * options.compress: ajustes de maybeCompressImage
          */
         async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio, options) {
@@ -559,6 +569,53 @@
                     Math.round(ready.size / 1024) + "KB"
                 );
             }
+
+            const mime =
+                ready.type || file.type || "application/octet-stream";
+            if (
+                (mime === "application/pdf" ||
+                    /\.pdf$/i.test(file.name || "")) &&
+                ready.size > 8 * 1024 * 1024
+            ) {
+                console.warn(
+                    "[EIEL] PDF grande (" +
+                        Math.round(ready.size / 1024 / 1024) +
+                        " MB): " +
+                        file.name +
+                        ". Si puede, optimícelo antes de subir para acortar el envío."
+                );
+            }
+
+            const workerBase = getAdjuntosWorkerUrl();
+            if (workerBase) {
+                try {
+                    return await this.uploadFileViaWorker(
+                        ready,
+                        file.name,
+                        mime,
+                        tipoFicha,
+                        muniCode,
+                        seccion,
+                        idEnvio
+                    );
+                } catch (workerErr) {
+                    console.warn(
+                        "[EIEL] Worker adjuntos falló; compruebo Drive / fallback Apps Script:",
+                        workerErr && workerErr.message
+                    );
+                    const ya = await this.pollCheckExists(
+                        file.name,
+                        tipoFicha,
+                        muniCode,
+                        seccion == null ? "DOCUMENTACION" : seccion,
+                        idEnvio,
+                        { attempts: 2, firstDelayMs: 400, gapMs: 700 }
+                    );
+                    if (ya) return true;
+                    // Worker caído o mal configurado: misma ruta clásica.
+                }
+            }
+
             const base64 = await this.toBase64(ready);
             const userEmail =
                 (document.getElementById("contactoEmail") &&
@@ -566,7 +623,7 @@
                 "anonimo";
             const payload = {
                 filename: file.name,
-                mimeType: ready.type || file.type || "application/octet-stream",
+                mimeType: mime,
                 bytesBase64: base64,
                 municipio: muniCode,
                 usuario: userEmail,
@@ -621,6 +678,147 @@
                     retryable: !!(result && result.retryable) || opaque,
                     technicalMessage: msg
                 });
+            }
+
+            return true;
+        },
+
+        /**
+         * Ruta rápida: Worker R2 (PUT bytes) + Apps Script import_url → Drive.
+         */
+        async uploadFileViaWorker(
+            ready,
+            fileName,
+            mimeType,
+            tipoFicha,
+            muniCode,
+            seccion,
+            idEnvio
+        ) {
+            const workerBase = getAdjuntosWorkerUrl();
+            const userEmail =
+                (document.getElementById("contactoEmail") &&
+                    document.getElementById("contactoEmail").value) ||
+                "anonimo";
+            const sec = seccion == null ? "DOCUMENTACION" : seccion;
+
+            const presignResp = await fetch(workerBase + "/", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "presign",
+                    filename: fileName,
+                    mimeType: mimeType,
+                    size: ready.size || 0,
+                    municipio: muniCode,
+                    tipo: tipoFicha,
+                    seccion: sec,
+                    id_envio: idEnvio,
+                    is_test: getIsTest()
+                })
+            });
+            const presignRaw = await presignResp.text();
+            let presign = null;
+            try {
+                presign = JSON.parse(presignRaw);
+            } catch (e) {
+                throw makeUploadError(
+                    'Worker adjuntos: respuesta no JSON al pedir URL de subida ("' +
+                        fileName +
+                        '").',
+                    { opaque: true, retryable: true }
+                );
+            }
+            if (!presignResp.ok || !presign || presign.status !== "success") {
+                throw makeUploadError(
+                    'No se pudo preparar la subida de "' +
+                        fileName +
+                        '": ' +
+                        cleanErrorText((presign && presign.message) || "error Worker"),
+                    { retryable: true }
+                );
+            }
+
+            const putResp = await fetch(presign.put_url, {
+                method: "PUT",
+                headers: { "Content-Type": mimeType },
+                body: ready
+            });
+            const putRaw = await putResp.text();
+            let putResult = null;
+            try {
+                putResult = JSON.parse(putRaw);
+            } catch (e) {
+                putResult = null;
+            }
+            if (!putResp.ok || !putResult || putResult.status !== "success") {
+                throw makeUploadError(
+                    'No se pudo subir "' +
+                        fileName +
+                        '" al almacenamiento rápido: ' +
+                        cleanErrorText(
+                            (putResult && putResult.message) ||
+                                "HTTP " + putResp.status
+                        ),
+                    { retryable: true }
+                );
+            }
+
+            const importResp = await fetch(global.EIEL_CONFIG.urlAdjuntos, {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "import_url",
+                    download_url: presign.get_url,
+                    filename: fileName,
+                    mimeType: mimeType,
+                    municipio: muniCode,
+                    usuario: userEmail,
+                    tipo: tipoFicha,
+                    seccion: sec,
+                    id_envio: idEnvio,
+                    session_token: requireSessionToken(),
+                    is_test: getIsTest()
+                }),
+                redirect: "follow"
+            });
+            const importRaw = await importResp.text();
+            let imported = null;
+            try {
+                imported = JSON.parse(importRaw);
+            } catch (e) {
+                throw makeUploadError(
+                    'Respuesta no válida al guardar "' +
+                        fileName +
+                        '" en Drive. Reintente.',
+                    { opaque: true, retryable: true }
+                );
+            }
+            if (!importResp.ok || !imported || imported.status !== "success") {
+                const detalle = cleanErrorText(
+                    (imported && imported.message) ||
+                        "HTTP " + importResp.status
+                );
+                // Si el import falla pero el check encuentra el fichero, OK.
+                const ya = await this.pollCheckExists(
+                    fileName,
+                    tipoFicha,
+                    muniCode,
+                    sec,
+                    idEnvio,
+                    { attempts: 2, firstDelayMs: 400, gapMs: 800 }
+                );
+                if (ya) {
+                    console.warn(
+                        "[EIEL] import_url falló pero el archivo ya está en Drive:",
+                        fileName
+                    );
+                    return true;
+                }
+                throw makeUploadError(
+                    'No se pudo guardar "' + fileName + '" en Drive: ' + detalle,
+                    { retryable: true, technicalMessage: detalle }
+                );
             }
 
             return true;
@@ -1085,7 +1283,7 @@
      * Sube con cola limitada (paralelo suave); reintenta si falla; si tras los
      * reintentos sigue mal, aborta el lote (no se debe llamar a generar PDF).
      * options.retries: por defecto 2
-     * options.concurrency: por defecto 3 (1 = serie)
+     * options.concurrency: por defecto 5 (1 = serie)
      * options.throwOnFail: por defecto true
      */
     async function uploadTaskList(tasks, idBatch, options) {
@@ -1102,7 +1300,7 @@
             options.checkPollGapMs != null ? options.checkPollGapMs : 1000;
         const concurrency = Math.max(
             1,
-            options.concurrency != null ? options.concurrency : 3
+            options.concurrency != null ? options.concurrency : 5
         );
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
