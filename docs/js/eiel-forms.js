@@ -408,12 +408,14 @@
                     if (current.size && current.size < 350 * 1024 && pass === 0) break;
                     const next = await compressOnce(current, side, q);
                     if (!next || next === current) break;
-                    console.info(
-                        "[EIEL] Foto comprimida",
-                        file.name,
-                        Math.round(file.size / 1024) + "KB → " + Math.round(next.size / 1024) + "KB",
-                        "(pass " + (pass + 1) + ")"
-                    );
+                    if (getIsTest()) {
+                        console.info(
+                            "[EIEL] Foto comprimida",
+                            file.name,
+                            Math.round(file.size / 1024) + "KB → " + Math.round(next.size / 1024) + "KB",
+                            "(pass " + (pass + 1) + ")"
+                        );
+                    }
                     current = next;
                     if (current.size <= targetBytes) break;
                     side = Math.round(side * 0.75);
@@ -539,7 +541,7 @@
                         idEnvio
                     );
                     if (yaEsta) {
-                        if (i > 0) {
+                        if (i > 0 && getIsTest()) {
                             console.info(
                                 "[EIEL] check OK en intento de poll",
                                 i + 1 + "/" + attempts + ":",
@@ -1287,14 +1289,19 @@
             });
             if (maxBytes >= 8 * 1024 * 1024) {
                 concurrency = 1;
-                console.info(
-                    "[EIEL] Cola en serie (Worker + fichero ≥8 MB) para no perder adjuntos."
-                );
+                if (getIsTest()) {
+                    console.info(
+                        "[EIEL] Hay un fichero ≥8 MB: se sube de uno en uno " +
+                            "(cola serie) para no saturar el Worker."
+                    );
+                }
             } else if (maxBytes >= 5 * 1024 * 1024) {
                 concurrency = Math.min(concurrency, 2);
-                console.info(
-                    "[EIEL] Cola limitada a 2 (Worker + fichero ≥5 MB)."
-                );
+                if (getIsTest()) {
+                    console.info(
+                        "[EIEL] Hay un fichero ≥5 MB: cola limitada a 2 subidas a la vez."
+                    );
+                }
             }
         }
         const totalTareas = ordered.length;
@@ -1620,14 +1627,16 @@
             }
 
             if (result && result.eiel_build) {
-                console.info(
-                    "[EIEL] PDF OK build=" +
-                        result.eiel_build +
-                        " is_test=" +
-                        result.is_test +
-                        " log_pestana=" +
-                        result.log_pestana
-                );
+                if (getIsTest()) {
+                    console.info(
+                        "[EIEL] PDF OK build=" +
+                            result.eiel_build +
+                            " is_test=" +
+                            result.is_test +
+                            " log_pestana=" +
+                            result.log_pestana
+                    );
+                }
             } else {
                 console.warn(
                     "[EIEL] PDF respondió OK pero sin eiel_build/log_pestana. " +
