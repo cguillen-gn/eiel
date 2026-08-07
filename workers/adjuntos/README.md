@@ -100,6 +100,7 @@ Debe devolver:
 - `"has_secret":true`
 - `"has_service_account":true`
 - `"has_root_folder":true`
+- `"has_impersonate":true` (si usáis opción A)
 
 ---
 
