@@ -581,19 +581,6 @@
 
             const mime =
                 ready.type || file.type || "application/octet-stream";
-            if (
-                (mime === "application/pdf" ||
-                    /\.pdf$/i.test(file.name || "")) &&
-                ready.size > 8 * 1024 * 1024
-            ) {
-                console.warn(
-                    "[EIEL] PDF grande (" +
-                        Math.round(ready.size / 1024 / 1024) +
-                        " MB): " +
-                        file.name +
-                        ". Si puede, optimícelo antes de subir para acortar el envío."
-                );
-            }
 
             const workerBase = getAdjuntosWorkerUrl();
             if (workerBase) {
