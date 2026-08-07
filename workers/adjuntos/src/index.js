@@ -5,15 +5,18 @@
  *   1) POST { action:"presign", filename, municipio, id_envio, seccion, mimeType, size, is_test }
  *      → { status, put_url, expires_at }
  *   2) PUT put_url  (bytes del fichero)
- *      → Worker autentica con cuenta de servicio y sube a Drive
- *         (mismas carpetas: raíz / mun / id_envio [/ sección])
+ *      → Worker sube a Drive (mismas carpetas que Apps Script)
  *
  *   GET ?action=ping
  *
- * Secretos / vars:
- *   UPLOAD_SECRET              — firma tokens PUT
- *   GOOGLE_SERVICE_ACCOUNT_JSON — JSON de la cuenta de servicio
- *   DRIVE_ROOT_FOLDER_ID       — id carpeta raíz (mismo que CARPETA_RAIZ_ID)
+ * Auth Drive (preferido sin admin Workspace):
+ *   GOOGLE_OAUTH_CLIENT_ID / SECRET / REFRESH_TOKEN  — OAuth de usuario
+ * Alternativa:
+ *   GOOGLE_SERVICE_ACCOUNT_JSON — cuenta de servicio (suele fallar por cuota)
+ *
+ * Otros:
+ *   UPLOAD_SECRET         — firma tokens PUT
+ *   DRIVE_ROOT_FOLDER_ID  — carpeta raíz (mismo id que CARPETA_RAIZ_ID en adjuntos.gs)
  */
 
 const VERSION = "eiel-adjuntos-worker-drive-20260807d";
@@ -248,9 +251,8 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
       cors
     );
   }
-  if (expectedSize > 0 && Math.abs(buf.byteLength - expectedSize) > 64) {
-    // Tolerancia mínima; avisar pero no bloquear si el cliente no envió size exacto.
-  }
+  // Si el token traía size y el cuerpo difiere un poco, no bloqueamos
+  // (tolerancia implícita; el límite duro es MAX_BYTES arriba).
 
   const mimeType =
     request.headers.get("Content-Type") ||
@@ -344,6 +346,7 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
 
 /* -------------------- Drive helpers -------------------- */
 
+/** ids de equipamiento: sin subcarpeta de sección (paridad con adjuntos.gs). */
 function isEquipamientoId_(idEnvio) {
   return (
     idEnvio.indexOf("-E-") !== -1 ||
@@ -352,6 +355,10 @@ function isEquipamientoId_(idEnvio) {
   );
 }
 
+/**
+ * Jerarquía: raíz / mun / id_envio [/ sección].
+ * Equipamientos (-E- / _E_ / EXP_E): ficheros directamente bajo id_envio.
+ */
 async function resolveDestFolderId_(accessToken, rootId, mun, idEnvio, seccion) {
   const munFolder = await getOrCreateFolder_(accessToken, rootId, mun);
   const expFolder = await getOrCreateFolder_(accessToken, munFolder, idEnvio);

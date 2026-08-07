@@ -1,7 +1,11 @@
 /**
  * EIEL — lógica compartida de formularios
- * Fuente única para progreso, subidas, validaciones y utilidades de UI.
+ * Fuente: js/eiel-forms.js → se copia a docs/js/ al regenerar (gen_forms.py).
  * Debe cargarse después de definir window.EIEL_CONFIG (parcial) en base.html.
+ *
+ * Tokens HMAC: desactivados a propósito. getSessionToken / requireSessionToken
+ * hoy son equivalentes (devuelven "" si no hay token); no bloquean el envío.
+ * Si se reactivan: emitir en login Worker, exigir aquí y validar en Adjuntos/PDF.
  */
 (function (global) {
     "use strict";
@@ -13,8 +17,8 @@
         return localStorage.getItem("eiel_session_token") || "";
     }
 
+    /** No bloquea: tokens desactivados a propósito (ver cabecera del fichero). */
     function requireSessionToken() {
-        // Tokens desactivados temporalmente: no bloquear envíos.
         return localStorage.getItem("eiel_session_token") || "";
     }
 
@@ -23,9 +27,10 @@
     }
 
     /**
-     * URL del Worker de adjuntos → Drive (opcional). localStorage para pruebas.
-     * Si falta el esquema (p. ej. "eiel-adjuntos….workers.dev"), antepone https://
-     * para no resolver como ruta relativa de GitHub Pages.
+     * URL del Worker de adjuntos → Drive.
+     * Preferencia: EIEL_CONFIG.urlAdjuntosWorker (fija en HTML) y, si no,
+     * localStorage.eiel_adjuntos_worker (override de prueba).
+     * Si falta el esquema, antepone https:// (evita ruta relativa en Pages).
      */
     function getAdjuntosWorkerUrl() {
         const cfg = global.EIEL_CONFIG || {};
@@ -571,9 +576,13 @@
         async uploadFile(file, tipoFicha, muniCode, seccion, idEnvio, options) {
             options = options || {};
             const ready = await this.maybeCompressImage(file, options.compress || {});
-            if (ready && ready.size && file && file.size && ready.size < file.size) {
-                // ok
-            } else if (ready && file && /image\//.test(file.type || "") && ready.size > 1500 * 1024) {
+            if (
+                !(ready && ready.size && file && file.size && ready.size < file.size) &&
+                ready &&
+                file &&
+                /image\//.test(file.type || "") &&
+                ready.size > 1500 * 1024
+            ) {
                 console.warn(
                     "[EIEL] Foto sigue siendo grande tras comprimir:",
                     file.name,

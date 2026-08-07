@@ -44,12 +44,10 @@ function esEnvioPrueba_(info) {
  * Punto de entrada para las peticiones POST desde el cliente.
  */
 function doPost(e) {
-  // 1. OBTENER EL CANDADO (Semáforo de seguridad)
+  // Evita solaparse con otro envío PDF en el mismo proyecto (máx. 30 s).
   const lock = LockService.getScriptLock();
   
   try {
-    // Espera hasta 30 segundos a que otros procesos terminen antes de entrar
-    // Si en 30 segundos no queda libre, lanza un error al bloque catch(f)
     lock.waitLock(30000); 
   } catch (f) {
     return ContentService.createTextOutput(JSON.stringify({
@@ -83,7 +81,7 @@ function doPost(e) {
        data = e.parameter;
     }
 
-    // Sesión firmada (opcional; tokens desactivados en el portal)
+    // Sesión firmada opcional (tokens desactivados a propósito en el portal).
     const municipioCodigoEarly =
       data.municipio_codigo || data.muni_code || "000";
     var sessionTokenPdf = data.session_token || data.token || "";
@@ -212,7 +210,7 @@ function doPost(e) {
     });
     registro.envio_started_at = data.envio_started_at || data.timestamp_envio || "";
 
-    // 5. ORGANIZACIÓN DE CARPETAS EN DRIVE (Blindado)
+    // 5. Organización de carpetas en Drive (adjuntos del id_envio).
     try {
       const muniCodeFolder = templateData.MUNI_CODIGO.toString().slice(-3); 
       const raizAdjuntos = DriveApp.getFolderById(CARPETA_RAIZ_ADJUNTOS_ID);
@@ -277,8 +275,7 @@ function doPost(e) {
     // Guardamos el PDF directamente en la carpeta del municipio
     const pdfFile = carpetaDestino.createFile(pdfBlob);
     
-    // Configuramos permisos y actualizamos el log
-    //pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    // Sin setSharing público: el enlace del log basta para quien tenga acceso Drive.
     actualizarUrlLog(
       registro.fila,
       pdfFile.getUrl(),
@@ -388,7 +385,6 @@ function doPost(e) {
     // -----------------------------------------------------------
 
   } finally {
-    // 8. SOLTAR EL CANDADO (Vital para que el siguiente técnico pueda entrar)
     lock.releaseLock();
   }
 
@@ -714,9 +710,10 @@ function missingAdjuntosFromList_(expected, foundNames) {
  * Política (prioridad: no castigar al técnico si los ficheros ya están):
  * 1. Varios reintentos con backoff (indexación Drive / renombrado carpeta).
  * 2. Match de nombres normalizado (no partir por comas).
- * 3. Si tras reintentos faltan nombres PERO la carpeta tiene al menos
- *    tantos ficheros como los declarados → aviso en log y se CONTINÚA
- *    (PDF + email OK). Solo falla si no hay carpeta o está vacía.
+ * 3. Si el conteo cuadra y faltan ≤15 % de nombres → aviso en log y CONTINÚA.
+ * 4. Si la carpeta no está vacía pero el conteo es inferior → también
+ *    CONTINÚA con aviso (subida ya dio OK al cliente).
+ * Solo falla de verdad si no hay carpeta o está vacía tras los reintentos.
  */
 function assertAdjuntosPresentes_(muniCode, idEnvio, idRegistro, expectedNames) {
   var expected = dedupeAdjuntoNames_(expectedNames || []);
