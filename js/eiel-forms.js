@@ -60,7 +60,11 @@
 
     /** Prefiere un error con mensaje de negocio frente a fallo opaco de red/HTML. */
     function isOpaqueUploadError(err) {
-        const s = cleanErrorText(err && err.message != null ? err.message : err).toLowerCase();
+        if (err && (err.opaque === true || err.eielOpaque === true)) return true;
+        const s = cleanErrorText(
+            (err && err.technicalMessage) ||
+                (err && err.message != null ? err.message : err)
+        ).toLowerCase();
         return (
             s.indexOf("respuesta no válida") !== -1 ||
             s.indexOf("failed to fetch") !== -1 ||
@@ -68,7 +72,10 @@
             s.indexOf("comprobar el despliegue") !== -1 ||
             // doGet vacío / redirect POST→GET de Apps Script
             s.indexOf("use post para subir") !== -1 ||
-            s.indexOf("get inesperado") !== -1
+            s.indexOf("get inesperado") !== -1 ||
+            // HTML 404 de googleusercontent.com/macros/echo
+            s.indexOf("<!doctype html") !== -1 ||
+            s.indexOf("macros/echo") !== -1
         );
     }
 
@@ -77,7 +84,10 @@
      * Detalle técnico → console; al usuario solo genérico (o sesión).
      */
     function formatUserError(err) {
-        const raw = cleanErrorText(err && err.message != null ? err.message : err);
+        const raw = cleanErrorText(
+            (err && err.technicalMessage) ||
+                (err && err.message != null ? err.message : err)
+        );
         console.error("[EIEL] Error de envío (detalle):", raw);
         const lower = raw.toLowerCase();
         if (lower.indexOf("sesión") !== -1) {
@@ -86,14 +96,43 @@
         return "❌ " + MSG_USUARIO_ENVIO;
     }
 
-    /** Error lanzable en subida/PDF: sesión o genérico (detalle ya en console). */
+    /**
+     * Solo para el mensaje FINAL al usuario (catch del formulario / PDF).
+     * NO usar dentro de uploadFile: borraría la señal «GET inesperado» y
+     * rompería la recuperación con action=check.
+     */
     function userFacingSendError(err) {
-        const raw = cleanErrorText(err && err.message != null ? err.message : err);
+        const raw = cleanErrorText(
+            (err && err.technicalMessage) ||
+                (err && err.message != null ? err.message : err)
+        );
         console.error("[EIEL] Fallo técnico:", raw);
+        var out;
         if (raw.toLowerCase().indexOf("sesión") !== -1) {
-            return new Error(MSG_USUARIO_SESION);
+            out = new Error(MSG_USUARIO_SESION);
+        } else {
+            out = new Error(MSG_USUARIO_ENVIO);
         }
-        return new Error(MSG_USUARIO_ENVIO);
+        out.technicalMessage = raw;
+        if (err && (err.opaque || err.eielOpaque)) {
+            out.opaque = true;
+            out.eielOpaque = true;
+        }
+        return out;
+    }
+
+    /** Error de subida con mensaje técnico intacto (para reintentos / check). */
+    function makeUploadError(message, extras) {
+        const err = new Error(message);
+        extras = extras || {};
+        if (extras.opaque) {
+            err.opaque = true;
+            err.eielOpaque = true;
+        }
+        if (extras.retryable) err.retryable = true;
+        if (extras.technicalMessage) err.technicalMessage = extras.technicalMessage;
+        else err.technicalMessage = message;
+        return err;
     }
 
     /**
@@ -556,12 +595,12 @@
                     file.name,
                     (raw || "").slice(0, 200)
                 );
-                throw userFacingSendError(
-                    new Error(
-                        'Respuesta no válida del servidor al subir "' +
-                            file.name +
-                            '". Compruebe el despliegue de Apps Script.'
-                    )
+                // Mensaje técnico (opaco): uploadTaskList hará check/reintento.
+                throw makeUploadError(
+                    'Respuesta no válida del servidor al subir "' +
+                        file.name +
+                        '". Compruebe el despliegue de Apps Script.',
+                    { opaque: true, retryable: true }
                 );
             }
 
@@ -571,9 +610,17 @@
                         "HTTP " + response.status ||
                         "Error desconocido"
                 );
-                throw userFacingSendError(
-                    new Error('No se pudo subir "' + file.name + '": ' + detalle)
-                );
+                const msg = 'No se pudo subir "' + file.name + '": ' + detalle;
+                const opaque =
+                    !!(result && (result.opaque || result.retryable)) ||
+                    isOpaqueUploadError(new Error(detalle));
+                // NO envolver con userFacingSendError aquí: haría perder
+                // «GET inesperado» y no se recuperaría con action=check.
+                throw makeUploadError(msg, {
+                    opaque: opaque,
+                    retryable: !!(result && result.retryable) || opaque,
+                    technicalMessage: msg
+                });
             }
 
             return true;
@@ -1200,7 +1247,8 @@
                 }
                 if (throwOnFail) {
                     abortAll = true;
-                    fatalError = userFacingSendError(new Error(msg));
+                    // Conservar detalle técnico (GET inesperado / HTML 404) en technicalMessage
+                    fatalError = userFacingSendError(errFinal || new Error(msg));
                     return;
                 }
                 console.error(options.logPrefix || "Fallo en subida individual:", errFinal);
@@ -1233,10 +1281,51 @@
 
         if (fatalError && throwOnFail) {
             UIProgress.hide();
+            try {
+                await reportClientUploadFailure_(fatalError, ordered, idBatch, defaultTipo);
+            } catch (logErr) {
+                console.warn("[EIEL] No se pudo registrar el fallo en logs_errores:", logErr);
+            }
             throw fatalError;
         }
 
         return completados;
+    }
+
+    /**
+     * Avisa a Adjuntos (action=client_log) para dejar fila en logs_errores(_pruebas).
+     * Los GET opacos del redirect de Apps Script no pasan por el catch del servidor.
+     */
+    async function reportClientUploadFailure_(fatalError, tasks, idBatch, defaultTipo) {
+        const cfg = global.EIEL_CONFIG;
+        if (!cfg || !cfg.urlAdjuntos) return;
+        const first = (tasks && tasks[0]) || {};
+        const detalle = cleanErrorText(
+            (fatalError && fatalError.technicalMessage) ||
+                (fatalError && fatalError.message) ||
+                ""
+        );
+        const payload = {
+            action: "client_log",
+            filename: (first.file && first.file.name) || "",
+            municipio: cfg.muniCode || "",
+            tipo: first.tipo || defaultTipo || "general",
+            seccion: first.seccion == null ? "DOCUMENTACION" : first.seccion,
+            id_envio: idBatch || "",
+            usuario:
+                (document.getElementById("contactoEmail") &&
+                    document.getElementById("contactoEmail").value) ||
+                "anonimo",
+            is_test: getIsTest(),
+            mensaje_usuario: MSG_USUARIO_ENVIO,
+            detalle: detalle
+        };
+        await fetch(cfg.urlAdjuntos, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload),
+            redirect: "follow"
+        });
     }
 
     /**
