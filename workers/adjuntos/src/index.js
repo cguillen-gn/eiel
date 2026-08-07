@@ -16,7 +16,7 @@
  *   DRIVE_ROOT_FOLDER_ID       — id carpeta raíz (mismo que CARPETA_RAIZ_ID)
  */
 
-const VERSION = "eiel-adjuntos-worker-drive-20260807c";
+const VERSION = "eiel-adjuntos-worker-drive-20260807d";
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 35 * 1024 * 1024;
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
@@ -273,19 +273,22 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
 
     const existing = await findChildByName_(accessToken, destFolderId, fileName);
     if (existing && existing.id) {
-      return json(
-        {
-          status: "success",
-          message: "Archivo ya estaba en Drive (idempotente).",
-          fileId: existing.id,
-          filename: fileName,
-          bytes: buf.byteLength,
-          via: "drive_direct_existing",
-          eiel_build: VERSION
-        },
-        200,
-        cors
-      );
+      const meta = await getFileMeta_(accessToken, existing.id);
+      if (meta && meta.id) {
+        return json(
+          {
+            status: "success",
+            message: "Archivo ya estaba en Drive (idempotente).",
+            fileId: meta.id,
+            filename: fileName,
+            bytes: buf.byteLength,
+            via: "drive_direct_existing",
+            eiel_build: VERSION
+          },
+          200,
+          cors
+        );
+      }
     }
 
     const created = await uploadResumable_(
@@ -295,12 +298,23 @@ async function handlePutToDrive(request, env, cors, tokenPath) {
       mimeType,
       buf
     );
+    if (!created || !created.id) {
+      throw new Error("Drive no devolvió id de fichero tras la subida.");
+    }
+    const verified = await getFileMeta_(accessToken, created.id);
+    if (!verified || !verified.id) {
+      throw new Error(
+        "El fichero se subió pero no se pudo verificar en Drive (id=" +
+          created.id +
+          ")."
+      );
+    }
 
     return json(
       {
         status: "success",
         message: "Archivo guardado en Drive.",
-        fileId: created.id,
+        fileId: verified.id,
         filename: fileName,
         bytes: buf.byteLength,
         via: "drive_direct",
@@ -437,6 +451,27 @@ async function findChildByName_(accessToken, parentId, name) {
 
 function escapeDriveQuery_(s) {
   return String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function getFileMeta_(accessToken, fileId) {
+  const url =
+    "https://www.googleapis.com/drive/v3/files/" +
+    encodeURIComponent(fileId) +
+    "?fields=id,name,size&" +
+    DRIVE_SUPPORTS;
+  const res = await fetch(url, {
+    headers: { Authorization: "Bearer " + accessToken }
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      "Verificar fichero Drive falló (" +
+        res.status +
+        "): " +
+        (data.error && data.error.message ? data.error.message : "")
+    );
+  }
+  return data;
 }
 
 async function uploadResumable_(accessToken, parentId, fileName, mimeType, buf) {

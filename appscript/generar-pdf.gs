@@ -778,9 +778,13 @@ function assertAdjuntosPresentes_(muniCode, idEnvio, idRegistro, expectedNames) 
     );
   }
 
-  // Red de seguridad: los ficheros están en Drive aunque el nombre no
-  // coincida al 100 % (coma en el nombre, sanitizado por Drive, etc.).
-  if (found.length >= expected.length) {
+  // Red de seguridad SOLO si el conteo cuadra Y no faltan demasiados
+  // nombres (antes: found>=expected bastaba y podía dar PDF OK con
+  // ficheros de otro envío / basura en carpeta). Exigimos casi todos.
+  if (
+    found.length >= expected.length &&
+    missing.length <= Math.max(1, Math.floor(expected.length * 0.15))
+  ) {
     console.warn(
       "ADJUNTOS OK POR CONTEO (nombres no coinciden al 100%): id_envio=" +
         idEnvio +
