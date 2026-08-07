@@ -1,92 +1,101 @@
-# Adjuntos EIEL — Cloudflare Worker + R2 → Drive
+# Adjuntos EIEL — Cloudflare Worker → Google Drive (directo)
 
-Subida **rápida** (bytes, no base64) a R2. Después Apps Script **importa a Drive**
-con la misma organización de carpetas de siempre
-(`municipio / id_envio / sección /…`).
-
-El portal puede seguir usando solo Apps Script hasta que configures la URL del Worker.
+Un solo camino para **todos** los ficheros (fotos y PDF grandes):
 
 ```
-Navegador ──PUT──► Worker/R2 ──get_url──► Apps Script import_url ──► Drive
+Navegador ──PUT binario──► Worker ──Drive API──► carpetas de siempre
 ```
+
+Sin base64, sin R2 como puente, sin `import_url` de Apps Script.
+
+Apps Script Adjuntos queda como **fallback** si el Worker falla o no está configurado.
 
 ---
 
-## 1. Crear bucket R2 y Worker (dashboard o CLI)
+## 1. Google Cloud — cuenta de servicio
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → crear/usar un proyecto.
+2. **APIs y servicios → Biblioteca** → activar **Google Drive API**.
+3. **IAM → Cuentas de servicio → Crear**:
+   - Nombre p. ej. `eiel-adjuntos-worker`
+   - Sin roles de proyecto (basta compartir la carpeta).
+4. En la cuenta → **Claves → Añadir clave → JSON** → descarga el fichero.
+5. Abre en Drive la carpeta raíz de adjuntos EIEL  
+   (`CARPETA_RAIZ_ID` = `1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV`).
+6. **Compartir** con el email de la cuenta de servicio  
+   (`…@….iam.gserviceaccount.com`) como **Editor**.
+
+---
+
+## 2. Desplegar el Worker
 
 ### Dashboard
-1. Cloudflare → **R2** → Create bucket → nombre `eiel-adjuntos`
-2. **Workers** → Create → nombre `eiel-adjuntos`
-3. Pegar el código de `src/index.js`
-4. Settings → **Variables** → añadir binding R2: `ADJUNTOS_BUCKET` → bucket `eiel-adjuntos`
-5. Secrets → `UPLOAD_SECRET` (cadena larga aleatoria)
-6. Deploy → anotar URL: `https://eiel-adjuntos.<subdominio>.workers.dev`
+1. Workers → `eiel-adjuntos` (el que ya tengáis) → Edit code → pegar `src/index.js`.
+2. Settings → Variables:
+   - `DRIVE_ROOT_FOLDER_ID` = `1XhyB9YD_m1jk_DTVzH782GWIiW62FPkV`
+3. Secrets:
+   - `UPLOAD_SECRET` = cadena larga aleatoria
+   - `GOOGLE_SERVICE_ACCOUNT_JSON` = **contenido completo** del JSON de la clave  
+     (todo el fichero en una sola secret; las `\n` del private_key se conservan).
+4. Si teníais binding R2, podéis dejarlo; **ya no se usa**.
+5. Deploy.
 
 ### CLI
 ```bash
 cd workers/adjuntos
 npm install
-npx wrangler r2 bucket create eiel-adjuntos
 npx wrangler secret put UPLOAD_SECRET
+npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_JSON   # pegar el JSON entero
 npx wrangler deploy
 ```
 
 Comprobar:
 
 ```bash
-curl -sL "https://eiel-adjuntos.…/workers.dev?action=ping"
+curl -sL "https://eiel-adjuntos.<subdominio>.workers.dev/?action=ping"
 ```
 
-Debe devolver `"has_bucket":true,"has_secret":true`.
+Debe devolver:
 
----
-
-## 2. Apps Script Adjuntos
-
-Pegar `appscript/adjuntos.gs` (incluye `action=import_url`) → **Nueva versión**.
+- `"mode":"drive_direct"`
+- `"has_secret":true`
+- `"has_service_account":true`
+- `"has_root_folder":true`
 
 ---
 
 ## 3. Activar en el portal
 
-Opción A (prueba rápida, sin regenerar HTML): en la consola del navegador, logueado:
+Consola del navegador (logueado):
 
 ```js
-localStorage.setItem("eiel_adjuntos_worker", "https://eiel-adjuntos.<subdominio>.workers.dev");
+localStorage.setItem("eiel_adjuntos_worker", "https://eiel-adjuntos.cguillen-4b9.workers.dev");
+location.reload();
 ```
 
-**Importante:** incluye `https://`. Sin esquema, el navegador lo trata como ruta
-de GitHub Pages (`…/eiel/eiel-adjuntos…`) y falla con 405.
+**Incluid `https://`.**
 
-Recargar el formulario. Las subidas usarán el Worker.
-
-Opción B (permanente): en `templates/base.html.j2` / `EIEL_CONFIG`:
-
-```js
-urlAdjuntosWorker: "https://eiel-adjuntos.<subdominio>.workers.dev",
-```
-
-y regenerar `docs/`, o rellenar ese campo en los HTML.
-
-Para volver al modo antiguo:
+Desactivar (volver solo a Apps Script):
 
 ```js
 localStorage.removeItem("eiel_adjuntos_worker");
+location.reload();
 ```
 
 ---
 
-## 4. Fiabilidad
+## 4. Qué mirar en una prueba
 
-- Tokens firmados (30 min) para PUT/GET
-- Límite 35 MB (igual que antes)
-- Tras PUT, Apps Script importa a Drive (idempotente por nombre)
-- `import_url` reintenta UrlFetch; el cliente reintenta 3 veces y, si hay
-  PDF ≥8–15 MB, baja la cola (2 o serie) para no saturar Apps Script
-- Si falla el import, fallback a subida clásica base64
-- Prefijos R2: `prod/…` y `pruebas/…`
+- Network: `POST` al Worker (presign) + `PUT /u/…` → JSON `via:"drive_direct"`.
+- **No** debe hacer falta `import_url` a Apps Script para esos ficheros.
+- Drive: mismas carpetas `municipio / id_envio / sección`.
+- Si el Worker falla, el portal hace fallback a Apps Script (base64).
 
-## 5. Limpieza R2
+---
 
-Los objetos en R2 son puente. Podéis borrar antiguos periódicamente
-(lifecycle del bucket a 7–30 días) cuando ya estén en Drive.
+## 5. Notas
+
+- Límite 35 MB (igual que antes).
+- Idempotencia: si el nombre ya existe en la carpeta destino, no duplica.
+- Equipamientos (`-E-` / `_E_` / `EXP_E…`): fichero directo bajo `id_envio` (como Apps Script).
+- Plan free de Workers suele bastar; PDF muy grandes y lentos pueden acercarse al límite de duración del Worker — si hubiera timeouts, subir a Workers de pago ($5) o bajar concurrencia.
