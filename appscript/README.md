@@ -49,7 +49,7 @@ Subida binaria al Cloudflare Worker, que escribe **directo en Drive**
 - URL fija en HTML: `urlAdjuntosWorker` → `https://eiel-adjuntos.cguillen-4b9.workers.dev`.
 - Sin Worker en config, el portal sigue con base64 → Apps Script.
 - Apps Script Adjuntos sigue como fallback / `action=check`.
-- Concurrencia de subidas por defecto: **5**.
+- Cola por tramos (Worker): ≥8 MB exclusivos; ≥5 MB máx 2; resto hasta **5**.
 
 ---
 

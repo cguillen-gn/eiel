@@ -1270,7 +1270,6 @@
             1,
             options.concurrency != null ? options.concurrency : 5
         );
-        let concurrency = concurrencyRequested;
         const throwOnFail = options.throwOnFail !== false;
         const defaultTipo = options.defaultTipo;
         // No-imágenes primero; fotos después.
@@ -1279,30 +1278,52 @@
             const bi = ((b.file && b.file.type) || "").indexOf("image/") === 0 ? 1 : 0;
             return ai - bi;
         });
-        // Worker→Drive: PDF grandes en paralelo saturan el Worker (timeouts /
-        // 2 de N en Drive). Con ficheros ≥5 MB bajamos la cola.
-        if (getAdjuntosWorkerUrl() && options.concurrency == null) {
-            let maxBytes = 0;
-            ordered.forEach(function (t) {
-                const sz = (t.file && t.file.size) || 0;
-                if (sz > maxBytes) maxBytes = sz;
-            });
-            if (maxBytes >= 8 * 1024 * 1024) {
-                concurrency = 1;
-                if (getIsTest()) {
-                    console.info(
-                        "[EIEL] Hay un fichero ≥8 MB: se sube de uno en uno " +
-                            "(cola serie) para no saturar el Worker."
-                    );
-                }
-            } else if (maxBytes >= 5 * 1024 * 1024) {
-                concurrency = Math.min(concurrency, 2);
-                if (getIsTest()) {
-                    console.info(
-                        "[EIEL] Hay un fichero ≥5 MB: cola limitada a 2 subidas a la vez."
-                    );
-                }
+        // Worker→Drive: cola por tramos (no tumba toda la cola a 1 solo
+        // porque exista un PDF grande).
+        //  - ≥8 MB: exclusivos (solo ese en vuelo)
+        //  - ≥5 MB: como máximo 2 a la vez
+        //  - resto: hasta concurrencyRequested (5)
+        const useTieredQueue =
+            !!getAdjuntosWorkerUrl() && options.concurrency == null;
+        const HEAVY_BYTES = 8 * 1024 * 1024;
+        const MEDIUM_BYTES = 5 * 1024 * 1024;
+        const maxTotal = concurrencyRequested;
+        const maxMediumPlus = 2;
+
+        function taskBytes(t) {
+            return (t && t.file && t.file.size) || 0;
+        }
+
+        function canStartWith(inFlightSizes, nextBytes) {
+            if (!useTieredQueue) {
+                return inFlightSizes.length < maxTotal;
             }
+            const n = inFlightSizes.length;
+            let nHeavy = 0;
+            let nMediumPlus = 0;
+            for (let i = 0; i < inFlightSizes.length; i++) {
+                const b = inFlightSizes[i];
+                if (b >= HEAVY_BYTES) nHeavy++;
+                if (b >= MEDIUM_BYTES) nMediumPlus++;
+            }
+            if (nextBytes >= HEAVY_BYTES) {
+                return n === 0;
+            }
+            if (nHeavy > 0) return false;
+            if (nextBytes >= MEDIUM_BYTES && nMediumPlus >= maxMediumPlus) {
+                return false;
+            }
+            return n < maxTotal;
+        }
+
+        if (useTieredQueue && getIsTest()) {
+            console.info(
+                "[EIEL] Cola por tramos: ≥8 MB exclusivos; ≥5 MB máx " +
+                    maxMediumPlus +
+                    "; resto hasta " +
+                    maxTotal +
+                    "."
+            );
         }
         const totalTareas = ordered.length;
         let completados = 0;
@@ -1455,21 +1476,97 @@
         }
 
         bumpProgress();
-        let cursor = 0;
-        async function worker() {
-            while (true) {
-                if (abortAll) return;
-                const idx = cursor++;
-                if (idx >= ordered.length) return;
-                await uploadOne(ordered[idx]);
+
+        const pending = ordered.slice();
+        const inFlight = [];
+
+        await new Promise(function (resolve) {
+            let settled = false;
+            function finish() {
+                if (settled) return;
+                settled = true;
+                resolve();
             }
-        }
-        const runners = Math.min(concurrency, Math.max(1, ordered.length));
-        await Promise.all(
-            Array.from({ length: runners }, function () {
-                return worker();
-            })
-        );
+            function pump() {
+                if (settled) return;
+                if (abortAll) {
+                    if (inFlight.length === 0) finish();
+                    return;
+                }
+                if (pending.length === 0 && inFlight.length === 0) {
+                    finish();
+                    return;
+                }
+                const sizes = inFlight.map(function (x) {
+                    return x.bytes;
+                });
+                let started = 0;
+                for (let i = 0; i < pending.length; i++) {
+                    const bytes = taskBytes(pending[i]);
+                    if (!canStartWith(sizes, bytes)) continue;
+                    const tarea = pending.splice(i, 1)[0];
+                    i--;
+                    const entry = { bytes: bytes };
+                    inFlight.push(entry);
+                    sizes.push(bytes);
+                    started++;
+                    Promise.resolve()
+                        .then(function () {
+                            return uploadOne(tarea);
+                        })
+                        .then(function () {
+                            const idx = inFlight.indexOf(entry);
+                            if (idx >= 0) inFlight.splice(idx, 1);
+                            pump();
+                        })
+                        .catch(function (err) {
+                            const idx = inFlight.indexOf(entry);
+                            if (idx >= 0) inFlight.splice(idx, 1);
+                            abortAll = true;
+                            if (!fatalError) {
+                                fatalError = userFacingSendError(
+                                    err || new Error("Error al subir adjunto")
+                                );
+                            }
+                            pump();
+                        });
+                }
+                if (
+                    started === 0 &&
+                    inFlight.length === 0 &&
+                    pending.length > 0
+                ) {
+                    // No debería ocurrir con las reglas actuales; evita deadlock.
+                    console.warn(
+                        "[EIEL] Cola adjuntos: desbloqueo forzando el siguiente fichero."
+                    );
+                    const tarea = pending.shift();
+                    const entry = { bytes: taskBytes(tarea) };
+                    inFlight.push(entry);
+                    Promise.resolve()
+                        .then(function () {
+                            return uploadOne(tarea);
+                        })
+                        .then(function () {
+                            const idx = inFlight.indexOf(entry);
+                            if (idx >= 0) inFlight.splice(idx, 1);
+                            pump();
+                        })
+                        .catch(function (err) {
+                            const idx = inFlight.indexOf(entry);
+                            if (idx >= 0) inFlight.splice(idx, 1);
+                            abortAll = true;
+                            if (!fatalError) {
+                                fatalError = userFacingSendError(
+                                    err || new Error("Error al subir adjunto")
+                                );
+                            }
+                            pump();
+                        });
+                }
+            }
+            pump();
+        });
 
         if (fatalError && throwOnFail) {
             UIProgress.hide();
