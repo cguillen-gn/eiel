@@ -85,9 +85,6 @@ Detalle de despliegue:
    fusiona/renombra la carpeta de adjuntos, genera PDF y envía email.
 5. Logs en hojas Sheets (pestañas normales o `_pruebas` si `is_test`).
 
-Tokens HMAC de sesión: **desactivados a propósito** (login rápido).  
-Seguridad actual = contraseña de municipio + URLs de backend + secretos del Worker.
-
 ---
 
 ## Regenerar formularios (mantenimiento)
@@ -139,20 +136,17 @@ GitHub Pages publica `docs/` automáticamente.
 
 ---
 
-## Seguridad del código en repo público
+## Secretos y repo público
 
-Tener `appscript/` y `workers/` en GitHub **público no es peligroso por sí solo**: es código de aplicación, igual que cualquier front open source.
+El código de `appscript/` y `workers/` puede vivir en un repositorio público:
+es lógica de aplicación, no credenciales.
 
-| Seguro en el repo | Nunca en el repo |
-|-------------------|------------------|
-| Lógica `.gs` / Worker | Contraseñas de municipios |
-| Estructura de carpetas Drive | `UPLOAD_SECRET`, OAuth refresh token |
-| IDs de carpeta Drive (ya hacen falta permisos) | JSON de cuenta de servicio |
-| Documentación de despliegue | `.env` real, claves BD |
+**No subir nunca:** `.env` real, contraseñas, refresh tokens OAuth,
+`UPLOAD_SECRET`, JSON de cuenta de servicio ni claves de base de datos.
 
-**Matiz:** las URLs `/exec` de Apps Script y la URL del Worker **ya son públicas** en Pages (`docs/*.html`). Quien las conozca puede intentar invocarlas. Hoy no hay token de sesión obligatorio; es un trade-off consciente. Endurecer = reactivar tokens HMAC o restringir quién puede llamar esos endpoints.
+Los secretos van en Cloudflare (Workers Secrets), propiedades de Apps Script
+o en `.env` local (gitignorado). Ver `.env.example` solo como plantilla de nombres.
 
-No hace falta sacar el código del repo público para “ocultarlo”: lo sensible son los **secretos** y el control de acceso, no el algoritmo.
 
 ---
 
