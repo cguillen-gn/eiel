@@ -731,6 +731,56 @@
         },
 
         /**
+         * Crea mun / id_envio [/ secciones] una vez vía Worker antes de la cola
+         * paralela (evita carpetas ENVIO_* duplicadas por carrera en Drive).
+         */
+        async ensureDrivePath(muniCode, idEnvio, secciones) {
+            const workerBase = getAdjuntosWorkerUrl();
+            if (!workerBase || !muniCode || !idEnvio) return false;
+            const secs = Array.isArray(secciones)
+                ? secciones.filter(Boolean)
+                : [];
+            const resp = await fetch(workerBase + "/", {
+                method: "POST",
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify({
+                    action: "ensure_path",
+                    municipio: muniCode,
+                    id_envio: idEnvio,
+                    secciones: secs,
+                    is_test: getIsTest()
+                })
+            });
+            const raw = await resp.text();
+            let result = null;
+            try {
+                result = JSON.parse(raw);
+            } catch (e) {
+                throw makeUploadError(
+                    "Worker: no se pudo preparar carpetas de Drive (respuesta no JSON).",
+                    { opaque: true, retryable: true }
+                );
+            }
+            if (!resp.ok || !result || result.status !== "success") {
+                throw makeUploadError(
+                    "Worker: no se pudo preparar carpetas de Drive: " +
+                        cleanErrorText(
+                            (result && result.message) || "HTTP " + resp.status
+                        ),
+                    { retryable: true }
+                );
+            }
+            if (getIsTest()) {
+                console.info(
+                    "[EIEL] Carpetas Drive listas para",
+                    idEnvio,
+                    secs.length ? "(" + secs.join(", ") + ")" : ""
+                );
+            }
+            return true;
+        },
+
+        /**
          * Ruta rápida: Worker recibe bytes y los guarda en Drive (Drive API).
          * Tras el PUT exige fileId y confirma con action=check (Apps Script).
          */
@@ -1406,6 +1456,31 @@
                     UIProgress.hide();
                     throw userFacingSendError(new Error(msg));
                 }
+            }
+        }
+
+        // Una sola creación de carpetas antes de la cola paralela.
+        if (
+            getAdjuntosWorkerUrl() &&
+            totalTareas > 0 &&
+            options.skipEnsurePath !== true
+        ) {
+            const seccionesSet = {};
+            ordered.forEach(function (t) {
+                const s = t.seccion == null ? "DOCUMENTACION" : String(t.seccion);
+                seccionesSet[s] = true;
+            });
+            try {
+                await UploadService.ensureDrivePath(
+                    global.EIEL_CONFIG.muniCode,
+                    idBatch,
+                    Object.keys(seccionesSet)
+                );
+            } catch (ensureErr) {
+                console.warn(
+                    "[EIEL] ensure_path falló; continúo (getOrCreate por fichero):",
+                    ensureErr && ensureErr.message
+                );
             }
         }
 
