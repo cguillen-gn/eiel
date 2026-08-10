@@ -30,7 +30,7 @@ function doGet(e) {
         status: "success",
         message: "adjuntos ok",
         supports_check: true,
-        version: "adjuntos-20260807c"
+        version: "adjuntos-20260810a"
       });
     }
     if (action === "check") {
@@ -587,26 +587,29 @@ function checkAdjuntoExists_(munCode, idEnvio, seccion, fileName) {
 
     var carpetaRaiz = DriveApp.getFolderById(CARPETA_RAIZ_ID);
     var carpetaMun = getOrCreateFolder(carpetaRaiz, munCode);
+    // Puede haber varias carpetas con el mismo id_envio (carrera en paralelo).
     var itExp = carpetaMun.getFoldersByName(idEnvio);
-    if (!itExp.hasNext()) return out;
-    var carpetaExpediente = itExp.next();
-
-    var carpetaDestino = carpetaExpediente;
-    if (
-      idEnvio.indexOf("-E-") === -1 &&
-      idEnvio.indexOf("_E_") === -1 &&
-      idEnvio.indexOf("EXP_E") !== 0
-    ) {
-      var itSec = carpetaExpediente.getFoldersByName(seccion);
-      if (!itSec.hasNext()) return out;
-      carpetaDestino = itSec.next();
-    }
-
-    var existentes = carpetaDestino.getFilesByName(fileName);
-    if (existentes.hasNext()) {
-      var ya = existentes.next();
-      cache.put(cacheKey, ya.getId(), 600);
-      return successIdempotent_(out, ya, fileName, "check-drive");
+    var isEquip =
+      idEnvio.indexOf("-E-") !== -1 ||
+      idEnvio.indexOf("_E_") !== -1 ||
+      idEnvio.indexOf("EXP_E") === 0;
+    while (itExp.hasNext()) {
+      var carpetaExpediente = itExp.next();
+      var destinos = [];
+      if (isEquip) {
+        destinos.push(carpetaExpediente);
+      } else {
+        var itSec = carpetaExpediente.getFoldersByName(seccion);
+        while (itSec.hasNext()) destinos.push(itSec.next());
+      }
+      for (var di = 0; di < destinos.length; di++) {
+        var existentes = destinos[di].getFilesByName(fileName);
+        if (existentes.hasNext()) {
+          var ya = existentes.next();
+          cache.put(cacheKey, ya.getId(), 600);
+          return successIdempotent_(out, ya, fileName, "check-drive");
+        }
+      }
     }
   } catch (err) {
     Logger.log("[ADJUNTOS CHECK] " + err.toString());
@@ -689,14 +692,29 @@ function friendlyUserMessageAdjuntos_(err) {
 }
 
 function getOrCreateFolder(parent, name) {
-  // Camino rápido sin candado (carpeta ya existe → paralelo OK).
+  // Camino rápido: si hay varias (carrera), usa la más antigua.
   var it = parent.getFoldersByName(name);
-  if (it.hasNext()) return it.next();
+  var existentes = [];
+  while (it.hasNext()) existentes.push(it.next());
+  if (existentes.length === 1) return existentes[0];
+  if (existentes.length > 1) {
+    existentes.sort(function (a, b) {
+      return a.getDateCreated() - b.getDateCreated();
+    });
+    return existentes[0];
+  }
   const lock = LockService.getScriptLock();
   try {
     lock.waitLock(15000);
     it = parent.getFoldersByName(name);
-    if (it.hasNext()) return it.next();
+    existentes = [];
+    while (it.hasNext()) existentes.push(it.next());
+    if (existentes.length) {
+      existentes.sort(function (a, b) {
+        return a.getDateCreated() - b.getDateCreated();
+      });
+      return existentes[0];
+    }
     return parent.createFolder(name);
   } finally {
     try {

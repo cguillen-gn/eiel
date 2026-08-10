@@ -131,10 +131,12 @@ location.reload();
 
 ## 4. Qué mirar en una prueba
 
-- Network: `POST` al Worker (presign) + `PUT /u/…` → JSON `via:"drive_direct"`.
+- Network: `POST ensure_path` (una vez) + `POST` presign + `PUT /u/…` → JSON `via:"drive_direct"`.
 - **No** debe hacer falta `import_url` a Apps Script para esos ficheros.
-- Drive: mismas carpetas `municipio / id_envio / sección`.
-- Si el Worker falla, el portal hace fallback a Apps Script (base64).
+- Drive: una sola carpeta `municipio / id_envio / sección` (sin gemelas `ENVIO_*`).
+- Si el Worker falla tras reintentos, el portal hace fallback a Apps Script (base64).
+
+**Despliegue Worker:** tras cambios en `src/index.js`, `npx wrangler deploy` en `workers/adjuntos/`.
 
 ---
 

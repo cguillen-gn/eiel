@@ -211,6 +211,8 @@ function doPost(e) {
     registro.envio_started_at = data.envio_started_at || data.timestamp_envio || "";
 
     // 5. Organización de carpetas en Drive (adjuntos del id_envio).
+    // Puede haber varias carpetas ENVIO_* gemelas por carrera en paralelo:
+    // fusionar en la más antigua y renombrar a id_registro.
     try {
       const muniCodeFolder = templateData.MUNI_CODIGO.toString().slice(-3); 
       const raizAdjuntos = DriveApp.getFolderById(CARPETA_RAIZ_ADJUNTOS_ID);
@@ -218,20 +220,7 @@ function doPost(e) {
       const itMun = raizAdjuntos.getFoldersByName(muniCodeFolder);
       if (itMun.hasNext()) {
         const carpetaMun = itMun.next();
-        // Buscamos la carpeta por el id_envio que nos manda la web
-        const itTemp = carpetaMun.getFoldersByName(data.id_envio);
-        
-        if (itTemp.hasNext()) {
-          const carpetaA_Renombrar = itTemp.next();
-          
-          // REINTENTO DE RENOMBRADO: Si falla, esperamos 1 segundo y probamos otra vez
-          try {
-            carpetaA_Renombrar.setName(registro.id);
-          } catch (err) {
-            Utilities.sleep(1500); // Pausa de seguridad
-            carpetaA_Renombrar.setName(registro.id);
-          }
-        }
+        renameAndMergeEnvioFolders_(carpetaMun, data.id_envio, registro.id);
       }
     } catch (e) {
       // Si falla el renombrado, lo anotamos, pero NO paramos el script.
@@ -602,9 +591,83 @@ function findCarpetaExpedienteAdjuntos_(muniCode, idEnvio, idRegistro) {
   }
   if (idEnvio) {
     var itEnv = carpetaMun.getFoldersByName(String(idEnvio));
-    if (itEnv.hasNext()) return itEnv.next();
+    var list = [];
+    while (itEnv.hasNext()) list.push(itEnv.next());
+    if (list.length) {
+      list.sort(function (a, b) {
+        return a.getDateCreated() - b.getDateCreated();
+      });
+      return list[0];
+    }
   }
   return null;
+}
+
+/**
+ * Fusiona carpetas gemelas con el mismo id_envio (carrera de subidas en paralelo)
+ * en la más antigua y la renombra a id_registro.
+ */
+function renameAndMergeEnvioFolders_(carpetaMun, idEnvio, idRegistro) {
+  if (!carpetaMun || !idEnvio || !idRegistro) return;
+  var folders = [];
+  var it = carpetaMun.getFoldersByName(String(idEnvio));
+  while (it.hasNext()) folders.push(it.next());
+  if (!folders.length) return;
+
+  folders.sort(function (a, b) {
+    return a.getDateCreated() - b.getDateCreated();
+  });
+  var canonical = folders[0];
+  for (var i = 1; i < folders.length; i++) {
+    try {
+      mergeFolderInto_(folders[i], canonical);
+      folders[i].setTrashed(true);
+    } catch (mergeErr) {
+      console.warn(
+        "Aviso: no se pudo fusionar carpeta duplicada " +
+          folders[i].getName() +
+          ": " +
+          mergeErr
+      );
+    }
+  }
+
+  try {
+    canonical.setName(String(idRegistro));
+  } catch (err) {
+    Utilities.sleep(1500);
+    canonical.setName(String(idRegistro));
+  }
+}
+
+/** Mueve ficheros/subcarpetas de src a dest; si el nombre ya existe, fusiona o descarta duplicado. */
+function mergeFolderInto_(src, dest) {
+  if (!src || !dest) return;
+  var files = src.getFiles();
+  while (files.hasNext()) {
+    var f = files.next();
+    var existing = dest.getFilesByName(f.getName());
+    if (existing.hasNext()) {
+      try {
+        f.setTrashed(true);
+      } catch (e) {}
+    } else {
+      f.moveTo(dest);
+    }
+  }
+  var subs = src.getFolders();
+  while (subs.hasNext()) {
+    var sub = subs.next();
+    var destSubIt = dest.getFoldersByName(sub.getName());
+    if (destSubIt.hasNext()) {
+      mergeFolderInto_(sub, destSubIt.next());
+      try {
+        sub.setTrashed(true);
+      } catch (e2) {}
+    } else {
+      sub.moveTo(dest);
+    }
+  }
 }
 
 /** Deduplica nombres conservando el orden (trim; ignora vacíos). */
