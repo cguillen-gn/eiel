@@ -2,6 +2,8 @@
  * EIEL — Worker de adjuntos → Google Drive (directo)
  *
  * Flujo único (todos los tamaños):
+ *   0) POST { action:"ensure_path", municipio, id_envio, secciones[] }
+ *      → crea mun / id_envio [/ secciones] una vez (evita carpetas duplicadas)
  *   1) POST { action:"presign", filename, municipio, id_envio, seccion, mimeType, size, is_test }
  *      → { status, put_url, expires_at }
  *   2) PUT put_url  (bytes del fichero)
@@ -19,7 +21,7 @@
  *   DRIVE_ROOT_FOLDER_ID  — carpeta raíz (mismo id que CARPETA_RAIZ_ID en adjuntos.gs)
  */
 
-const VERSION = "eiel-adjuntos-worker-drive-20260807d";
+const VERSION = "eiel-adjuntos-worker-drive-20260810a";
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 35 * 1024 * 1024;
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
@@ -152,8 +154,16 @@ async function handlePresign(request, env, cors) {
     return json({ status: "error", message: "JSON inválido." }, 400, cors);
   }
 
-  if (String(data.action || "").toLowerCase() !== "presign") {
-    return json({ status: "error", message: "Use action=presign." }, 400, cors);
+  const action = String(data.action || "").toLowerCase();
+  if (action === "ensure_path") {
+    return handleEnsurePath(env, cors, data);
+  }
+  if (action !== "presign") {
+    return json(
+      { status: "error", message: "Use action=presign o action=ensure_path." },
+      400,
+      cors
+    );
   }
 
   const filename = String(data.filename || data.nombre_archivo || "").trim();
@@ -215,6 +225,75 @@ async function handlePresign(request, env, cors) {
     200,
     cors
   );
+}
+
+/**
+ * Crea (o reutiliza) mun / id_envio [/ secciones] de forma serial
+ * antes de las subidas en paralelo. Evita N carpetas ENVIO_* gemelas.
+ */
+async function handleEnsurePath(env, cors, data) {
+  const municipio = String(data.municipio || data.mun || "")
+    .trim()
+    .slice(-3);
+  const idEnvio = String(data.id_envio || "").trim();
+  if (!municipio || !idEnvio) {
+    return json(
+      { status: "error", message: "Faltan municipio o id_envio." },
+      400,
+      cors
+    );
+  }
+  let secciones = data.secciones || data.sections || [];
+  if (!Array.isArray(secciones)) secciones = [secciones];
+  secciones = secciones
+    .map(function (s) {
+      return String(s || "").trim();
+    })
+    .filter(Boolean);
+  if (!secciones.length && !isEquipamientoId_(idEnvio)) {
+    secciones = ["DOCUMENTACION"];
+  }
+
+  try {
+    const accessToken = await getGoogleAccessToken(env);
+    const munFolder = await getOrCreateFolder_(
+      accessToken,
+      env.DRIVE_ROOT_FOLDER_ID,
+      municipio
+    );
+    const expFolder = await getOrCreateFolder_(accessToken, munFolder, idEnvio);
+    const sectionIds = {};
+    if (!isEquipamientoId_(idEnvio)) {
+      for (let i = 0; i < secciones.length; i++) {
+        const sec = secciones[i];
+        sectionIds[sec] = await getOrCreateFolder_(accessToken, expFolder, sec);
+      }
+    }
+    return json(
+      {
+        status: "success",
+        message: "Ruta de carpetas lista.",
+        municipio,
+        id_envio: idEnvio,
+        secciones: sectionIds,
+        eiel_build: VERSION
+      },
+      200,
+      cors
+    );
+  } catch (err) {
+    return json(
+      {
+        status: "error",
+        message:
+          "No se pudo preparar carpetas: " +
+          String(err && err.message ? err.message : err),
+        retryable: true
+      },
+      502,
+      cors
+    );
+  }
 }
 
 async function handlePutToDrive(request, env, cors, tokenPath) {
@@ -367,8 +446,8 @@ async function resolveDestFolderId_(accessToken, rootId, mun, idEnvio, seccion) 
 }
 
 async function getOrCreateFolder_(accessToken, parentId, name) {
-  const found = await findChildFolder_(accessToken, parentId, name);
-  if (found) return found.id;
+  const existing = await findCanonicalChildFolder_(accessToken, parentId, name);
+  if (existing) return existing.id;
 
   const res = await fetch(
     "https://www.googleapis.com/drive/v3/files?" + DRIVE_SUPPORTS,
@@ -386,21 +465,35 @@ async function getOrCreateFolder_(accessToken, parentId, name) {
     }
   );
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    // Carrera: otro request pudo crearla.
-    const again = await findChildFolder_(accessToken, parentId, name);
-    if (again) return again.id;
-    throw new Error(
-      "Crear carpeta Drive falló (" +
-        res.status +
-        "): " +
-        (data.error && data.error.message ? data.error.message : JSON.stringify(data).slice(0, 200))
-    );
+  // Tras crear (o si falló por carrera), reconciliar: puede haber
+  // varias carpetas con el mismo nombre; la canónica es la más antigua.
+  for (let i = 0; i < 5; i++) {
+    if (i > 0) await sleepMs_(150 * i);
+    const canon = await findCanonicalChildFolder_(accessToken, parentId, name);
+    if (canon) return canon.id;
   }
-  return data.id;
+  if (res.ok && data && data.id) return data.id;
+  throw new Error(
+    "Crear carpeta Drive falló (" +
+      res.status +
+      "): " +
+      (data.error && data.error.message
+        ? data.error.message
+        : JSON.stringify(data).slice(0, 200))
+  );
+}
+
+/** Carpeta hija canónica = la más antigua si hay duplicados por carrera. */
+async function findCanonicalChildFolder_(accessToken, parentId, name) {
+  const all = await listChildFoldersByName_(accessToken, parentId, name);
+  return all[0] || null;
 }
 
 async function findChildFolder_(accessToken, parentId, name) {
+  return findCanonicalChildFolder_(accessToken, parentId, name);
+}
+
+async function listChildFoldersByName_(accessToken, parentId, name) {
   const q =
     "'" +
     parentId +
@@ -408,7 +501,7 @@ async function findChildFolder_(accessToken, parentId, name) {
     escapeDriveQuery_(name) +
     "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
   const url =
-    "https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)&" +
+    "https://www.googleapis.com/drive/v3/files?pageSize=25&orderBy=createdTime&fields=files(id,name,createdTime)&" +
     DRIVE_SUPPORTS +
     "&q=" +
     encodeURIComponent(q);
@@ -425,7 +518,20 @@ async function findChildFolder_(accessToken, parentId, name) {
     );
   }
   const files = data.files || [];
-  return files[0] || null;
+  files.sort(function (a, b) {
+    const ta = a.createdTime || "";
+    const tb = b.createdTime || "";
+    if (ta < tb) return -1;
+    if (ta > tb) return 1;
+    return 0;
+  });
+  return files;
+}
+
+function sleepMs_(ms) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function findChildByName_(accessToken, parentId, name) {
