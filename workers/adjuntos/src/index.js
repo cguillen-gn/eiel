@@ -21,7 +21,7 @@
  *   DRIVE_ROOT_FOLDER_ID  — carpeta raíz (mismo id que CARPETA_RAIZ_ID en adjuntos.gs)
  */
 
-const VERSION = "eiel-adjuntos-worker-drive-20260810a";
+const VERSION = "eiel-adjuntos-worker-drive-20260819a";
 const TOKEN_TTL_MS = 30 * 60 * 1000;
 const MAX_BYTES = 35 * 1024 * 1024;
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
@@ -30,6 +30,7 @@ const DRIVE_SUPPORTS =
   "supportsAllDrives=true&includeItemsFromAllDrives=true";
 
 const DEFAULT_ORIGINS = [
+  "https://eiel.diputacionalicante.es",
   "https://cguillen-gn.github.io",
   "http://localhost:5500",
   "http://127.0.0.1:5500",
@@ -850,20 +851,23 @@ function timingSafeEqualStr(a, b) {
 }
 
 function corsHeaders(origin, env) {
-  const allowed = String(env.ALLOWED_ORIGINS || "")
+  const extra = String(env.ALLOWED_ORIGINS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const list = allowed.length ? allowed : DEFAULT_ORIGINS;
-  const allow =
-    list.indexOf(origin) !== -1 || list.indexOf("*") !== -1 ? origin : list[0];
-  return {
-    "Access-Control-Allow-Origin": allow || "*",
+  const list = DEFAULT_ORIGINS.concat(extra);
+  const ok =
+    !origin || list.indexOf(origin) !== -1 || list.indexOf("*") !== -1;
+  const headers = {
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin"
   };
+  if (ok) {
+    headers["Access-Control-Allow-Origin"] = origin || "*";
+  }
+  return headers;
 }
 
 function json(obj, status, cors) {

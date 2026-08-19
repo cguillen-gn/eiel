@@ -14,9 +14,10 @@
  */
 
 const KV_KEY = "credenciales";
-const VERSION = "eiel-login-worker-20260806a";
+const VERSION = "eiel-login-worker-20260819a";
 
 const DEFAULT_ORIGINS = [
+  "https://eiel.diputacionalicante.es",
   "https://cguillen-gn.github.io",
   "http://localhost:5500",
   "http://127.0.0.1:5500",
