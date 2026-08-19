@@ -136,7 +136,10 @@ location.reload();
 - Drive: una sola carpeta `municipio / id_envio / sección` (sin gemelas `ENVIO_*`).
 - Si el Worker falla tras reintentos, el portal hace fallback a Apps Script (base64).
 
-**Despliegue Worker:** tras cambios en `src/index.js`, `npx wrangler deploy` en `workers/adjuntos/`.
+**Despliegue Worker:** tras cambios en `src/index.js`, `npx wrangler deploy` en `workers/adjuntos/` (o Edit code → Deploy en el panel).
+
+Orígenes CORS por defecto: `https://eiel.diputacionalicante.es`, GitHub Pages y localhost.
+Extra: variable `ALLOWED_ORIGINS` (lista separada por comas; se **suma** a los defaults).
 
 ---
 
