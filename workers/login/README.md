@@ -129,6 +129,6 @@ exigen otra vez — sin pasar el login por Apps Script. Eso es un PR aparte.
 ## Seguridad (breve)
 
 - Rate limit básico ~30 intentos/min/IP (en KV).
-- CORS limitado a Pages / localhost.
+- CORS: `eiel.diputacionalicante.es`, GitHub Pages y localhost (ampliable con `ALLOWED_ORIGINS`).
 - `SYNC_SECRET` obligatorio para volcar credenciales.
 - Las claves en KV son tan sensibles como en la hoja: protege la cuenta CF.
